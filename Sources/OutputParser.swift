@@ -30,11 +30,13 @@ struct BuildResult: Codable {
 struct BuildSummary: Codable {
     let errors: Int
     let failedTests: Int
+    let passedTests: Int?
     let buildTime: String?
     
     enum CodingKeys: String, CodingKey {
         case errors
         case failedTests = "failed_tests"
+        case passedTests = "passed_tests"
         case buildTime = "build_time"
     }
 }
@@ -58,6 +60,10 @@ class OutputParser {
     private var failedTests: [FailedTest] = []
     private var buildTime: String?
     private var seenTestNames: Set<String> = []
+    private var executedTestsCount: Int?
+    private var summaryFailedTestsCount: Int?
+    private var passedTestsCount: Int = 0
+    private var seenPassedTestNames: Set<String> = []
     
     @available(*, deprecated, message: "This function will be removed in a future version")
     func deprecatedFunction() -> String {
@@ -69,6 +75,7 @@ class OutputParser {
     }
     
     func parse(input: String) -> BuildResult {
+        resetState()
         let lines = input.components(separatedBy: .newlines)
         
         for i in 0..<lines.count {
@@ -76,10 +83,21 @@ class OutputParser {
         }
         
         let status = errors.isEmpty && failedTests.isEmpty ? "success" : "failed"
+        let summaryFailedCount = summaryFailedTestsCount ?? failedTests.count
+        let computedPassedTests: Int? = {
+            if let executed = executedTestsCount {
+                return max(executed - summaryFailedCount, 0)
+            }
+            if passedTestsCount > 0 {
+                return passedTestsCount
+            }
+            return nil
+        }()
         
         let summary = BuildSummary(
             errors: errors.count,
             failedTests: failedTests.count,
+            passedTests: computedPassedTests,
             buildTime: buildTime
         )
         
@@ -89,6 +107,17 @@ class OutputParser {
             errors: errors,
             failedTests: failedTests
         )
+    }
+    
+    private func resetState() {
+        errors = []
+        failedTests = []
+        buildTime = nil
+        seenTestNames = []
+        executedTestsCount = nil
+        summaryFailedTestsCount = nil
+        passedTestsCount = 0
+        seenPassedTestNames = []
     }
     
     private func parseLine(_ line: String) {
@@ -111,6 +140,8 @@ class OutputParser {
             }
         } else if let error = parseError(line) {
             errors.append(error)
+        } else if parsePassedTest(line) {
+            return
         } else if let time = parseBuildTime(line) {
             buildTime = time
         }
@@ -127,6 +158,14 @@ class OutputParser {
     
     private func hasSeenSimilarTest(_ normalizedTestName: String) -> Bool {
         return seenTestNames.contains(normalizedTestName)
+    }
+    
+    private func recordPassedTest(named testName: String) {
+        let normalizedTestName = normalizeTestName(testName)
+        guard seenPassedTestNames.insert(normalizedTestName).inserted else {
+            return
+        }
+        passedTestsCount += 1
     }
     
     private func parseError(_ line: String) -> BuildError? {
@@ -236,6 +275,40 @@ class OutputParser {
         }
         
         return nil
+    }
+    
+    private func parsePassedTest(_ line: String) -> Bool {
+        let testCasePassedPattern = Regex {
+            "Test Case '"
+            Capture(OneOrMore(.any, .reluctant))
+            "' passed ("
+            OneOrMore(.any, .reluctant)
+            ")"
+            Optionally(".")
+            Anchor.endOfSubject
+        }
+        
+        if let match = line.firstMatch(of: testCasePassedPattern) {
+            let testName = String(match.1)
+            recordPassedTest(named: testName)
+            return true
+        }
+        
+        let swiftTestingPassedPattern = Regex {
+            "✓ Test \""
+            Capture(OneOrMore(.any, .reluctant))
+            "\" passed"
+            OneOrMore(.any, .reluctant)
+            Anchor.endOfSubject
+        }
+        
+        if let match = line.firstMatch(of: swiftTestingPassedPattern) {
+            let testName = String(match.1)
+            recordPassedTest(named: testName)
+            return true
+        }
+        
+        return false
     }
     
     
@@ -412,15 +485,15 @@ class OutputParser {
         // Pattern: Executed N tests, with N failures (N unexpected) in time (seconds) seconds
         let executedTestsPattern = Regex {
             "Executed "
-            OneOrMore(.digit)
+            Capture(OneOrMore(.digit))
             " test"
             Optionally("s")
             ", with "
-            OneOrMore(.digit)
+            Capture(OneOrMore(.digit))
             " failure"
             Optionally("s")
             " ("
-            OneOrMore(.digit)
+            Capture(OneOrMore(.digit))
             " unexpected) in "
             Capture(OneOrMore(.any, .reluctant))
             " ("
@@ -430,7 +503,39 @@ class OutputParser {
         }
         
         if let match = line.firstMatch(of: executedTestsPattern) {
-            return String(match.1)
+            if let total = Int(match.1) {
+                executedTestsCount = total
+            }
+            if let failures = Int(match.2) {
+                summaryFailedTestsCount = failures
+            }
+            return String(match.4)
+        }
+        
+        let executedTestsSimplePattern = Regex {
+            "Executed "
+            Capture(OneOrMore(.digit))
+            " test"
+            Optionally("s")
+            ", with "
+            Capture(OneOrMore(.digit))
+            " failure"
+            Optionally("s")
+            " in "
+            Capture(OneOrMore(.any, .reluctant))
+            " seconds"
+            Optionally(".")
+            Anchor.endOfSubject
+        }
+        
+        if let match = line.firstMatch(of: executedTestsSimplePattern) {
+            if let total = Int(match.1) {
+                executedTestsCount = total
+            }
+            if let failures = Int(match.2) {
+                summaryFailedTestsCount = failures
+            }
+            return String(match.3)
         }
         
         return nil

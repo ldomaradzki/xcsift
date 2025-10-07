@@ -17,6 +17,7 @@ struct SwiftTestingOutputParserTests {
         #expect(result.status == "success")
         #expect(result.summary.errors == 0)
         #expect(result.summary.failedTests == 0)
+        #expect(result.summary.passedTests == nil)
     }
     
     @Test("Parse error with file and line")
@@ -52,6 +53,7 @@ struct SwiftTestingOutputParserTests {
         #expect(result.status == "failed")
         #expect(result.summary.errors == 2)
         #expect(result.errors.count == 2)
+        #expect(result.summary.passedTests == nil)
     }
     
     @Test("Parse fatal error")
@@ -69,6 +71,7 @@ struct SwiftTestingOutputParserTests {
         #expect(result.errors[0].file == "Swift/ContiguousArrayBuffer.swift")
         #expect(result.errors[0].line == 690)
         #expect(result.errors[0].message == "Index out of range")
+        #expect(result.summary.passedTests == nil)
     }
     
     @Test("This test should fail intentionally")
@@ -102,5 +105,18 @@ struct SwiftTestingOutputParserTests {
         #expect(result.status == "failed")
         #expect(result.errors.count == 1)
         #expect(result.errors[0].file == "main.swift")
+    }
+    
+    @Test("Parse passed tests from Swift Testing output")
+    func parseSwiftTestingPassCount() {
+        let parser = OutputParser()
+        let input = """
+        ✓ Test "Example" passed after 0.020 seconds.
+        """
+        
+        let result = parser.parse(input: input)
+        
+        #expect(result.summary.passedTests == 1)
+        #expect(result.summary.failedTests == 0)
     }
 }
