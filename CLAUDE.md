@@ -28,10 +28,15 @@ cp .build/release/xcsift /usr/local/bin/
 ### Running the Tool
 ```bash
 # Basic usage (reads from stdin)
-xcodebuild build | xcsift
+# IMPORTANT: Always use 2>&1 to capture stderr (where compiler errors are written)
+xcodebuild build 2>&1 | xcsift
 
 # Test output parsing
-xcodebuild test | xcsift
+xcodebuild test 2>&1 | xcsift
+
+# Swift Package Manager
+swift build 2>&1 | xcsift
+swift test 2>&1 | xcsift
 ```
 
 ## Architecture

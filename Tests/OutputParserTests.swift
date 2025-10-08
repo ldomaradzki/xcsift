@@ -163,10 +163,37 @@ final class OutputParserTests: XCTestCase {
         let input = """
         Test Case 'SampleTests.testExample' passed (0.001 seconds).
         """
-        
+
         let result = parser.parse(input: input)
-        
+
         XCTAssertEqual(result.summary.passedTests, 1)
         XCTAssertEqual(result.summary.failedTests, 0)
+    }
+
+    func testSwiftCompilerVisualErrorLinesAreFiltered() {
+        let parser = OutputParser()
+        // Swift compiler outputs each error twice:
+        // 1. Main error line with file:line:column
+        // 2. Visual caret line with pipe and backtick
+        // We should only capture the first one
+        let input = """
+        /Users/test/project/Tests/TestFile.swift:16:34: error: missing argument for parameter 'fragments' in call
+         14 |             kind: "class",
+         15 |             language: "swift",
+         16 |             structuredContent: []
+            |                                  `- error: missing argument for parameter 'fragments' in call
+         17 |         )
+         18 |
+        """
+
+        let result = parser.parse(input: input)
+
+        // Should only have 1 error (not 2), and it should have file/line info
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.errors, 1)
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertEqual(result.errors[0].file, "/Users/test/project/Tests/TestFile.swift")
+        XCTAssertEqual(result.errors[0].line, 16)
+        XCTAssertEqual(result.errors[0].message, "missing argument for parameter 'fragments' in call")
     }
 }

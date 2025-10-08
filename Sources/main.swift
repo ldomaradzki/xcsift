@@ -15,15 +15,18 @@ struct XCSift: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "xcsift",
         abstract: "A Swift tool to parse and format xcodebuild output for coding agents",
-        usage: "xcodebuild [options] | xcsift",
+        usage: "xcodebuild [options] 2>&1 | xcsift",
         discussion: """
         xcsift reads xcodebuild output from stdin and outputs structured JSON.
-        
+
+        Important: Always use 2>&1 to redirect stderr to stdout. This ensures all
+        compiler errors, warnings, and build output are captured.
+
         Examples:
-          xcodebuild build | xcsift
-          xcodebuild test | xcsift
-          swift build | xcsift
-          swift test | xcsift
+          xcodebuild build 2>&1 | xcsift
+          xcodebuild test 2>&1 | xcsift
+          swift build 2>&1 | xcsift
+          swift test 2>&1 | xcsift
         """,
         helpNames: [.short, .long]
     )
@@ -55,11 +58,26 @@ struct XCSift: ParsableCommand {
     }
     
     private func readStandardInput() -> String {
-        var input = ""
-        while let line = readLine() {
-            input += line + "\n"
+        var buffer = Data()
+        
+        while true {
+            let available = FileHandle.standardInput.availableData
+            if available.isEmpty {
+                break
+            }
+            buffer.append(available)
+            
+            // Small delay to allow more data to arrive
+            usleep(10000) // 10ms
+            
+            // Check if no more data is available
+            let nextAvailable = FileHandle.standardInput.availableData
+            if nextAvailable.isEmpty {
+                break
+            }
         }
-        return input
+        
+        return String(data: buffer, encoding: .utf8) ?? ""
     }
     
     private func outputResult(_ result: BuildResult) {

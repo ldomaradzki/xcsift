@@ -59,8 +59,10 @@ cp .build/release/xcsift /usr/local/bin/
 Pipe xcodebuild output directly to xcsift:
 
 ```bash
-xcodebuild [flags] | xcsift
+xcodebuild [flags] 2>&1 | xcsift
 ```
+
+**Important**: Always use `2>&1` to redirect stderr to stdout. This ensures all compiler errors, warnings, and build output are captured, removing noise and providing clean, structured JSON output.
 
 Currently outputs JSON format only.
 
@@ -68,14 +70,14 @@ Currently outputs JSON format only.
 
 ```bash
 # Basic usage with JSON output
-xcodebuild build | xcsift
+xcodebuild build 2>&1 | xcsift
 
 # Test output parsing
-xcodebuild test | xcsift
+xcodebuild test 2>&1 | xcsift
 
 # Swift Package Manager support
-swift build | xcsift
-swift test | xcsift
+swift build 2>&1 | xcsift
+swift test 2>&1 | xcsift
 ```
 
 ## Output Format

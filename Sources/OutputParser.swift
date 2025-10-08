@@ -169,6 +169,11 @@ class OutputParser {
     }
     
     private func parseError(_ line: String) -> BuildError? {
+        // Skip visual error lines (e.g., "    |   `- error: message")
+        if line.hasPrefix(" ") && (line.contains("|") || line.contains("`")) {
+            return nil
+        }
+
         // Pattern: file:line:column: error: message
         let fileLineColumnError = Regex {
             Capture(OneOrMore(.any, .reluctant))
