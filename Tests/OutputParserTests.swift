@@ -34,6 +34,7 @@ final class OutputParserTests: XCTestCase {
         XCTAssertEqual(result.status, "success")
         XCTAssertEqual(result.summary.errors, 0)
         XCTAssertEqual(result.summary.failedTests, 0)
+        XCTAssertNil(result.summary.passedTests)
     }
     
     func testFailingTest() {
@@ -48,6 +49,7 @@ final class OutputParserTests: XCTestCase {
         XCTAssertEqual(result.status, "failed")
         XCTAssertEqual(result.summary.failedTests, 2)
         XCTAssertEqual(result.failedTests.count, 2)
+        XCTAssertNil(result.summary.passedTests)
         XCTAssertEqual(result.failedTests[0].test, "LoginTests.testInvalidCredentials")
         XCTAssertEqual(result.failedTests[1].test, "Test assertion")
     }
@@ -65,6 +67,7 @@ final class OutputParserTests: XCTestCase {
         XCTAssertEqual(result.status, "failed")
         XCTAssertEqual(result.summary.errors, 2)
         XCTAssertEqual(result.errors.count, 2)
+        XCTAssertNil(result.summary.passedTests)
     }
     
     func testInvalidAssertion() {
@@ -74,6 +77,7 @@ final class OutputParserTests: XCTestCase {
         
         XCTAssertEqual(result.status, "failed")
         XCTAssertEqual(result.summary.failedTests, 1)
+        XCTAssertNil(result.summary.passedTests)
         XCTAssertEqual(result.failedTests.count, 1)
         XCTAssertEqual(result.failedTests[0].test, "Test assertion")
         XCTAssertEqual(result.failedTests[0].message, line.trimmingCharacters(in: .whitespaces))
@@ -89,6 +93,7 @@ final class OutputParserTests: XCTestCase {
         
         XCTAssertEqual(result.status, "failed")
         XCTAssertEqual(result.summary.errors, 1)
+        XCTAssertNil(result.summary.passedTests)
         XCTAssertEqual(result.errors[0].file, "NonexistentFile.swift")
         XCTAssertEqual(result.errors[0].line, 999)
         XCTAssertEqual(result.errors[0].message, "file not found")
@@ -104,6 +109,7 @@ final class OutputParserTests: XCTestCase {
         let result = parser.parse(input: input)
         
         XCTAssertEqual(result.summary.buildTime, "5.7 seconds")
+        XCTAssertNil(result.summary.passedTests)
     }
     
     func testDeprecatedFunction() {
@@ -132,8 +138,35 @@ final class OutputParserTests: XCTestCase {
         
         XCTAssertEqual(result.status, "failed")
         XCTAssertEqual(result.summary.errors, 1)
+        XCTAssertNil(result.summary.passedTests)
         XCTAssertEqual(result.errors[0].file, "UserManager.swift")
         XCTAssertEqual(result.errors[0].line, 42)
         XCTAssertEqual(result.errors[0].message, "cannot find 'undefinedVariable' in scope")
+    }
+    
+    func testPassedTestCountFromExecutedSummary() {
+        let parser = OutputParser()
+        let input = """
+        Test Case 'SampleTests.testExample' passed (0.001 seconds).
+        Executed 5 tests, with 0 failures (0 unexpected) in 5.017 (5.020) seconds
+        """
+        
+        let result = parser.parse(input: input)
+        
+        XCTAssertEqual(result.summary.passedTests, 5)
+        XCTAssertEqual(result.summary.failedTests, 0)
+        XCTAssertEqual(result.summary.buildTime, "5.017")
+    }
+    
+    func testPassedTestCountFromPassLineOnly() {
+        let parser = OutputParser()
+        let input = """
+        Test Case 'SampleTests.testExample' passed (0.001 seconds).
+        """
+        
+        let result = parser.parse(input: input)
+        
+        XCTAssertEqual(result.summary.passedTests, 1)
+        XCTAssertEqual(result.summary.failedTests, 0)
     }
 }
