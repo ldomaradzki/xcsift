@@ -196,4 +196,24 @@ final class OutputParserTests: XCTestCase {
         XCTAssertEqual(result.errors[0].line, 16)
         XCTAssertEqual(result.errors[0].message, "missing argument for parameter 'fragments' in call")
     }
+
+    func testLargeRealWorldBuildOutput() throws {
+        let parser = OutputParser()
+
+        // Load the real-world build.txt fixture
+        let fixtureURL = URL(fileURLWithPath: #file)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures")
+            .appendingPathComponent("build.txt")
+
+        let input = try String(contentsOf: fixtureURL, encoding: .utf8)
+
+        // This is a large successful build output (2.6MB, 8000+ lines)
+        // Test that it parses without hanging and completes in reasonable time
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.errors, 0)
+        XCTAssertEqual(result.summary.failedTests, 0)
+    }
 }

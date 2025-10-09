@@ -39,45 +39,38 @@ struct XCSift: ParsableCommand {
             print(getVersion())
             return
         }
-        
+
         // Check if stdin is a terminal (no piped input) before trying to read
         if isatty(STDIN_FILENO) == 1 {
             throw ValidationError("No input provided. Please pipe xcodebuild output to xcsift.\n\nExample: xcodebuild build | xcsift")
         }
-        
+
         let parser = OutputParser()
         let input = readStandardInput()
-        
+
         // Check if input is empty
         if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             throw ValidationError("No input provided. Please pipe xcodebuild output to xcsift.\n\nExample: xcodebuild build | xcsift")
         }
-        
+
         let result = parser.parse(input: input)
         outputResult(result)
     }
     
     private func readStandardInput() -> String {
-        var buffer = Data()
-        
-        while true {
-            let available = FileHandle.standardInput.availableData
-            if available.isEmpty {
-                break
+        if #available(macOS 10.15.4, *) {
+            // Use modern API that properly handles EOF
+            do {
+                let data = try FileHandle.standardInput.readToEnd() ?? Data()
+                return String(data: data, encoding: .utf8) ?? ""
+            } catch {
+                return ""
             }
-            buffer.append(available)
-            
-            // Small delay to allow more data to arrive
-            usleep(10000) // 10ms
-            
-            // Check if no more data is available
-            let nextAvailable = FileHandle.standardInput.availableData
-            if nextAvailable.isEmpty {
-                break
-            }
+        } else {
+            // Fallback for older systems
+            let data = FileHandle.standardInput.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8) ?? ""
         }
-        
-        return String(data: buffer, encoding: .utf8) ?? ""
     }
     
     private func outputResult(_ result: BuildResult) {

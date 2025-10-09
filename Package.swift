@@ -27,7 +27,10 @@ let package = Package(
         .testTarget(
             name: "xcsiftTests",
             dependencies: ["xcsift"],
-            path: "Tests"
+            path: "Tests",
+            resources: [
+                .copy("Fixtures/build.txt")
+            ]
         ),
         .testTarget(
             name: "xcsiftSwiftTestingTests",

@@ -76,12 +76,12 @@ class OutputParser {
     
     func parse(input: String) -> BuildResult {
         resetState()
-        let lines = input.components(separatedBy: .newlines)
-        
-        for i in 0..<lines.count {
-            parseLine(lines[i])
+        let lines = input.split(separator: "\n", omittingEmptySubsequences: false)
+
+        for line in lines {
+            parseLine(String(line))
         }
-        
+
         let status = errors.isEmpty && failedTests.isEmpty ? "success" : "failed"
         let summaryFailedCount = summaryFailedTestsCount ?? failedTests.count
         let computedPassedTests: Int? = {
@@ -93,14 +93,14 @@ class OutputParser {
             }
             return nil
         }()
-        
+
         let summary = BuildSummary(
             errors: errors.count,
             failedTests: failedTests.count,
             passedTests: computedPassedTests,
             buildTime: buildTime
         )
-        
+
         return BuildResult(
             status: status,
             summary: summary,
@@ -121,9 +121,29 @@ class OutputParser {
     }
     
     private func parseLine(_ line: String) {
+        // Quick filters to avoid regex on irrelevant lines
+        if line.isEmpty || line.count > 5000 {
+            return
+        }
+
+        // Fast path checks before expensive regex
+        let containsRelevant = line.contains("error:") ||
+                               line.contains("failed") ||
+                               line.contains("passed") ||
+                               line.contains("✘") ||
+                               line.contains("✓") ||
+                               line.contains("❌") ||
+                               line.contains("Build succeeded") ||
+                               line.contains("Build failed") ||
+                               line.contains("Executed")
+
+        if !containsRelevant {
+            return
+        }
+
         if let failedTest = parseFailedTest(line) {
             let normalizedTestName = normalizeTestName(failedTest.test)
-            
+
             // Check if we've already seen this test name or a similar one
             if !hasSeenSimilarTest(normalizedTestName) {
                 failedTests.append(failedTest)
