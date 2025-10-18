@@ -216,4 +216,94 @@ final class OutputParserTests: XCTestCase {
         XCTAssertEqual(result.summary.errors, 0)
         XCTAssertEqual(result.summary.failedTests, 0)
     }
+
+    func testParseWarning() {
+        let parser = OutputParser()
+        let input = """
+        AppDelegate.swift:67:8: warning: unused variable 'config'
+        """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.warnings, 1)
+        XCTAssertEqual(result.warnings.count, 1)
+        XCTAssertEqual(result.warnings[0].file, "AppDelegate.swift")
+        XCTAssertEqual(result.warnings[0].line, 67)
+        XCTAssertEqual(result.warnings[0].message, "unused variable 'config'")
+    }
+
+    func testParseMultipleWarnings() {
+        let parser = OutputParser()
+        let input = """
+        UserService.swift:45:12: warning: variable 'temp' was never used
+        NetworkManager.swift:23:5: warning: initialization of immutable value 'data' was never used
+        AppDelegate.swift:67:8: warning: unused variable 'config'
+        """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.warnings, 3)
+        XCTAssertEqual(result.warnings.count, 3)
+    }
+
+    func testParseErrorsAndWarnings() {
+        let parser = OutputParser()
+        let input = """
+        UserService.swift:45:12: error: cannot find 'invalidFunction' in scope
+        NetworkManager.swift:23:5: warning: variable 'temp' was never used
+        AppDelegate.swift:67:8: warning: unused variable 'config'
+        """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.errors, 1)
+        XCTAssertEqual(result.summary.warnings, 2)
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertEqual(result.warnings.count, 2)
+    }
+
+    func testPrintWarningsFlagFalse() {
+        let parser = OutputParser()
+        let input = """
+        AppDelegate.swift:67:8: warning: unused variable 'config'
+        """
+
+        let result = parser.parse(input: input, printWarnings: false)
+
+        XCTAssertEqual(result.summary.warnings, 1)
+        XCTAssertEqual(result.warnings.count, 1)
+        XCTAssertEqual(result.printWarnings, false)
+
+        // Encode to JSON and verify warnings are not included
+        let encoder = JSONEncoder()
+        let jsonData = try! encoder.encode(result)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+
+        XCTAssertFalse(jsonString.contains("\"warnings\":["))
+        XCTAssertTrue(jsonString.contains("\"warnings\":1"))  // Summary should still show count
+    }
+
+    func testPrintWarningsFlagTrue() {
+        let parser = OutputParser()
+        let input = """
+        AppDelegate.swift:67:8: warning: unused variable 'config'
+        """
+
+        let result = parser.parse(input: input, printWarnings: true)
+
+        XCTAssertEqual(result.summary.warnings, 1)
+        XCTAssertEqual(result.warnings.count, 1)
+        XCTAssertEqual(result.printWarnings, true)
+
+        // Encode to JSON and verify warnings are included
+        let encoder = JSONEncoder()
+        let jsonData = try! encoder.encode(result)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+
+        XCTAssertTrue(jsonString.contains("\"warnings\":["))
+        XCTAssertTrue(jsonString.contains("unused variable"))
+    }
 }

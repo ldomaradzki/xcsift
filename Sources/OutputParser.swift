@@ -5,22 +5,47 @@ struct BuildResult: Codable {
     let status: String
     let summary: BuildSummary
     let errors: [BuildError]
+    let warnings: [BuildWarning]
     let failedTests: [FailedTest]
-    
+    let printWarnings: Bool
+
     enum CodingKeys: String, CodingKey {
-        case status, summary, errors
+        case status, summary, errors, warnings
         case failedTests = "failed_tests"
     }
-    
+
+    init(status: String, summary: BuildSummary, errors: [BuildError], warnings: [BuildWarning], failedTests: [FailedTest], printWarnings: Bool) {
+        self.status = status
+        self.summary = summary
+        self.errors = errors
+        self.warnings = warnings
+        self.failedTests = failedTests
+        self.printWarnings = printWarnings
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        status = try container.decode(String.self, forKey: .status)
+        summary = try container.decode(BuildSummary.self, forKey: .summary)
+        errors = try container.decodeIfPresent([BuildError].self, forKey: .errors) ?? []
+        warnings = try container.decodeIfPresent([BuildWarning].self, forKey: .warnings) ?? []
+        failedTests = try container.decodeIfPresent([FailedTest].self, forKey: .failedTests) ?? []
+        printWarnings = false  // Default value for decoding
+    }
+
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(status, forKey: .status)
         try container.encode(summary, forKey: .summary)
-        
+
         if !errors.isEmpty {
             try container.encode(errors, forKey: .errors)
         }
-        
+
+        if printWarnings && !warnings.isEmpty {
+            try container.encode(warnings, forKey: .warnings)
+        }
+
         if !failedTests.isEmpty {
             try container.encode(failedTests, forKey: .failedTests)
         }
@@ -29,12 +54,14 @@ struct BuildResult: Codable {
 
 struct BuildSummary: Codable {
     let errors: Int
+    let warnings: Int
     let failedTests: Int
     let passedTests: Int?
     let buildTime: String?
-    
+
     enum CodingKeys: String, CodingKey {
         case errors
+        case warnings
         case failedTests = "failed_tests"
         case passedTests = "passed_tests"
         case buildTime = "build_time"
@@ -47,6 +74,11 @@ struct BuildError: Codable {
     let message: String
 }
 
+struct BuildWarning: Codable {
+    let file: String?
+    let line: Int?
+    let message: String
+}
 
 struct FailedTest: Codable {
     let test: String
@@ -57,6 +89,7 @@ struct FailedTest: Codable {
 
 class OutputParser {
     private var errors: [BuildError] = []
+    private var warnings: [BuildWarning] = []
     private var failedTests: [FailedTest] = []
     private var buildTime: String?
     private var seenTestNames: Set<String> = []
@@ -72,9 +105,10 @@ class OutputParser {
     
     func functionWithUnusedVariable() {
         let unusedVariable = "This variable is never used and will cause a warning"
+        // TODO: Test if SwiftLint detects this TODO comment
     }
     
-    func parse(input: String) -> BuildResult {
+    func parse(input: String, printWarnings: Bool = false) -> BuildResult {
         resetState()
         let lines = input.split(separator: "\n", omittingEmptySubsequences: false)
 
@@ -96,6 +130,7 @@ class OutputParser {
 
         let summary = BuildSummary(
             errors: errors.count,
+            warnings: warnings.count,
             failedTests: failedTests.count,
             passedTests: computedPassedTests,
             buildTime: buildTime
@@ -105,12 +140,15 @@ class OutputParser {
             status: status,
             summary: summary,
             errors: errors,
-            failedTests: failedTests
+            warnings: warnings,
+            failedTests: failedTests,
+            printWarnings: printWarnings
         )
     }
     
     private func resetState() {
         errors = []
+        warnings = []
         failedTests = []
         buildTime = nil
         seenTestNames = []
@@ -128,6 +166,7 @@ class OutputParser {
 
         // Fast path checks before expensive regex
         let containsRelevant = line.contains("error:") ||
+                               line.contains("warning:") ||
                                line.contains("failed") ||
                                line.contains("passed") ||
                                line.contains("✘") ||
@@ -160,6 +199,8 @@ class OutputParser {
             }
         } else if let error = parseError(line) {
             errors.append(error)
+        } else if let warning = parseWarning(line) {
+            warnings.append(warning)
         } else if parsePassedTest(line) {
             return
         } else if let time = parseBuildTime(line) {
@@ -301,7 +342,78 @@ class OutputParser {
         
         return nil
     }
-    
+
+    private func parseWarning(_ line: String) -> BuildWarning? {
+        // Skip visual warning lines (e.g., "    |   `- warning: message")
+        if line.hasPrefix(" ") && (line.contains("|") || line.contains("`")) {
+            return nil
+        }
+
+        // Pattern: file:line:column: warning: message
+        let fileLineColumnWarning = Regex {
+            Capture(OneOrMore(.any, .reluctant))
+            ":"
+            Capture(OneOrMore(.digit))
+            ":"
+            OneOrMore(.digit)
+            ": warning: "
+            Capture(OneOrMore(.any, .reluctant))
+            Anchor.endOfSubject
+        }
+
+        if let match = line.firstMatch(of: fileLineColumnWarning) {
+            let file = String(match.1)
+            let lineNumber = Int(String(match.2))
+            let message = String(match.3)
+            return BuildWarning(file: file, line: lineNumber, message: message)
+        }
+
+        // Pattern: file:line: warning: message
+        let fileLineWarning = Regex {
+            Capture(OneOrMore(.any, .reluctant))
+            ":"
+            Capture(OneOrMore(.digit))
+            ": warning: "
+            Capture(OneOrMore(.any, .reluctant))
+            Anchor.endOfSubject
+        }
+
+        if let match = line.firstMatch(of: fileLineWarning) {
+            let file = String(match.1)
+            let lineNumber = Int(String(match.2))
+            let message = String(match.3)
+            return BuildWarning(file: file, line: lineNumber, message: message)
+        }
+
+        // Pattern: file: warning: message
+        let fileWarning = Regex {
+            Capture(OneOrMore(.any, .reluctant))
+            ": warning: "
+            Capture(OneOrMore(.any, .reluctant))
+            Anchor.endOfSubject
+        }
+
+        if let match = line.firstMatch(of: fileWarning) {
+            let file = String(match.1)
+            let message = String(match.2)
+            return BuildWarning(file: file, line: nil, message: message)
+        }
+
+        // Pattern: warning: message
+        let simpleWarning = Regex {
+            "warning: "
+            Capture(OneOrMore(.any, .reluctant))
+            Anchor.endOfSubject
+        }
+
+        if let match = line.firstMatch(of: simpleWarning) {
+            let message = String(match.1)
+            return BuildWarning(file: nil, line: nil, message: message)
+        }
+
+        return nil
+    }
+
     private func parsePassedTest(_ line: String) -> Bool {
         let testCasePassedPattern = Regex {
             "Test Case '"

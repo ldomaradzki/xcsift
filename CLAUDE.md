@@ -28,7 +28,7 @@ cp .build/release/xcsift /usr/local/bin/
 ### Running the Tool
 ```bash
 # Basic usage (reads from stdin)
-# IMPORTANT: Always use 2>&1 to capture stderr (where compiler errors are written)
+# IMPORTANT: Always use 2>&1 to capture stderr (where compiler errors and warnings are written)
 xcodebuild build 2>&1 | xcsift
 
 # Test output parsing
@@ -37,6 +37,10 @@ xcodebuild test 2>&1 | xcsift
 # Swift Package Manager
 swift build 2>&1 | xcsift
 swift test 2>&1 | xcsift
+
+# Print detailed warnings list (by default only warning count is shown in summary)
+swift build 2>&1 | xcsift --print-warnings
+xcodebuild build 2>&1 | xcsift --print-warnings
 ```
 
 ## Architecture
@@ -92,4 +96,7 @@ swift test --filter OutputParserTests.testParseError
 
 The tool outputs structured data optimized for coding agents:
 
-- **JSON**: Structured format with `status`, `summary`, `errors`, `warnings`, `failed_tests`
+- **JSON**: Structured format with `status`, `summary`, `errors`, `warnings` (optional), `failed_tests`
+  - **Summary always includes warning count**: `{"summary": {"warnings": N, ...}}`
+  - **Detailed warnings list** (with `--print-warnings` flag): `{"warnings": [{"file": "...", "line": N, "message": "..."}]}`
+  - **Default behavior** (without flag): Only shows warning count in summary, omits detailed warnings array to reduce token usage

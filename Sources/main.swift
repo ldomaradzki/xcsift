@@ -33,7 +33,10 @@ struct XCSift: ParsableCommand {
     
     @Flag(name: [.short, .long], help: "Show version information")
     var version: Bool = false
-    
+
+    @Flag(name: [.long], help: "Print detailed warnings list (by default only warning count is shown)")
+    var printWarnings: Bool = false
+
     func run() throws {
         if version {
             print(getVersion())
@@ -53,7 +56,7 @@ struct XCSift: ParsableCommand {
             throw ValidationError("No input provided. Please pipe xcodebuild output to xcsift.\n\nExample: xcodebuild build | xcsift")
         }
 
-        let result = parser.parse(input: input)
+        let result = parser.parse(input: input, printWarnings: printWarnings)
         outputResult(result)
     }
     

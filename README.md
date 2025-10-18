@@ -69,8 +69,11 @@ Currently outputs JSON format only.
 ### Examples
 
 ```bash
-# Basic usage with JSON output
+# Basic usage with JSON output (warning count shown in summary only)
 xcodebuild build 2>&1 | xcsift
+
+# Print detailed warnings list (useful for fixing warnings)
+xcodebuild build 2>&1 | xcsift --print-warnings
 
 # Test output parsing
 xcodebuild test 2>&1 | xcsift
@@ -115,6 +118,8 @@ swift test 2>&1 | xcsift
   ]
 }
 ```
+
+**Note on warnings:** By default, only the warning count appears in `summary.warnings`. The detailed `warnings` array (shown above) is only included when using the `--print-warnings` flag. This reduces token usage for coding agents that don't need to process every warning.
 
 
 ## Comparison with xcbeautify/xcpretty
