@@ -1,0 +1,120 @@
+Test Suite 'All tests' started at 2025-10-21 13:54:18.134.
+Test Suite 'All tests' passed at 2025-10-21 13:54:18.140.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.006) seconds
+􀟈  Test run started.
+􀄵  Testing Library Version: 6.2 (3fdabe5392108d8)
+􀄵  Target Platform: arm64-apple-macosx
+􀟈  Suite "LocaleUrlTag Tests" started.
+􀟈  Suite "LocaleRedirectMiddleware Tests" started.
+􀟈  Suite "FrontmatterParser Tests" started.
+􀟈  Suite "HomeController Tests" started.
+􀟈  Test "LocaleUrlTag handles deep paths correctly in default locale" started.
+􀟈  Suite "getCanonicalPath" started.
+􀟈  Test "Handles trailing slash correctly for default locale" started.
+􀟈  Test "Handles trailing slash correctly for non-default locale" started.
+􀟈  Test "Removes quotes from values" started.
+􀟈  Test "LocaleUrlTag handles deep paths correctly in non-default locale" started.
+􀟈  Test "Skips empty lines and comments in frontmatter" started.
+􀟈  Test "LocaleUrlTag generates correct URLs in default locale (pl)" started.
+􀟈  Test "Throws error on missing closing delimiter" started.
+􀟈  Test "Parses valid frontmatter with metadata and markdown" started.
+􀟈  Test "LocaleUrlTag generates correct URLs in non-default locale (en)" started.
+􀟈  Test "Sets default locale (pl) when no locale parameter in URL" started.
+􀟈  Test "Redirects to path without locale for default locale (pl)" started.
+􀟈  Test "Non-default locale paths work correctly" started.
+􀟈  Test "Handles missing frontmatter - no opening delimiter" started.
+􀟈  Test "Sets session locale for valid non-default locale" started.
+􀟈  Test "Returns 404 for invalid locale" started.
+􀟈  Test "Correctly separates metadata from markdown body" started.
+􀟈  Test "Handles empty frontmatter" started.
+􀟈  Test "Trims whitespace from markdown body" started.
+􀟈  Test "Does not remove locale-like strings in non-prefix positions" started.
+􀟈  Test "Converts locale root paths to root" started.
+􀟈  Test "Preserves paths without locale prefix" started.
+􀟈  Test "Removes locale prefix from paths" started.
+􀟈  Test case passing 2 arguments input → "/pl/blog", expectedLocation → "/blog" to "Redirects to path without locale for default locale (pl)" started.
+􀟈  Test case passing 2 arguments input → "/pl/about", expectedLocation → "/about" to "Redirects to path without locale for default locale (pl)" started.
+􀟈  Test case passing 2 arguments input → "/pl/contact", expectedLocation → "/contact" to "Redirects to path without locale for default locale (pl)" started.
+􀟈  Test case passing 2 arguments input → "/pl", expectedLocation → "/" to "Redirects to path without locale for default locale (pl)" started.
+􀟈  Test case passing 1 argument path → "/es" to "Returns 404 for invalid locale" started.
+􀟈  Test case passing 1 argument path → "/fr/contact" to "Returns 404 for invalid locale" started.
+􁁛  Test "Skips empty lines and comments in frontmatter" passed after 0.001 seconds.
+􁁛  Test "Removes quotes from values" passed after 0.001 seconds.
+􀟈  Test case passing 2 arguments input → "/entries/about", expected → "/entries/about" to "Does not remove locale-like strings in non-prefix positions" started.
+􀟈  Test case passing 2 arguments input → "/blog/en/post", expected → "/blog/en/post" to "Does not remove locale-like strings in non-prefix positions" started.
+􀟈  Test case passing 1 argument input → "/en" to "Converts locale root paths to root" started.
+􁁛  Test "Parses valid frontmatter with metadata and markdown" passed after 0.001 seconds.
+􀟈  Test case passing 1 argument input → "/en/" to "Converts locale root paths to root" started.
+􀟈  Test case passing 1 argument input → "/pl/" to "Converts locale root paths to root" started.
+􀟈  Test case passing 1 argument path → "/de/about" to "Returns 404 for invalid locale" started.
+􀟈  Test case passing 1 argument input → "/pl" to "Converts locale root paths to root" started.
+􁁛  Test "Throws error on missing closing delimiter" passed after 0.002 seconds.
+􀟈  Test case passing 2 arguments input → "/blog/post", expected → "/blog/post" to "Preserves paths without locale prefix" started.
+􀟈  Test case passing 2 arguments input → "/en/about", expected → "/about" to "Removes locale prefix from paths" started.
+􀟈  Test case passing 2 arguments input → "/pl/contact", expected → "/contact" to "Removes locale prefix from paths" started.
+􀟈  Test case passing 2 arguments input → "/pl-news/article", expected → "/pl-news/article" to "Does not remove locale-like strings in non-prefix positions" started.
+􀟈  Test case passing 2 arguments input → "/about", expected → "/about" to "Preserves paths without locale prefix" started.
+􀟈  Test case passing 2 arguments input → "/contact", expected → "/contact" to "Preserves paths without locale prefix" started.
+􁁛  Test "Handles empty frontmatter" passed after 0.001 seconds.
+􀟈  Test case passing 2 arguments input → "/en/blog/posts/123", expected → "/blog/posts/123" to "Removes locale prefix from paths" started.
+􀟈  Test case passing 2 arguments input → "/pl/portfolio/art/gallery", expected → "/portfolio/art/gallery" to "Removes locale prefix from paths" started.
+􁁛  Test "Trims whitespace from markdown body" passed after 0.001 seconds.
+􀟈  Test case passing 2 arguments input → "/", expected → "/" to "Preserves paths without locale prefix" started.
+􁁛  Test "Handles missing frontmatter - no opening delimiter" passed after 0.002 seconds.
+􁁛  Test "Correctly separates metadata from markdown body" passed after 0.002 seconds.
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=F8C60DAF-4BF1-450E-9696-0A77896A03A9 [Vapor] GET /en
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=4C02B6DB-85F1-48E8-87CF-B9C5A2912251 [Vapor] GET /pl/blog
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=25920C2B-28A3-4B81-A28E-8B5063A7A9E3 [Vapor] GET /en/
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=7C1AE3DE-8BB6-4CD3-9981-4B1A832FB4F1 [Vapor] GET /pl/about
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=90AFF3A3-61E8-4B35-A1BC-934A118BE216 [Vapor] GET /pl
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=3F8C0331-F78B-45DF-A6FB-AE117A84E8C6 [Vapor] GET /about
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=6EA35484-17AD-4C59-B929-83C07702DCAB [Vapor] GET /es
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=DC1CD9DE-0583-47FD-A21D-F824616081C9 [Vapor] GET /en/about
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=7043F7E4-C9CD-486C-A76B-EFE00D8B7BDD [Vapor] GET /pl/
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=E119AD09-6B04-4A81-94CD-E029335FA9CB [Vapor] GET /about
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=2DE2EFCF-29AD-4E8C-BE07-C30160F9089C [Vapor] GET /pl/contact
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=238F8CA4-3F37-4E83-90D3-74AECC9B0C57 [Vapor] GET /en/about
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=C3203BC2-71F5-42BF-9AA7-B301CFA91BE1 [Vapor] GET /fr/contact
+􁁛  Suite "FrontmatterParser Tests" passed after 0.006 seconds.
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=0482AED7-101C-49C9-88D8-9EDF2CEF4505 [Vapor] GET /de/about
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=D6E59730-5554-4569-88EA-F523B6DCA14E [Vapor] GET /en
+2025-10-21T13:54:18+0200 info codes.vapor.application: request-id=B5A548F8-51CA-4CCA-9DF1-95313FA4CFC1 [Vapor] GET /
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+􁁛  Test "Does not remove locale-like strings in non-prefix positions" with 3 test cases passed after 0.006 seconds.
+􁁛  Test "Removes locale prefix from paths" with 4 test cases passed after 0.006 seconds.
+􁁛  Test "Handles trailing slash correctly for default locale" passed after 0.006 seconds.
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+􁁛  Test "Converts locale root paths to root" with 4 test cases passed after 0.006 seconds.
+􁁛  Test "Preserves paths without locale prefix" with 4 test cases passed after 0.006 seconds.
+2025-10-21T13:54:18+0200 warning codes.vapor.application: method=GET request-id=0482AED7-101C-49C9-88D8-9EDF2CEF4505 url=/de/about userAgent=[] [App] Abort.404: Not Found
+2025-10-21T13:54:18+0200 warning codes.vapor.application: method=GET request-id=6EA35484-17AD-4C59-B929-83C07702DCAB url=/es userAgent=[] [App] Abort.404: Not Found
+􁁛  Suite "getCanonicalPath" passed after 0.006 seconds.
+􁁛  Test "Redirects to path without locale for default locale (pl)" with 4 test cases passed after 0.006 seconds.
+􁁛  Suite "HomeController Tests" passed after 0.007 seconds.
+2025-10-21T13:54:18+0200 warning codes.vapor.application: method=GET request-id=C3203BC2-71F5-42BF-9AA7-B301CFA91BE1 url=/fr/contact userAgent=[] [App] Abort.404: Not Found
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+􁁛  Test "Returns 404 for invalid locale" with 3 test cases passed after 0.007 seconds.
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+􁁛  Test "Non-default locale paths work correctly" passed after 0.022 seconds.
+􁁛  Test "Sets default locale (pl) when no locale parameter in URL" passed after 0.022 seconds.
+􁁛  Test "LocaleUrlTag handles deep paths correctly in default locale" passed after 0.022 seconds.
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+􁁛  Test "LocaleUrlTag generates correct URLs in non-default locale (en)" passed after 0.022 seconds.
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+􁁛  Test "LocaleUrlTag handles deep paths correctly in non-default locale" passed after 0.023 seconds.
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+􁁛  Test "Handles trailing slash correctly for non-default locale" passed after 0.023 seconds.
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+􁁛  Test "Sets session locale for valid non-default locale" passed after 0.031 seconds.
+􁁛  Suite "LocaleRedirectMiddleware Tests" passed after 0.031 seconds.
+2025-10-21T13:54:18+0200 debug codes.vapor.application: [Vapor] Application shutting down
+􁁛  Test "LocaleUrlTag generates correct URLs in default locale (pl)" passed after 0.031 seconds.
+􁁛  Suite "LocaleUrlTag Tests" passed after 0.031 seconds.
+􁁛  Test run with 23 tests in 5 suites passed after 0.031 seconds.

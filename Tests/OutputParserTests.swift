@@ -306,4 +306,42 @@ final class OutputParserTests: XCTestCase {
         XCTAssertTrue(jsonString.contains("\"warnings\":["))
         XCTAssertTrue(jsonString.contains("unused variable"))
     }
+
+    func testSwiftTestingSummaryPassed() {
+        let parser = OutputParser()
+        let input = """
+        ✓ Test "LocaleUrlTag handles deep paths correctly in default locale" passed after 0.022 seconds.
+        ✓ Test "LocaleUrlTag generates correct URLs in non-default locale (en)" passed after 0.022 seconds.
+        ✓ Test "LocaleUrlTag handles deep paths correctly in non-default locale" passed after 0.023 seconds.
+        Test run with 23 tests in 5 suites passed after 0.031 seconds.
+        """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.passedTests, 23)
+        XCTAssertEqual(result.summary.failedTests, 0)
+        XCTAssertEqual(result.summary.buildTime, "0.031")
+    }
+
+    func testRealWorldSwiftTestingOutput() throws {
+        let parser = OutputParser()
+
+        // Load the real-world Swift Testing output fixture
+        let fixtureURL = URL(fileURLWithPath: #file)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures")
+            .appendingPathComponent("swift-testing-output.txt")
+
+        let input = try String(contentsOf: fixtureURL, encoding: .utf8)
+
+        // This is real Swift Testing output with 23 passed tests
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.errors, 0)
+        XCTAssertEqual(result.summary.failedTests, 0)
+        XCTAssertEqual(result.summary.passedTests, 23)
+        XCTAssertEqual(result.summary.buildTime, "0.031")
+    }
 }

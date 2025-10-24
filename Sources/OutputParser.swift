@@ -674,7 +674,32 @@ class OutputParser {
             }
             return String(match.3)
         }
-        
+
+        // Pattern: Test run with N tests in N suites passed after X seconds.
+        let swiftTestingPassedPattern = Regex {
+            "Test run with "
+            Capture(OneOrMore(.digit))
+            " test"
+            Optionally("s")
+            " in "
+            OneOrMore(.digit)
+            " suite"
+            Optionally("s")
+            " passed after "
+            Capture(OneOrMore(.any, .reluctant))
+            " seconds"
+            Optionally(".")
+            Anchor.endOfSubject
+        }
+
+        if let match = line.firstMatch(of: swiftTestingPassedPattern) {
+            if let total = Int(match.1) {
+                executedTestsCount = total
+                summaryFailedTestsCount = 0  // All tests passed
+            }
+            return String(match.2)
+        }
+
         return nil
     }
 }

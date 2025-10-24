@@ -33,7 +33,8 @@ let package = Package(
             dependencies: ["xcsift"],
             path: "Tests",
             resources: [
-                .copy("Fixtures/build.txt")
+                .copy("Fixtures/build.txt"),
+                .copy("Fixtures/swift-testing-output.txt")
             ]
         ),
         // Temporarily commented out due to swift-syntax version conflict with SwiftLint
