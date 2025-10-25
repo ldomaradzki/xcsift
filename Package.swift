@@ -15,8 +15,6 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.0.0"),
-        // Temporarily commented out due to swift-syntax version conflict with SwiftLint
-        .package(url: "https://github.com/realm/SwiftLint", branch: "main")
     ],
     targets: [
         .executableTarget(
@@ -24,9 +22,6 @@ let package = Package(
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ],
-            plugins: [
-                .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLint")
-            ]
         ),
         .testTarget(
             name: "xcsiftTests",
