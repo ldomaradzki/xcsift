@@ -15,7 +15,7 @@ struct XCSift: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "xcsift",
         abstract: "A Swift tool to parse and format xcodebuild output for coding agents",
-        usage: "xcodebuild [options] 2>&1 | xcsift [--warnings|-w] [--version|-v] [--help|-h]",
+        usage: "xcodebuild [options] 2>&1 | xcsift [--warnings|-w] [--quiet|-q] [--version|-v] [--help|-h]",
         discussion: """
         xcsift reads xcodebuild output from stdin and outputs structured JSON.
 
@@ -27,6 +27,7 @@ struct XCSift: ParsableCommand {
           xcodebuild test 2>&1 | xcsift -w
           swift build 2>&1 | xcsift --warnings
           swift test 2>&1 | xcsift
+          swift build 2>&1 | xcsift --quiet
         """,
         helpNames: [.short, .long]
     )
@@ -36,6 +37,9 @@ struct XCSift: ParsableCommand {
 
     @Flag(name: [.short, .long], help: "Print detailed warnings list (by default only warning count is shown)")
     var warnings: Bool = false
+
+    @Flag(name: [.short, .long], help: "Suppress output when build succeeds with no warnings or errors")
+    var quiet: Bool = false
 
     func run() throws {
         if version {
@@ -57,7 +61,7 @@ struct XCSift: ParsableCommand {
         }
 
         let result = parser.parse(input: input, printWarnings: warnings)
-        outputResult(result)
+        outputResult(result, quiet: quiet)
     }
     
     private func readStandardInput() -> String {
@@ -76,7 +80,11 @@ struct XCSift: ParsableCommand {
         }
     }
     
-    private func outputResult(_ result: BuildResult) {
+    private func outputResult(_ result: BuildResult, quiet: Bool) {
+        // In quiet mode, suppress output if build succeeded with no warnings or errors
+        if quiet && result.status == "success" && result.summary.warnings == 0 {
+            return
+        }
         outputJSON(result)
     }
     
