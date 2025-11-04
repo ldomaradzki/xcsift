@@ -41,6 +41,10 @@ swift test 2>&1 | xcsift
 # Print detailed warnings list (by default only warning count is shown in summary)
 swift build 2>&1 | xcsift --print-warnings
 xcodebuild build 2>&1 | xcsift --print-warnings
+
+# Quiet mode - suppress output when build succeeds with no warnings or errors
+swift build 2>&1 | xcsift --quiet
+xcodebuild build 2>&1 | xcsift -q
 ```
 
 ## Architecture
@@ -100,3 +104,4 @@ The tool outputs structured data optimized for coding agents:
   - **Summary always includes warning count**: `{"summary": {"warnings": N, ...}}`
   - **Detailed warnings list** (with `--print-warnings` flag): `{"warnings": [{"file": "...", "line": N, "message": "..."}]}`
   - **Default behavior** (without flag): Only shows warning count in summary, omits detailed warnings array to reduce token usage
+  - **Quiet mode** (with `--quiet` or `-q` flag): Produces no output when build succeeds with zero warnings and zero errors
