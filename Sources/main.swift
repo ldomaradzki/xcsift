@@ -15,7 +15,7 @@ struct XCSift: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "xcsift",
         abstract: "A Swift tool to parse and format xcodebuild output for coding agents",
-        usage: "xcodebuild [options] 2>&1 | xcsift",
+        usage: "xcodebuild [options] 2>&1 | xcsift [--warnings|-w] [--version|-v] [--help|-h]",
         discussion: """
         xcsift reads xcodebuild output from stdin and outputs structured JSON.
 
@@ -24,8 +24,8 @@ struct XCSift: ParsableCommand {
 
         Examples:
           xcodebuild build 2>&1 | xcsift
-          xcodebuild test 2>&1 | xcsift
-          swift build 2>&1 | xcsift
+          xcodebuild test 2>&1 | xcsift -w
+          swift build 2>&1 | xcsift --warnings
           swift test 2>&1 | xcsift
         """,
         helpNames: [.short, .long]
@@ -34,8 +34,8 @@ struct XCSift: ParsableCommand {
     @Flag(name: [.short, .long], help: "Show version information")
     var version: Bool = false
 
-    @Flag(name: [.long], help: "Print detailed warnings list (by default only warning count is shown)")
-    var printWarnings: Bool = false
+    @Flag(name: [.short, .long], help: "Print detailed warnings list (by default only warning count is shown)")
+    var warnings: Bool = false
 
     func run() throws {
         if version {
@@ -56,7 +56,7 @@ struct XCSift: ParsableCommand {
             throw ValidationError("No input provided. Please pipe xcodebuild output to xcsift.\n\nExample: xcodebuild build | xcsift")
         }
 
-        let result = parser.parse(input: input, printWarnings: printWarnings)
+        let result = parser.parse(input: input, printWarnings: warnings)
         outputResult(result)
     }
     
