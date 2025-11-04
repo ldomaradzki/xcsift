@@ -21,7 +21,7 @@ let package = Package(
             name: "xcsift",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
-            ],
+            ]
         ),
         .testTarget(
             name: "xcsiftTests",
