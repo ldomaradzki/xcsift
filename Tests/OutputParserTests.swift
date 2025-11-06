@@ -344,4 +344,63 @@ final class OutputParserTests: XCTestCase {
         XCTAssertEqual(result.summary.passedTests, 23)
         XCTAssertEqual(result.summary.buildTime, "0.031")
     }
+    
+    func testJSONLikeLinesAreFiltered() {
+        let parser = OutputParser()
+        // This simulates the case where JSON output contains "error:" but shouldn't be parsed as an error
+        let input = """
+        {
+          "errors" : [
+            {
+              "message" : "\\(message)\""
+            },
+            {
+              "message" : "\\(message)\""
+            },
+            {
+              "message" : "\\(message)\""
+            }
+          ],
+          "status" : "failed",
+          "summary" : {
+            "warnings" : 96,
+            "failed_tests" : 0,
+            "errors" : 3
+          }
+        }
+        """
+        
+        let result = parser.parse(input: input)
+        
+        // Should not parse JSON lines as errors - this should be a successful parse with no errors
+        // (since there are no actual build errors, just JSON structure)
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.errors, 0)
+        XCTAssertEqual(result.errors.count, 0)
+    }
+    
+    func testJSONLikeLinesWithActualErrors() {
+        let parser = OutputParser()
+        // Mix of JSON-like lines and actual errors - should only parse the real errors
+        let input = """
+        {
+          "errors" : [
+            {
+              "message" : "\\(message)\""
+            }
+          ]
+        }
+        main.swift:15:5: error: use of undeclared identifier 'unknown'
+        """
+        
+        let result = parser.parse(input: input)
+        
+        // Should parse the real error but ignore JSON lines
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.errors, 1)
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertEqual(result.errors[0].file, "main.swift")
+        XCTAssertEqual(result.errors[0].line, 15)
+        XCTAssertEqual(result.errors[0].message, "use of undeclared identifier 'unknown'")
+    }
 }
