@@ -347,55 +347,56 @@ final class OutputParserTests: XCTestCase {
     
     func testJSONLikeLinesAreFiltered() {
         let parser = OutputParser()
-        // This simulates the case where JSON output contains "error:" but shouldn't be parsed as an error
+        // This simulates the actual problematic case: Swift compiler warning/note lines
+        // with string interpolation patterns that were incorrectly parsed as errors
         let input = """
-        {
-          "errors" : [
-            {
-              "message" : "\\(message)\""
-            },
-            {
-              "message" : "\\(message)\""
-            },
-            {
-              "message" : "\\(message)\""
-            }
-          ],
-          "status" : "failed",
-          "summary" : {
-            "warnings" : 96,
-            "failed_tests" : 0,
-            "errors" : 3
-          }
-        }
+        /Path/To/File.swift:79:41: warning: string interpolation produces a debug description for an optional value; did you mean to make this explicit?
+
+            return "Encryption error: \\(message)"
+
+                                        ^~~~~~~
+
+        /Path/To/File.swift:79:41: note: use 'String(describing:)' to silence this warning
+
+            return "Encryption error: \\(message)"
+
+                                        ^~~~~~~
+
+                                        String(describing:  )
+
+        /Path/To/File.swift:79:41: note: provide a default value to avoid this warning
+
+            return "Encryption error: \\(message)"
+
+                                        ^~~~~~~
+
+                                                ?? <#default value#>
         """
         
         let result = parser.parse(input: input)
         
-        // Should not parse JSON lines as errors - this should be a successful parse with no errors
-        // (since there are no actual build errors, just JSON structure)
-        XCTAssertEqual(result.status, "success")
+        // Should parse the warning correctly, but NOT parse the note lines as errors
+        // The note lines contain \\(message) pattern which shouldn't be treated as error messages
+        XCTAssertEqual(result.status, "success") // No actual errors, just warnings
         XCTAssertEqual(result.summary.errors, 0)
+        XCTAssertEqual(result.summary.warnings, 1) // Should parse the warning
         XCTAssertEqual(result.errors.count, 0)
     }
     
     func testJSONLikeLinesWithActualErrors() {
         let parser = OutputParser()
-        // Mix of JSON-like lines and actual errors - should only parse the real errors
+        // Mix of compiler note lines (with interpolation patterns) and actual errors
+        // Should only parse the real errors, not the note lines
         let input = """
-        {
-          "errors" : [
-            {
-              "message" : "\\(message)\""
-            }
-          ]
-        }
+        /Path/To/File.swift:79:41: note: use 'String(describing:)' to silence this warning
+            return "Encryption error: \\(message)"
+                                        ^~~~~~~
         main.swift:15:5: error: use of undeclared identifier 'unknown'
         """
         
         let result = parser.parse(input: input)
         
-        // Should parse the real error but ignore JSON lines
+        // Should parse the real error but ignore note lines with interpolation patterns
         XCTAssertEqual(result.status, "failed")
         XCTAssertEqual(result.summary.errors, 1)
         XCTAssertEqual(result.errors.count, 1)
