@@ -12,6 +12,10 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 - **Structured error reporting** - Clear categorization of errors, warnings, and test failures
 - **File/line number extraction** - Easy navigation to problematic code locations
 - **Build status summary** - Quick overview of build results
+- **Automatic code coverage conversion** - Converts .profraw (SPM) and .xcresult (xcodebuild) to JSON automatically
+- **Target filtering** - Automatically filters xcodebuild coverage to tested target only
+- **Summary-only mode** - Default coverage output includes only percentage (token-efficient)
+- **Quiet mode** - Suppress output when build succeeds with no warnings or errors
 
 ## Installation
 
@@ -74,6 +78,26 @@ xcodebuild build 2>&1 | xcsift
 
 # Print detailed warnings list (useful for fixing warnings)
 xcodebuild build 2>&1 | xcsift --print-warnings
+xcodebuild build 2>&1 | xcsift -w
+
+# Quiet mode - suppress output when build succeeds with no warnings or errors
+xcodebuild build 2>&1 | xcsift --quiet
+swift build 2>&1 | xcsift -q
+
+# Code coverage - automatic conversion from .profraw or .xcresult to JSON
+# Default: summary-only mode (line coverage percentage only - token-efficient)
+# xcodebuild automatically searches ~/Library/Developer/Xcode/DerivedData for latest .xcresult
+# and filters to tested target only
+swift test --enable-code-coverage 2>&1 | xcsift --coverage
+xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift --coverage
+xcodebuild test 2>&1 | xcsift -c
+
+# Show detailed per-file coverage (use when you need file-by-file breakdown)
+swift test --enable-code-coverage 2>&1 | xcsift --coverage --coverage-details
+xcodebuild test 2>&1 | xcsift -c --coverage-details
+
+# Specify custom coverage path (optional - auto-detects by default)
+swift test --enable-code-coverage 2>&1 | xcsift --coverage --coverage-path .build/arm64-apple-macosx/debug/codecov
 
 # Test output parsing
 xcodebuild test 2>&1 | xcsift
@@ -94,7 +118,9 @@ swift test 2>&1 | xcsift
     "errors": 2,
     "warnings": 1,
     "failed_tests": 2,
-    "build_time": "3.2 seconds"
+    "passed_tests": 28,
+    "build_time": "3.2",
+    "coverage_percent": 85.5
   },
   "errors": [
     {
@@ -115,11 +141,36 @@ swift test 2>&1 | xcsift
       "test": "Test assertion",
       "message": "XCTAssertEqual failed: (\"invalid\") is not equal to (\"valid\")"
     }
-  ]
+  ],
+  "coverage": {
+    "line_coverage": 85.5,
+    "files": [
+      {
+        "path": "/path/to/ViewController.swift",
+        "name": "ViewController.swift",
+        "line_coverage": 92.5,
+        "covered_lines": 37,
+        "executable_lines": 40
+      }
+    ]
+  }
 }
 ```
 
 **Note on warnings:** By default, only the warning count appears in `summary.warnings`. The detailed `warnings` array (shown above) is only included when using the `--print-warnings` flag. This reduces token usage for coding agents that don't need to process every warning.
+
+**Note on coverage:** The `coverage` section is only included when using the `--coverage-details` flag:
+- **Summary-only mode** (default): Only includes coverage percentage in summary for maximum token efficiency
+  ```json
+  {
+    "summary": {
+      "coverage_percent": 85.5
+    }
+  }
+  ```
+- **Details mode** (with `--coverage-details`): Includes full `files` array as shown in the example above
+- **Target filtering** (xcodebuild only): Automatically extracts tested target from stdout and shows coverage for that target only
+- xcsift automatically converts `.profraw` files (SPM) or `.xcresult` bundles (xcodebuild) to JSON format without requiring manual llvm-cov or xccov commands
 
 
 ## Comparison with xcbeautify/xcpretty
@@ -131,6 +182,7 @@ swift test 2>&1 | xcsift
 | **Token efficiency** | High | Medium | Low |
 | **Machine readable** | Yes | No | Limited |
 | **Error extraction** | Structured | Visual | Visual |
+| **Code coverage** | Auto-converts | No | No |
 | **Build time** | Fast | Fast | Slower |
 
 ## Development
