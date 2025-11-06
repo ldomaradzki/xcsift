@@ -15,7 +15,7 @@ struct XCSift: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "xcsift",
         abstract: "A Swift tool to parse and format xcodebuild output for coding agents",
-        usage: "xcodebuild [options] 2>&1 | xcsift [--warnings|-w] [--quiet|-q] [--version|-v] [--help|-h]",
+        usage: "xcodebuild [options] 2>&1 | xcsift [--warnings|-w] [--quiet|-q] [--coverage|-c] [--version|-v] [--help|-h]",
         discussion: """
         xcsift reads xcodebuild output from stdin and outputs structured JSON.
 
@@ -28,6 +28,9 @@ struct XCSift: ParsableCommand {
           swift build 2>&1 | xcsift --warnings
           swift test 2>&1 | xcsift
           swift build 2>&1 | xcsift --quiet
+          swift test --enable-code-coverage 2>&1 | xcsift --coverage
+          xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift --coverage
+          xcsift -c --coverage-path .build/debug/codecov
         """,
         helpNames: [.short, .long]
     )
@@ -40,6 +43,15 @@ struct XCSift: ParsableCommand {
 
     @Flag(name: [.short, .long], help: "Suppress output when build succeeds with no warnings or errors")
     var quiet: Bool = false
+
+    @Flag(name: [.short, .long], help: "Include code coverage data (auto-converts .profraw files)")
+    var coverage: Bool = false
+
+    @Option(name: .long, help: "Path to code coverage directory or JSON file (default: auto-detect in .build/)")
+    var coveragePath: String?
+
+    @Flag(name: .long, help: "Include detailed per-file coverage data (default: summary only)")
+    var coverageDetails: Bool = false
 
     func run() throws {
         if version {
@@ -60,7 +72,20 @@ struct XCSift: ParsableCommand {
             throw ValidationError("No input provided. Please pipe xcodebuild output to xcsift.\n\nExample: xcodebuild build | xcsift")
         }
 
-        let result = parser.parse(input: input, printWarnings: warnings)
+        // Parse coverage if requested
+        var coverageData: CodeCoverage? = nil
+        if coverage {
+            let path = coveragePath ?? ""
+            let targetFilter = parser.extractTestedTarget(from: input)
+            coverageData = OutputParser.parseCoverageFromPath(path, targetFilter: targetFilter)
+
+            // Warn if target filter was extracted but no coverage data was found
+            if let filter = targetFilter, coverageData == nil {
+                fputs("Warning: Target '\(filter)' was detected but no matching coverage data was found.\n", stderr)
+            }
+        }
+
+        let result = parser.parse(input: input, printWarnings: warnings, coverage: coverageData, printCoverageDetails: coverageDetails)
         outputResult(result, quiet: quiet)
     }
     
