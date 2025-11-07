@@ -294,6 +294,88 @@ class OutputParser {
         return seenTestNames.contains(normalizedTestName)
     }
     
+    /// Checks if a line looks like JSON output (e.g., from the tool's own output or other JSON sources)
+    /// This prevents false positives when parsing build output that contains JSON
+    private func isJSONLikeLine(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        
+        // Check for JSON-like patterns:
+        // 1. Lines that start with quotes and contain colon (JSON key-value pairs)
+        // 2. Lines containing JSON structure like "key" : "value"
+        // 3. Lines with escaped quotes and backslashes typical of JSON
+        // 4. Lines that are indented and contain JSON-like structures (common in formatted JSON)
+        
+        // Pattern: "key" : "value" or "key" : value
+        let jsonKeyValuePattern = Regex {
+            Optionally(OneOrMore(.whitespace))
+            "\""
+            OneOrMore(.any, .reluctant)
+            "\""
+            Optionally(OneOrMore(.whitespace))
+            ":"
+            Optionally(OneOrMore(.whitespace))
+        }
+        
+        if trimmed.firstMatch(of: jsonKeyValuePattern) != nil {
+            return true
+        }
+        
+        // Check for JSON array/object markers at start
+        if trimmed.hasPrefix("{") || trimmed.hasPrefix("[") || trimmed.hasPrefix("}") || trimmed.hasPrefix("]") {
+            return true
+        }
+        
+        // Check for lines with multiple escaped characters (common in JSON)
+        // Pattern like "\\(message)\"" suggests JSON escaping
+        if line.contains("\\\"") && line.contains("\"") && line.contains(":") {
+            return true
+        }
+        
+        // Check for indented lines that look like JSON (common in formatted JSON output)
+        // Lines starting with spaces/tabs followed by quotes are likely JSON
+        if line.hasPrefix(" ") || line.hasPrefix("\t") {
+            // If it's indented and contains quoted strings with colons, it's likely JSON
+            if trimmed.firstMatch(of: jsonKeyValuePattern) != nil {
+                return true
+            }
+            // Check for JSON array/object markers in indented lines
+            if trimmed.hasPrefix("{") || trimmed.hasPrefix("}") || trimmed.hasPrefix("[") || trimmed.hasPrefix("]") {
+                return true
+            }
+        }
+        
+        // Check for lines that contain "error:" but are clearly JSON (e.g., error messages in JSON)
+        // Pattern: lines with quotes, colons, and escaped characters that contain "error:"
+        if line.contains("error:") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            
+            // If line starts with "error:" (even if indented), it's likely a real error, not JSON
+            // UNLESS it's clearly JSON structure like "error" : "value"
+            if trimmed.hasPrefix("\"") && trimmed.contains("\"") && trimmed.contains(":") {
+                // This looks like JSON: "error" : "value" or "errors" : [...]
+                return true
+            }
+            
+            // If it's indented and has JSON-like structure (quoted keys), it's probably JSON
+            if (line.hasPrefix(" ") || line.hasPrefix("\t")) && trimmed.hasPrefix("\"") {
+                return true
+            }
+            
+            // If it has escaped quotes and looks like JSON structure, but NOT if it starts with "error:"
+            // (lines starting with "error:" are likely real errors, not JSON)
+            if !trimmed.hasPrefix("error:") {
+                let hasQuotedStrings = line.contains("\"") && line.contains(":")
+                let hasEscapedContent = line.contains("\\") && line.contains("\"")
+                // If it has escaped quotes and looks like JSON structure (but not a file path)
+                if hasEscapedContent && hasQuotedStrings && !line.contains("file:") && !line.contains(".swift:") && !line.contains(".m:") && !line.contains(".h:") {
+                    return true
+                }
+            }
+        }
+        
+        return false
+    }
+    
     private func recordPassedTest(named testName: String) {
         let normalizedTestName = normalizeTestName(testName)
         guard seenPassedTestNames.insert(normalizedTestName).inserted else {
@@ -303,6 +385,11 @@ class OutputParser {
     }
     
     private func parseError(_ line: String) -> BuildError? {
+        // Skip JSON-like lines (e.g., "  \"message\" : \"\\\\(message)\\\"\"")
+        if isJSONLikeLine(line) {
+            return nil
+        }
+        
         // Skip visual error lines (e.g., "    |   `- error: message")
         if line.hasPrefix(" ") && (line.contains("|") || line.contains("`")) {
             return nil
@@ -417,6 +504,11 @@ class OutputParser {
     }
 
     private func parseWarning(_ line: String) -> BuildWarning? {
+        // Skip JSON-like lines (e.g., "  \"message\" : \"\\\\(message)\\\"\"")
+        if isJSONLikeLine(line) {
+            return nil
+        }
+        
         // Skip visual warning lines (e.g., "    |   `- warning: message")
         if line.hasPrefix(" ") && (line.contains("|") || line.contains("`")) {
             return nil
