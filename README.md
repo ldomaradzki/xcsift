@@ -30,7 +30,22 @@ brew install xcsift
 brew install https://raw.githubusercontent.com/ldomaradzki/xcsift/master/homebrew-formula/xcsift.rb
 ```
 
-### Option 2: Download Pre-built Binary
+### Option 2: mise ubi
+
+If you use [mise](https://mise.jdx.dev/) for managing development tools:
+
+```bash
+# Install using ubi plugin
+mise use -g ubi:ldomaradzki/xcsift
+
+# Or add to your .mise.toml
+# [tools]
+# "ubi:ldomaradzki/xcsift" = "latest"
+```
+
+This will automatically download the latest binary from GitHub releases.
+
+### Option 3: Download Pre-built Binary
 
 Download the latest release from [GitHub Releases](https://github.com/ldomaradzki/xcsift/releases):
 
@@ -49,7 +64,7 @@ xattr -d com.apple.quarantine /usr/local/bin/xcsift
 
 > **Note**: This binary is not code-signed with an Apple Developer ID certificate. macOS will show a security warning when first running it. The `xattr` command above removes the quarantine flag. For open source projects, Apple's $99/year Developer Program is required for code signing - there are no free alternatives for macOS.
 
-### Option 3: Build from Source
+### Option 4: Build from Source
 
 ```bash
 git clone https://github.com/ldomaradzki/xcsift.git
