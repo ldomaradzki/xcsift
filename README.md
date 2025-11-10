@@ -30,17 +30,17 @@ brew install xcsift
 brew install https://raw.githubusercontent.com/ldomaradzki/xcsift/master/homebrew-formula/xcsift.rb
 ```
 
-### Option 2: mise ubi
+### Option 2: mise
 
 If you use [mise](https://mise.jdx.dev/) for managing development tools:
 
 ```bash
-# Install using ubi plugin
-mise use -g ubi:ldomaradzki/xcsift
+# Install from mise registry
+mise use -g xcsift
 
 # Or add to your .mise.toml
 # [tools]
-# "ubi:ldomaradzki/xcsift" = "latest"
+# xcsift = "latest"
 ```
 
 This will automatically download the latest binary from GitHub releases.
