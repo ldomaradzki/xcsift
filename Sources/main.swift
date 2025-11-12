@@ -15,7 +15,7 @@ struct XCSift: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "xcsift",
         abstract: "A Swift tool to parse and format xcodebuild output for coding agents",
-        usage: "xcodebuild [options] 2>&1 | xcsift [--warnings|-w] [--quiet|-q] [--version|-v] [--help|-h]",
+        usage: "xcodebuild [options] 2>&1 | xcsift [--warnings|-w] [--Werror|-W] [--quiet|-q] [--version|-v] [--help|-h]",
         discussion: """
         xcsift reads xcodebuild output from stdin and outputs structured JSON.
 
@@ -28,6 +28,7 @@ struct XCSift: ParsableCommand {
           swift build 2>&1 | xcsift --warnings
           swift test 2>&1 | xcsift
           swift build 2>&1 | xcsift --quiet
+          swift build 2>&1 | xcsift --Werror
         """,
         helpNames: [.short, .long]
     )
@@ -37,6 +38,9 @@ struct XCSift: ParsableCommand {
 
     @Flag(name: [.short, .long], help: "Print detailed warnings list (by default only warning count is shown)")
     var warnings: Bool = false
+
+    @Flag(name: [.customShort("W"), .customLong("Werror")], help: "Treat warnings as errors (build fails if warnings present)")
+    var warningsAsErrors: Bool = false
 
     @Flag(name: [.short, .long], help: "Suppress output when build succeeds with no warnings or errors")
     var quiet: Bool = false
@@ -60,7 +64,7 @@ struct XCSift: ParsableCommand {
             throw ValidationError("No input provided. Please pipe xcodebuild output to xcsift.\n\nExample: xcodebuild build | xcsift")
         }
 
-        let result = parser.parse(input: input, printWarnings: warnings)
+        let result = parser.parse(input: input, printWarnings: warnings, warningsAsErrors: warningsAsErrors)
         outputResult(result, quiet: quiet)
     }
     
