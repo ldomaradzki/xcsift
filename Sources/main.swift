@@ -15,7 +15,7 @@ struct XCSift: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "xcsift",
         abstract: "A Swift tool to parse and format xcodebuild output for coding agents",
-        usage: "xcodebuild [options] 2>&1 | xcsift [--warnings|-w] [--quiet|-q] [--coverage|-c] [--version|-v] [--help|-h]",
+        usage: "xcodebuild [options] 2>&1 | xcsift [--warnings|-w] [--Werror|-W] [--quiet|-q] [--coverage|-c] [--version|-v] [--help|-h]",
         discussion: """
         xcsift reads xcodebuild output from stdin and outputs structured JSON.
 
@@ -28,6 +28,7 @@ struct XCSift: ParsableCommand {
           swift build 2>&1 | xcsift --warnings
           swift test 2>&1 | xcsift
           swift build 2>&1 | xcsift --quiet
+          swift build 2>&1 | xcsift --Werror
           swift test --enable-code-coverage 2>&1 | xcsift --coverage
           xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift --coverage
           xcsift -c --coverage-path .build/debug/codecov
@@ -40,6 +41,9 @@ struct XCSift: ParsableCommand {
 
     @Flag(name: [.short, .long], help: "Print detailed warnings list (by default only warning count is shown)")
     var warnings: Bool = false
+
+    @Flag(name: [.customShort("W"), .customLong("Werror")], help: "Treat warnings as errors (build fails if warnings present)")
+    var warningsAsErrors: Bool = false
 
     @Flag(name: [.short, .long], help: "Suppress output when build succeeds with no warnings or errors")
     var quiet: Bool = false
@@ -85,7 +89,7 @@ struct XCSift: ParsableCommand {
             }
         }
 
-        let result = parser.parse(input: input, printWarnings: warnings, coverage: coverageData, printCoverageDetails: coverageDetails)
+        let result = parser.parse(input: input, printWarnings: warnings, warningsAsErrors: warningsAsErrors, coverage: coverageData, printCoverageDetails: coverageDetails)
         outputResult(result, quiet: quiet)
     }
     
