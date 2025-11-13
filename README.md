@@ -46,26 +46,7 @@ mise use -g xcsift
 
 This will automatically download the latest binary from GitHub releases.
 
-### Option 3: Download Pre-built Binary
-
-Download the latest release from [GitHub Releases](https://github.com/ldomaradzki/xcsift/releases):
-
-```bash
-# Download and extract
-curl -L https://github.com/ldomaradzki/xcsift/releases/latest/download/xcsift-vX.X.X-macos-arm64.tar.gz | tar -xz
-
-# Move to PATH
-mv xcsift /usr/local/bin/xcsift
-chmod +x /usr/local/bin/xcsift
-
-# If you get a quarantine warning when running xcsift:
-# Remove the quarantine attribute (macOS security feature)
-xattr -d com.apple.quarantine /usr/local/bin/xcsift
-```
-
-> **Note**: This binary is not code-signed with an Apple Developer ID certificate. macOS will show a security warning when first running it. The `xattr` command above removes the quarantine flag. For open source projects, Apple's $99/year Developer Program is required for code signing - there are no free alternatives for macOS.
-
-### Option 4: Build from Source
+### Option 3: Build from Source
 
 ```bash
 git clone https://github.com/ldomaradzki/xcsift.git

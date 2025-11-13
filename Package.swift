@@ -1,11 +1,11 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.0
 import PackageDescription
 import Foundation
 
 let package = Package(
     name: "xcsift",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v15)
     ],
     products: [
         .executable(
@@ -33,16 +33,7 @@ let package = Package(
                 .copy("Fixtures/build.txt"),
                 .copy("Fixtures/swift-testing-output.txt")
             ]
-        ),
-        // Temporarily commented out due to swift-syntax version conflict with SwiftLint
-        // .testTarget(
-        //     name: "xcsiftSwiftTestingTests",
-        //     dependencies: [
-        //         "xcsift",
-        //         .product(name: "Testing", package: "swift-testing")
-        //     ],
-        //     path: "SwiftTestingTests"
-        // )
+        )
     ]
 )
 

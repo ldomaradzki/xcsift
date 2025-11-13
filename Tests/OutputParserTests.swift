@@ -119,14 +119,6 @@ final class OutputParserTests: XCTestCase {
         parser.functionWithUnusedVariable()
     }
     
-    func testFirstFailingTest() {
-        XCTAssertEqual("expected", "actual", "This test should fail - values don't match")
-    }
-    
-    func testSecondFailingTest() {
-        XCTAssertTrue(false, "This test should fail - asserting false")
-    }
-    
     func testParseCompileError() {
         let parser = OutputParser()
         let input = """
@@ -201,12 +193,7 @@ final class OutputParserTests: XCTestCase {
     func testLargeRealWorldBuildOutput() throws {
         let parser = OutputParser()
 
-        // Load the real-world build.txt fixture
-        let fixtureURL = URL(fileURLWithPath: #file)
-            .deletingLastPathComponent()
-            .appendingPathComponent("Fixtures")
-            .appendingPathComponent("build.txt")
-
+        let fixtureURL = Bundle.module.url(forResource: "build", withExtension: "txt")!
         let input = try String(contentsOf: fixtureURL, encoding: .utf8)
 
         // This is a large successful build output (2.6MB, 8000+ lines)
@@ -328,12 +315,7 @@ final class OutputParserTests: XCTestCase {
     func testRealWorldSwiftTestingOutput() throws {
         let parser = OutputParser()
 
-        // Load the real-world Swift Testing output fixture
-        let fixtureURL = URL(fileURLWithPath: #file)
-            .deletingLastPathComponent()
-            .appendingPathComponent("Fixtures")
-            .appendingPathComponent("swift-testing-output.txt")
-
+        let fixtureURL = Bundle.module.url(forResource: "swift-testing-output", withExtension: "txt")!
         let input = try String(contentsOf: fixtureURL, encoding: .utf8)
 
         // This is real Swift Testing output with 23 passed tests

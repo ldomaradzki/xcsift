@@ -137,16 +137,6 @@ class OutputParser {
     private var summaryFailedTestsCount: Int?
     private var passedTestsCount: Int = 0
     private var seenPassedTestNames: Set<String> = []
-    
-    @available(*, deprecated, message: "This function will be removed in a future version")
-    func deprecatedFunction() -> String {
-        return "This function is deprecated"
-    }
-    
-    func functionWithUnusedVariable() {
-        let unusedVariable = "This variable is never used and will cause a warning"
-        // TODO: Test if SwiftLint detects this TODO comment
-    }
 
     func parse(input: String, printWarnings: Bool = false, warningsAsErrors: Bool = false, coverage: CodeCoverage? = nil, printCoverageDetails: Bool = false) -> BuildResult {
         resetState()
