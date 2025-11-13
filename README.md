@@ -8,7 +8,8 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 
 ## Features
 
-- **Token-efficient JSON output** - Structured format optimized for coding agents
+- **Token-efficient output formats** - JSON (default) or TOON format (30-60% fewer tokens)
+- **TOON format support** - Token-Oriented Object Notation optimized for LLM consumption
 - **Structured error reporting** - Clear categorization of errors, warnings, and test failures
 - **File/line number extraction** - Easy navigation to problematic code locations
 - **Build status summary** - Quick overview of build results
@@ -81,9 +82,9 @@ Pipe xcodebuild output directly to xcsift:
 xcodebuild [flags] 2>&1 | xcsift
 ```
 
-**Important**: Always use `2>&1` to redirect stderr to stdout. This ensures all compiler errors, warnings, and build output are captured, removing noise and providing clean, structured JSON output.
+**Important**: Always use `2>&1` to redirect stderr to stdout. This ensures all compiler errors, warnings, and build output are captured, removing noise and providing clean, structured output.
 
-Currently outputs JSON format only.
+Supports both **JSON** (default) and **TOON** formats.
 
 ### Examples
 
@@ -120,6 +121,22 @@ xcodebuild test 2>&1 | xcsift
 # Swift Package Manager support
 swift build 2>&1 | xcsift
 swift test 2>&1 | xcsift
+
+# TOON format (30-60% fewer tokens for LLMs)
+# Token-Oriented Object Notation - optimized for reducing LLM API costs
+xcodebuild build 2>&1 | xcsift --toon
+xcodebuild build 2>&1 | xcsift -t
+
+# TOON with warnings
+swift build 2>&1 | xcsift -t --print-warnings
+xcodebuild build 2>&1 | xcsift -t -w
+
+# TOON with coverage
+swift test --enable-code-coverage 2>&1 | xcsift -t --coverage
+xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift -t -c
+
+# Combine all flags
+xcodebuild test 2>&1 | xcsift -t -w -c --coverage-details
 ```
 
 ## Output Format
@@ -187,14 +204,48 @@ swift test 2>&1 | xcsift
 - **Target filtering** (xcodebuild only): Automatically extracts tested target from stdout and shows coverage for that target only
 - xcsift automatically converts `.profraw` files (SPM) or `.xcresult` bundles (xcodebuild) to JSON format without requiring manual llvm-cov or xccov commands
 
+### TOON Format
+
+With the `--toon` / `-t` flag, xcsift outputs in **TOON (Token-Oriented Object Notation)** format, which provides **30-60% token reduction** compared to JSON. This format is specifically optimized for LLM consumption and can significantly reduce API costs.
+
+```toon
+status: failed
+summary:
+  errors: 1
+  warnings: 3
+  failed_tests: 0
+  passed_tests: null
+  build_time: null
+  coverage_percent: null
+errors[1]{file,line,message}:
+  main.swift,15,"use of undeclared identifier \"unknown\""
+warnings[3]{file,line,message}:
+  Parser.swift,20,"immutable value \"result\" was never used"
+  Parser.swift,25,"variable \"foo\" was never mutated"
+  Model.swift,30,"initialization of immutable value \"bar\" was never used"
+```
+
+**TOON Benefits:**
+- **30-60% fewer tokens** - Reduces LLM API costs significantly
+- **Tabular format** - Uniform arrays (errors, warnings) shown as compact tables
+- **Human-readable** - Indentation-based structure similar to YAML
+- **Compatible** - Works with all existing flags (`--quiet`, `--coverage`, `--print-warnings`)
+
+**Example token savings:**
+- Same build output (1 error, 3 warnings)
+- JSON: 652 bytes
+- TOON: 447 bytes
+- **Savings: 31.4%** (205 bytes)
+
 
 ## Comparison with xcbeautify/xcpretty
 
 | Feature | xcsift | xcbeautify | xcpretty |
 |---------|---------|------------|----------|
-| **Target audience** | Coding agents | Humans | Humans |
-| **Output format** | JSON | Colorized text | Formatted text |
-| **Token efficiency** | High | Medium | Low |
+| **Target audience** | Coding agents / LLMs | Humans | Humans |
+| **Output format** | JSON + TOON | Colorized text | Formatted text |
+| **Token efficiency** | Very High (TOON) | Medium | Low |
+| **LLM optimization** | Yes (TOON format) | No | No |
 | **Machine readable** | Yes | No | Limited |
 | **Error extraction** | Structured | Visual | Visual |
 | **Code coverage** | Auto-converts | No | No |

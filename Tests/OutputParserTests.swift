@@ -1,4 +1,5 @@
 import XCTest
+import TOONEncoder
 @testable import xcsift
 
 final class OutputParserTests: XCTestCase {
@@ -1071,5 +1072,190 @@ final class OutputParserTests: XCTestCase {
         XCTAssertTrue(jsonString.contains("\"files\""))
         XCTAssertTrue(jsonString.contains("\"path\""))
         XCTAssertTrue(jsonString.contains("file.swift"))
+    }
+
+    // MARK: - TOON Format Tests
+
+    func testTOONEncoderBasic() throws {
+        let parser = OutputParser()
+        let input = """
+        main.swift:15:5: error: use of undeclared identifier 'unknown'
+        """
+        let result = parser.parse(input: input)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("status: failed"))
+        XCTAssertTrue(toonString!.contains("errors[1]{"))
+        XCTAssertTrue(toonString!.contains("main.swift"))
+    }
+
+    func testTOONEncoderWithWarnings() throws {
+        let parser = OutputParser()
+        let input = """
+        Parser.swift:20:10: warning: immutable value 'result' was never used
+        Parser.swift:25:10: warning: variable 'foo' was never mutated
+        """
+        let result = parser.parse(input: input, printWarnings: true)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("status: success"))
+        XCTAssertTrue(toonString!.contains("warnings: 2"))
+        XCTAssertTrue(toonString!.contains("warnings[2]{"))
+        XCTAssertTrue(toonString!.contains("Parser.swift"))
+    }
+
+    func testTOONEncoderWithErrorsAndWarnings() throws {
+        let parser = OutputParser()
+        let input = """
+        main.swift:15:5: error: use of undeclared identifier 'unknown'
+        Parser.swift:20:10: warning: immutable value 'result' was never used
+        ** BUILD FAILED **
+        """
+        let result = parser.parse(input: input, printWarnings: true)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("status: failed"))
+        XCTAssertTrue(toonString!.contains("errors: 1"))
+        XCTAssertTrue(toonString!.contains("warnings: 1"))
+        XCTAssertTrue(toonString!.contains("errors[1]{file,line,message}"))
+        XCTAssertTrue(toonString!.contains("warnings[1]{file,line,message}"))
+    }
+
+    func testTOONEncoderWithCoverage() throws {
+        let parser = OutputParser()
+        let input = "Build complete!"
+        let coverage = CodeCoverage(
+            lineCoverage: 85.5,
+            files: [
+                FileCoverage(path: "/path/to/file.swift", name: "file.swift", lineCoverage: 85.5, coveredLines: 85, executableLines: 100)
+            ]
+        )
+        let result = parser.parse(input: input, printWarnings: false, coverage: coverage, printCoverageDetails: true)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("coverage_percent: 85.5"))
+        XCTAssertTrue(toonString!.contains("line_coverage: 85.5"))
+        XCTAssertTrue(toonString!.contains("files[1]{"))
+        XCTAssertTrue(toonString!.contains("file.swift"))
+    }
+
+    func testTOONTokenEfficiency() throws {
+        let parser = OutputParser()
+        let input = """
+        main.swift:15:5: error: use of undeclared identifier 'unknown'
+        Parser.swift:20:10: warning: immutable value 'result' was never used
+        Parser.swift:25:10: warning: variable 'foo' was never mutated
+        Model.swift:30:15: warning: initialization of immutable value 'bar' was never used
+        ** BUILD FAILED **
+        """
+        let result = parser.parse(input: input, printWarnings: true)
+
+        // JSON encoding
+        let jsonEncoder = JSONEncoder()
+        jsonEncoder.outputFormatting = .prettyPrinted
+        let jsonData = try jsonEncoder.encode(result)
+        let jsonSize = jsonData.count
+
+        // TOON encoding
+        let toonEncoder = TOONEncoder()
+        toonEncoder.indent = 2
+        toonEncoder.delimiter = .comma
+        let toonData = try toonEncoder.encode(result)
+        let toonSize = toonData.count
+
+        // TOON should be significantly smaller (30-60% reduction)
+        let reduction = Double(jsonSize - toonSize) / Double(jsonSize) * 100.0
+        XCTAssertGreaterThan(reduction, 20.0, "TOON should save at least 20% tokens")
+        XCTAssertLessThan(toonSize, jsonSize, "TOON output should be smaller than JSON")
+    }
+
+    func testTOONEncoderWithFailedTests() throws {
+        let parser = OutputParser()
+        let input = """
+        Test Case 'LoginTests.testInvalidCredentials' failed (0.045 seconds).
+        XCTAssertEqual failed: Expected valid login
+        """
+        let result = parser.parse(input: input)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("status: failed"))
+        XCTAssertTrue(toonString!.contains("failed_tests: 2"))
+        XCTAssertTrue(toonString!.contains("failed_tests[2]{"))
+        XCTAssertTrue(toonString!.contains("LoginTests.testInvalidCredentials"))
+    }
+
+    func testTOONEncoderSuccessfulBuild() throws {
+        let parser = OutputParser()
+        let input = """
+        Building for debugging...
+        Build complete!
+        """
+        let result = parser.parse(input: input)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("status: success"))
+        XCTAssertTrue(toonString!.contains("errors: 0"))
+        XCTAssertTrue(toonString!.contains("warnings: 0"))
+        XCTAssertTrue(toonString!.contains("failed_tests: 0"))
+    }
+
+    func testTOONCoverageOnlyPrintsCoveragePercentInSummary() throws {
+        let parser = OutputParser()
+        let input = "Build complete!"
+        let coverage = CodeCoverage(
+            lineCoverage: 75.5,
+            files: [
+                FileCoverage(path: "/path/to/file.swift", name: "file.swift", lineCoverage: 75.5, coveredLines: 75, executableLines: 100)
+            ]
+        )
+        let result = parser.parse(input: input, printWarnings: false, coverage: coverage, printCoverageDetails: false)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("coverage_percent: 75.5"))
+        // Should NOT contain detailed coverage section in summary-only mode
+        XCTAssertFalse(toonString!.contains("line_coverage:"))
+        XCTAssertFalse(toonString!.contains("files["))
     }
 }

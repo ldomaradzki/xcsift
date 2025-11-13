@@ -1,6 +1,7 @@
 import ArgumentParser
 import Foundation
 import Darwin
+import TOONEncoder
 
 func getVersion() -> String {
     // Try to get version from git tag during build
@@ -15,9 +16,9 @@ struct XCSift: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "xcsift",
         abstract: "A Swift tool to parse and format xcodebuild output for coding agents",
-        usage: "xcodebuild [options] 2>&1 | xcsift [--warnings|-w] [--Werror|-W] [--quiet|-q] [--coverage|-c] [--version|-v] [--help|-h]",
+        usage: "xcodebuild [options] 2>&1 | xcsift [--toon|-t] [--warnings|-w] [--Werror|-W] [--quiet|-q] [--coverage|-c] [--version|-v] [--help|-h]",
         discussion: """
-        xcsift reads xcodebuild output from stdin and outputs structured JSON.
+        xcsift reads xcodebuild output from stdin and outputs structured JSON or TOON format.
 
         Important: Always use 2>&1 to redirect stderr to stdout. This ensures all
         compiler errors, warnings, and build output are captured.
@@ -32,6 +33,13 @@ struct XCSift: ParsableCommand {
           swift test --enable-code-coverage 2>&1 | xcsift --coverage
           xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift --coverage
           xcsift -c --coverage-path .build/debug/codecov
+
+        TOON format (30-60% fewer tokens for LLMs):
+          xcodebuild build 2>&1 | xcsift --toon
+          xcodebuild build 2>&1 | xcsift -t
+          swift build 2>&1 | xcsift -t --warnings
+          xcodebuild test 2>&1 | xcsift -t -c
+          swift test 2>&1 | xcsift -t -w -c --coverage-details
         """,
         helpNames: [.short, .long]
     )
@@ -56,6 +64,9 @@ struct XCSift: ParsableCommand {
 
     @Flag(name: .long, help: "Include detailed per-file coverage data (default: summary only)")
     var coverageDetails: Bool = false
+
+    @Flag(name: [.customShort("t"), .long], help: "Output in TOON format (30-60% fewer tokens for LLMs)")
+    var toon: Bool = false
 
     func run() throws {
         if version {
@@ -114,7 +125,12 @@ struct XCSift: ParsableCommand {
         if quiet && result.status == "success" && result.summary.warnings == 0 {
             return
         }
-        outputJSON(result)
+
+        if toon {
+            outputTOON(result)
+        } else {
+            outputJSON(result)
+        }
     }
     
     private func outputJSON(_ result: BuildResult) {
@@ -123,7 +139,7 @@ struct XCSift: ParsableCommand {
         if #available(macOS 10.15, *) {
             encoder.outputFormatting.insert(.withoutEscapingSlashes)
         }
-        
+
         do {
             let jsonData = try encoder.encode(result)
             if let jsonString = String(data: jsonData, encoding: .utf8) {
@@ -131,6 +147,21 @@ struct XCSift: ParsableCommand {
             }
         } catch {
             print("Error encoding JSON: \(error)")
+        }
+    }
+
+    private func outputTOON(_ result: BuildResult) {
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+
+        do {
+            let toonData = try encoder.encode(result)
+            if let toonString = String(data: toonData, encoding: .utf8) {
+                print(toonString)
+            }
+        } catch {
+            fputs("Error encoding TOON: \(error)\n", stderr)
         }
     }
     
