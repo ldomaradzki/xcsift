@@ -147,8 +147,8 @@ class OutputParser {
         let unusedVariable = "This variable is never used and will cause a warning"
         // TODO: Test if SwiftLint detects this TODO comment
     }
-    
-    func parse(input: String, printWarnings: Bool = false, coverage: CodeCoverage? = nil, printCoverageDetails: Bool = false) -> BuildResult {
+
+    func parse(input: String, printWarnings: Bool = false, warningsAsErrors: Bool = false, coverage: CodeCoverage? = nil, printCoverageDetails: Bool = false) -> BuildResult {
         resetState()
         let lines = input.split(separator: "\n", omittingEmptySubsequences: false)
 
@@ -156,7 +156,24 @@ class OutputParser {
             parseLine(String(line))
         }
 
-        let status = errors.isEmpty && failedTests.isEmpty ? "success" : "failed"
+        // If warnings-as-errors is enabled, convert warnings to errors
+        var finalErrors = errors
+        var finalWarnings = warnings
+
+        if warningsAsErrors && !warnings.isEmpty {
+            // Convert warnings to errors
+            for warning in warnings {
+                finalErrors.append(BuildError(
+                    file: warning.file,
+                    line: warning.line,
+                    message: warning.message
+                ))
+            }
+            finalWarnings = []
+        }
+
+        let status = finalErrors.isEmpty && failedTests.isEmpty ? "success" : "failed"
+
         let summaryFailedCount = summaryFailedTestsCount ?? failedTests.count
         let computedPassedTests: Int? = {
             if let executed = executedTestsCount {
@@ -169,8 +186,8 @@ class OutputParser {
         }()
 
         let summary = BuildSummary(
-            errors: errors.count,
-            warnings: warnings.count,
+            errors: finalErrors.count,
+            warnings: finalWarnings.count,
             failedTests: failedTests.count,
             passedTests: computedPassedTests,
             buildTime: buildTime,
@@ -180,8 +197,8 @@ class OutputParser {
         return BuildResult(
             status: status,
             summary: summary,
-            errors: errors,
-            warnings: warnings,
+            errors: finalErrors,
+            warnings: finalWarnings,
             failedTests: failedTests,
             coverage: coverage,
             printWarnings: printWarnings,
