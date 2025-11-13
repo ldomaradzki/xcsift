@@ -39,8 +39,8 @@ swift build 2>&1 | xcsift
 swift test 2>&1 | xcsift
 
 # Print detailed warnings list (by default only warning count is shown in summary)
-swift build 2>&1 | xcsift --print-warnings
-xcodebuild build 2>&1 | xcsift --print-warnings
+swift build 2>&1 | xcsift --warnings
+xcodebuild build 2>&1 | xcsift --warnings
 
 # Quiet mode - suppress output when build succeeds with no warnings or errors
 swift build 2>&1 | xcsift --quiet
@@ -75,6 +75,57 @@ xcodebuild test 2>&1 | xcsift --coverage --coverage-path path/to/file.xcresult
 # xcodebuild (.xcresult → JSON via xcrun xccov):
 #   - ~/Library/Developer/Xcode/DerivedData/**/*.xcresult (searches automatically)
 #   - Current directory/**/*.xcresult
+
+# TOON format (30-60% fewer tokens for LLMs)
+# Token-Oriented Object Notation - optimized for LLM consumption
+
+# Basic TOON output
+xcodebuild build 2>&1 | xcsift --format toon
+xcodebuild build 2>&1 | xcsift -f toon
+
+# TOON with warnings
+swift build 2>&1 | xcsift -f toon --warnings
+xcodebuild build 2>&1 | xcsift -f toon -w
+
+# TOON with coverage
+swift test --enable-code-coverage 2>&1 | xcsift -f toon --coverage
+xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift -f toon -c
+
+# Combine all flags
+xcodebuild test 2>&1 | xcsift -f toon -w -c --coverage-details
+
+# TOON format features:
+# - 30-60% token reduction compared to JSON
+# - Tabular format for uniform arrays (errors, warnings, tests)
+# - Human-readable indentation-based structure
+# - Ideal for LLM consumption and API cost reduction
+# - Works with all existing flags (--quiet, --coverage, --warnings)
+
+# TOON Configuration - customize delimiter and length markers
+
+# Delimiter options (default: comma):
+# - comma: CSV-style format (default, most compact)
+# - tab: TSV-style format (better for Excel/spreadsheet import)
+# - pipe: Alternative separator (good for data with many commas)
+
+# Tab delimiter - useful for Excel/spreadsheet import
+xcodebuild build 2>&1 | xcsift -f toon --toon-delimiter tab
+swift build 2>&1 | xcsift --format toon --toon-delimiter tab
+
+# Pipe delimiter - alternative when data contains many commas
+xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe
+
+# Length marker options (default: none):
+# - none: [3]{file,line,message}: (default, most compact)
+# - hash: [#3]{file,line,message}: (Ruby/Perl-style length prefix)
+
+# Hash length marker - adds # prefix to array counts
+xcodebuild build 2>&1 | xcsift -f toon --toon-length-marker hash
+swift build 2>&1 | xcsift --format toon --toon-length-marker hash
+
+# Combine configuration options
+xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter tab --toon-length-marker hash -w -c
+swift test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash --coverage-details
 ```
 
 ## Architecture
@@ -85,7 +136,7 @@ The codebase follows a simple two-component architecture:
 
 1. **main.swift** - Entry point using Swift ArgumentParser
    - Reads from stdin and coordinates parsing/output
-   - Outputs JSON format only
+   - Outputs JSON or TOON format (controlled by `--format` / `-f` flag)
 
 2. **OutputParser.swift** - Core parsing logic
    - `OutputParser` class with regex-based line parsing
@@ -98,7 +149,7 @@ The codebase follows a simple two-component architecture:
 1. Stdin input → `readStandardInput()`
 2. Raw text → `OutputParser.parse()` → line-by-line regex matching
 3. Parsed data → `BuildResult` struct
-4. Output formatting (JSON/compact) → stdout
+4. Output formatting (JSON or TOON) → stdout
 
 ### Key Features
 - **Error/Warning Parsing**: Multiple regex patterns handle various Xcode error formats
@@ -136,6 +187,12 @@ Tests are in `Tests/OutputParserTests.swift` using XCTest framework. Test cases 
 - Target extraction from xcodebuild output
 - Coverage target filtering
 - Summary-only vs details mode for coverage output
+- **TOON format encoding** (8 tests):
+  - Basic TOON encoding
+  - TOON with errors, warnings, and failed tests
+  - TOON with code coverage
+  - Token efficiency verification (30-60% reduction)
+  - Summary-only vs details mode in TOON format
 
 Run individual tests:
 ```bash
@@ -145,17 +202,20 @@ swift test --filter OutputParserTests.testParseError
 ## Dependencies
 
 - **Swift ArgumentParser**: CLI argument handling (Package.swift dependency)
+- **TOONEncoder**: Token-Oriented Object Notation encoder for efficient LLM output (Package.swift dependency)
 - **Foundation**: Core Swift framework for regex, JSON encoding, string processing
 - **XCTest**: Testing framework (test target only)
 
 ## Output Formats
 
-The tool outputs structured data optimized for coding agents:
+The tool outputs structured data optimized for coding agents in two formats:
+
+### JSON Format (default)
 
 - **JSON**: Structured format with `status`, `summary`, `errors`, `warnings` (optional), `failed_tests`, `coverage` (optional)
   - **Summary always includes warning count**: `{"summary": {"warnings": N, ...}}`
   - **Summary includes coverage percentage** (when `--coverage` flag is used): `{"summary": {"coverage_percent": X.X, ...}}`
-  - **Detailed warnings list** (with `--print-warnings` flag): `{"warnings": [{"file": "...", "line": N, "message": "..."}]}`
+  - **Detailed warnings list** (with `--warnings` flag): `{"warnings": [{"file": "...", "line": N, "message": "..."}]}`
   - **Default behavior** (without flag): Only shows warning count in summary, omits detailed warnings array to reduce token usage
   - **Quiet mode** (with `--quiet` or `-q` flag): Produces no output when build succeeds with zero warnings and zero errors
   - **Coverage data** (with `--coverage` flag):
@@ -188,3 +248,51 @@ The tool outputs structured data optimized for coding agents:
     - Supports both SPM (`swift test --enable-code-coverage`) and xcodebuild (`-enableCodeCoverage YES`) formats
     - Automatically detects format and parses accordingly
     - Warns to stderr if target was detected but no matching coverage data found
+
+### TOON Format (with `--format toon` / `-f toon` flag)
+
+**TOON (Token-Oriented Object Notation)** is a compact serialization format optimized for LLM consumption, providing **30-60% token reduction** compared to JSON.
+
+**Key Features:**
+- Tabular format for uniform arrays (errors, warnings, tests, coverage files)
+- Indentation-based structure (similar to YAML)
+- Human-readable while optimized for machine parsing
+- Works with all existing flags (`--quiet`, `--coverage`, `--warnings`)
+- Ideal for reducing LLM API costs
+
+**Example TOON Output:**
+
+```toon
+status: failed
+summary:
+  errors: 1
+  warnings: 3
+  failed_tests: 0
+  passed_tests: null
+  build_time: null
+  coverage_percent: null
+errors[1]{file,line,message}:
+  main.swift,15,"use of undeclared identifier \"unknown\""
+warnings[3]{file,line,message}:
+  Parser.swift,20,"immutable value \"result\" was never used"
+  Parser.swift,25,"variable \"foo\" was never mutated"
+  Model.swift,30,"initialization of immutable value \"bar\" was never used"
+```
+
+**Token Efficiency Comparison:**
+
+For the same build output with 1 error and 3 warnings:
+- **JSON**: 652 bytes
+- **TOON**: 447 bytes
+- **Savings**: 31.4% (205 bytes)
+
+**When to Use TOON:**
+- Passing build output to LLM APIs (reduces costs)
+- Processing large build outputs with many errors/warnings
+- Automated CI/CD pipelines with LLM analysis
+- Token-constrained environments
+
+**When to Use JSON:**
+- Integrating with existing JSON-based tooling
+- Maximum compatibility with JSON parsers
+- Pretty-printed output for human debugging
