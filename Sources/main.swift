@@ -3,6 +3,39 @@ import Foundation
 import Darwin
 import TOONEncoder
 
+// MARK: - Format Types
+
+enum FormatType: String, ExpressibleByArgument {
+    case json
+    case toon
+}
+
+enum TOONDelimiterType: String, ExpressibleByArgument {
+    case comma
+    case tab
+    case pipe
+
+    var toonDelimiter: TOONEncoder.Delimiter {
+        switch self {
+        case .comma: return .comma
+        case .tab: return .tab
+        case .pipe: return .pipe
+        }
+    }
+}
+
+enum TOONLengthMarkerType: String, ExpressibleByArgument {
+    case none
+    case hash
+
+    var toonLengthMarker: TOONEncoder.LengthMarker {
+        switch self {
+        case .none: return .none
+        case .hash: return .hash
+        }
+    }
+}
+
 func getVersion() -> String {
     // Try to get version from git tag during build
     #if DEBUG
@@ -16,14 +49,13 @@ struct XCSift: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "xcsift",
         abstract: "A Swift tool to parse and format xcodebuild output for coding agents",
-        usage: "xcodebuild [options] 2>&1 | xcsift [--toon|-t] [--warnings|-w] [--Werror|-W] [--quiet|-q] [--coverage|-c] [--version|-v] [--help|-h]",
+        usage: "xcodebuild [options] 2>&1 | xcsift [--format|-f json|toon] [--toon-delimiter comma|tab|pipe] [--toon-length-marker none|hash] [--warnings|-w] [--Werror|-W] [--quiet|-q] [--coverage|-c] [--version|-v] [--help|-h]",
         discussion: """
-        xcsift reads xcodebuild output from stdin and outputs structured JSON or TOON format.
+        xcsift parses xcodebuild/SPM output and formats it as JSON or TOON.
 
-        Important: Always use 2>&1 to redirect stderr to stdout. This ensures all
-        compiler errors, warnings, and build output are captured.
+        Important: Always use 2>&1 to redirect stderr to stdout.
 
-        Examples:
+        Basic examples:
           xcodebuild build 2>&1 | xcsift
           xcodebuild test 2>&1 | xcsift -w
           swift build 2>&1 | xcsift --warnings
@@ -35,11 +67,12 @@ struct XCSift: ParsableCommand {
           xcsift -c --coverage-path .build/debug/codecov
 
         TOON format (30-60% fewer tokens for LLMs):
-          xcodebuild build 2>&1 | xcsift --toon
-          xcodebuild build 2>&1 | xcsift -t
-          swift build 2>&1 | xcsift -t --warnings
-          xcodebuild test 2>&1 | xcsift -t -c
-          swift test 2>&1 | xcsift -t -w -c --coverage-details
+          xcodebuild build 2>&1 | xcsift -f toon
+          swift test 2>&1 | xcsift -f toon -w -c
+
+        Configuration options:
+          --toon-delimiter [comma|tab|pipe]  # Default: comma
+          --toon-length-marker [none|hash]   # Default: none
         """,
         helpNames: [.short, .long]
     )
@@ -65,8 +98,14 @@ struct XCSift: ParsableCommand {
     @Flag(name: .long, help: "Include detailed per-file coverage data (default: summary only)")
     var coverageDetails: Bool = false
 
-    @Flag(name: [.customShort("t"), .long], help: "Output in TOON format (30-60% fewer tokens for LLMs)")
-    var toon: Bool = false
+    @Option(name: [.customShort("f"), .long], help: "Output format (json or toon). Default: json")
+    var format: FormatType = .json
+
+    @Option(name: .long, help: "TOON delimiter (comma, tab, or pipe). Default: comma")
+    var toonDelimiter: TOONDelimiterType = .comma
+
+    @Option(name: .long, help: "TOON length marker (none or hash). Default: none")
+    var toonLengthMarker: TOONLengthMarkerType = .none
 
     func run() throws {
         if version {
@@ -126,7 +165,7 @@ struct XCSift: ParsableCommand {
             return
         }
 
-        if toon {
+        if format == .toon {
             outputTOON(result)
         } else {
             outputJSON(result)
@@ -153,12 +192,15 @@ struct XCSift: ParsableCommand {
     private func outputTOON(_ result: BuildResult) {
         let encoder = TOONEncoder()
         encoder.indent = 2
-        encoder.delimiter = .comma
+        encoder.delimiter = toonDelimiter.toonDelimiter
+        encoder.lengthMarker = toonLengthMarker.toonLengthMarker
 
         do {
             let toonData = try encoder.encode(result)
             if let toonString = String(data: toonData, encoding: .utf8) {
                 print(toonString)
+            } else {
+                fputs("Error: TOON data is not valid UTF-8\n", stderr)
             }
         } catch {
             fputs("Error encoding TOON: \(error)\n", stderr)

@@ -124,19 +124,19 @@ swift test 2>&1 | xcsift
 
 # TOON format (30-60% fewer tokens for LLMs)
 # Token-Oriented Object Notation - optimized for reducing LLM API costs
-xcodebuild build 2>&1 | xcsift --toon
-xcodebuild build 2>&1 | xcsift -t
+xcodebuild build 2>&1 | xcsift --format toon
+xcodebuild build 2>&1 | xcsift -f toon
 
 # TOON with warnings
-swift build 2>&1 | xcsift -t --print-warnings
-xcodebuild build 2>&1 | xcsift -t -w
+swift build 2>&1 | xcsift -f toon --print-warnings
+xcodebuild build 2>&1 | xcsift -f toon -w
 
 # TOON with coverage
-swift test --enable-code-coverage 2>&1 | xcsift -t --coverage
-xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift -t -c
+swift test --enable-code-coverage 2>&1 | xcsift -f toon --coverage
+xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift -f toon -c
 
 # Combine all flags
-xcodebuild test 2>&1 | xcsift -t -w -c --coverage-details
+xcodebuild test 2>&1 | xcsift -f toon -w -c --coverage-details
 ```
 
 ## Output Format
@@ -206,7 +206,7 @@ xcodebuild test 2>&1 | xcsift -t -w -c --coverage-details
 
 ### TOON Format
 
-With the `--toon` / `-t` flag, xcsift outputs in **TOON (Token-Oriented Object Notation)** format, which provides **30-60% token reduction** compared to JSON. This format is specifically optimized for LLM consumption and can significantly reduce API costs.
+With the `--format toon` / `-f toon` flag, xcsift outputs in **TOON (Token-Oriented Object Notation)** format, which provides **30-60% token reduction** compared to JSON. This format is specifically optimized for LLM consumption and can significantly reduce API costs.
 
 ```toon
 status: failed
@@ -236,6 +236,53 @@ warnings[3]{file,line,message}:
 - JSON: 652 bytes
 - TOON: 447 bytes
 - **Savings: 31.4%** (205 bytes)
+
+### TOON Configuration
+
+TOON format can be customized with delimiter and length marker options for different use cases:
+
+**Delimiter Options** (`--toon-delimiter [comma|tab|pipe]`):
+- `comma` (default): CSV-style format, most compact
+  ```bash
+  xcodebuild build 2>&1 | xcsift -f toon
+  # Output: errors[1]{file,line,message}:
+  #   main.swift,15,"use of undeclared identifier"
+  ```
+
+- `tab`: TSV-style format, ideal for Excel/spreadsheet import
+  ```bash
+  xcodebuild build 2>&1 | xcsift -f toon --toon-delimiter tab
+  # Output uses tabs instead of commas, can be directly imported to Excel
+  ```
+
+- `pipe`: Alternative separator, useful when data contains many commas
+  ```bash
+  xcodebuild build 2>&1 | xcsift -f toon --toon-delimiter pipe
+  # Output: errors[1]{file|line|message}:
+  #   main.swift|15|"use of undeclared identifier"
+  ```
+
+**Length Marker Options** (`--toon-length-marker [none|hash]`):
+- `none` (default): Standard array notation `[3]{...}`
+  ```bash
+  xcodebuild build 2>&1 | xcsift -f toon
+  # Output: errors[1]{file,line,message}:
+  ```
+
+- `hash`: Ruby/Perl-style length prefix `[#3]{...}`
+  ```bash
+  xcodebuild build 2>&1 | xcsift -f toon --toon-length-marker hash
+  # Output: errors[#1]{file,line,message}:
+  ```
+
+**Combined Configuration:**
+```bash
+# TSV format with hash markers for data analysis workflows
+xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter tab --toon-length-marker hash -w -c
+
+# Pipe-delimited with hash markers for complex data
+swift test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash --coverage-details
+```
 
 
 ## Comparison with xcbeautify/xcpretty

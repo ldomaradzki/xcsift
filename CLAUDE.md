@@ -80,19 +80,19 @@ xcodebuild test 2>&1 | xcsift --coverage --coverage-path path/to/file.xcresult
 # Token-Oriented Object Notation - optimized for LLM consumption
 
 # Basic TOON output
-xcodebuild build 2>&1 | xcsift --toon
-xcodebuild build 2>&1 | xcsift -t
+xcodebuild build 2>&1 | xcsift --format toon
+xcodebuild build 2>&1 | xcsift -f toon
 
 # TOON with warnings
-swift build 2>&1 | xcsift -t --print-warnings
-xcodebuild build 2>&1 | xcsift -t -w
+swift build 2>&1 | xcsift -f toon --print-warnings
+xcodebuild build 2>&1 | xcsift -f toon -w
 
 # TOON with coverage
-swift test --enable-code-coverage 2>&1 | xcsift -t --coverage
-xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift -t -c
+swift test --enable-code-coverage 2>&1 | xcsift -f toon --coverage
+xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift -f toon -c
 
 # Combine all flags
-xcodebuild test 2>&1 | xcsift -t -w -c --coverage-details
+xcodebuild test 2>&1 | xcsift -f toon -w -c --coverage-details
 
 # TOON format features:
 # - 30-60% token reduction compared to JSON
@@ -100,6 +100,32 @@ xcodebuild test 2>&1 | xcsift -t -w -c --coverage-details
 # - Human-readable indentation-based structure
 # - Ideal for LLM consumption and API cost reduction
 # - Works with all existing flags (--quiet, --coverage, --print-warnings)
+
+# TOON Configuration - customize delimiter and length markers
+
+# Delimiter options (default: comma):
+# - comma: CSV-style format (default, most compact)
+# - tab: TSV-style format (better for Excel/spreadsheet import)
+# - pipe: Alternative separator (good for data with many commas)
+
+# Tab delimiter - useful for Excel/spreadsheet import
+xcodebuild build 2>&1 | xcsift -f toon --toon-delimiter tab
+swift build 2>&1 | xcsift --format toon --toon-delimiter tab
+
+# Pipe delimiter - alternative when data contains many commas
+xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe
+
+# Length marker options (default: none):
+# - none: [3]{file,line,message}: (default, most compact)
+# - hash: [#3]{file,line,message}: (Ruby/Perl-style length prefix)
+
+# Hash length marker - adds # prefix to array counts
+xcodebuild build 2>&1 | xcsift -f toon --toon-length-marker hash
+swift build 2>&1 | xcsift --format toon --toon-length-marker hash
+
+# Combine configuration options
+xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter tab --toon-length-marker hash -w -c
+swift test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash --coverage-details
 ```
 
 ## Architecture
@@ -110,7 +136,7 @@ The codebase follows a simple two-component architecture:
 
 1. **main.swift** - Entry point using Swift ArgumentParser
    - Reads from stdin and coordinates parsing/output
-   - Outputs JSON or TOON format (controlled by `--toon` / `-t` flag)
+   - Outputs JSON or TOON format (controlled by `--format` / `-f` flag)
 
 2. **OutputParser.swift** - Core parsing logic
    - `OutputParser` class with regex-based line parsing
@@ -223,7 +249,7 @@ The tool outputs structured data optimized for coding agents in two formats:
     - Automatically detects format and parses accordingly
     - Warns to stderr if target was detected but no matching coverage data found
 
-### TOON Format (with `--toon` / `-t` flag)
+### TOON Format (with `--format toon` / `-f toon` flag)
 
 **TOON (Token-Oriented Object Notation)** is a compact serialization format optimized for LLM consumption, providing **30-60% token reduction** compared to JSON.
 
