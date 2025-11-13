@@ -93,7 +93,7 @@ Supports both **JSON** (default) and **TOON** formats.
 xcodebuild build 2>&1 | xcsift
 
 # Print detailed warnings list (useful for fixing warnings)
-xcodebuild build 2>&1 | xcsift --print-warnings
+xcodebuild build 2>&1 | xcsift --warnings
 xcodebuild build 2>&1 | xcsift -w
 
 # Quiet mode - suppress output when build succeeds with no warnings or errors
@@ -128,7 +128,7 @@ xcodebuild build 2>&1 | xcsift --format toon
 xcodebuild build 2>&1 | xcsift -f toon
 
 # TOON with warnings
-swift build 2>&1 | xcsift -f toon --print-warnings
+swift build 2>&1 | xcsift -f toon --warnings
 xcodebuild build 2>&1 | xcsift -f toon -w
 
 # TOON with coverage
@@ -189,7 +189,7 @@ xcodebuild test 2>&1 | xcsift -f toon -w -c --coverage-details
 }
 ```
 
-**Note on warnings:** By default, only the warning count appears in `summary.warnings`. The detailed `warnings` array (shown above) is only included when using the `--print-warnings` flag. This reduces token usage for coding agents that don't need to process every warning.
+**Note on warnings:** By default, only the warning count appears in `summary.warnings`. The detailed `warnings` array (shown above) is only included when using the `--warnings` flag. This reduces token usage for coding agents that don't need to process every warning.
 
 **Note on coverage:** The `coverage` section is only included when using the `--coverage-details` flag:
 - **Summary-only mode** (default): Only includes coverage percentage in summary for maximum token efficiency
@@ -229,7 +229,7 @@ warnings[3]{file,line,message}:
 - **30-60% fewer tokens** - Reduces LLM API costs significantly
 - **Tabular format** - Uniform arrays (errors, warnings) shown as compact tables
 - **Human-readable** - Indentation-based structure similar to YAML
-- **Compatible** - Works with all existing flags (`--quiet`, `--coverage`, `--print-warnings`)
+- **Compatible** - Works with all existing flags (`--quiet`, `--coverage`, `--warnings`)
 
 **Example token savings:**
 - Same build output (1 error, 3 warnings)

@@ -39,8 +39,8 @@ swift build 2>&1 | xcsift
 swift test 2>&1 | xcsift
 
 # Print detailed warnings list (by default only warning count is shown in summary)
-swift build 2>&1 | xcsift --print-warnings
-xcodebuild build 2>&1 | xcsift --print-warnings
+swift build 2>&1 | xcsift --warnings
+xcodebuild build 2>&1 | xcsift --warnings
 
 # Quiet mode - suppress output when build succeeds with no warnings or errors
 swift build 2>&1 | xcsift --quiet
@@ -84,7 +84,7 @@ xcodebuild build 2>&1 | xcsift --format toon
 xcodebuild build 2>&1 | xcsift -f toon
 
 # TOON with warnings
-swift build 2>&1 | xcsift -f toon --print-warnings
+swift build 2>&1 | xcsift -f toon --warnings
 xcodebuild build 2>&1 | xcsift -f toon -w
 
 # TOON with coverage
@@ -99,7 +99,7 @@ xcodebuild test 2>&1 | xcsift -f toon -w -c --coverage-details
 # - Tabular format for uniform arrays (errors, warnings, tests)
 # - Human-readable indentation-based structure
 # - Ideal for LLM consumption and API cost reduction
-# - Works with all existing flags (--quiet, --coverage, --print-warnings)
+# - Works with all existing flags (--quiet, --coverage, --warnings)
 
 # TOON Configuration - customize delimiter and length markers
 
@@ -215,7 +215,7 @@ The tool outputs structured data optimized for coding agents in two formats:
 - **JSON**: Structured format with `status`, `summary`, `errors`, `warnings` (optional), `failed_tests`, `coverage` (optional)
   - **Summary always includes warning count**: `{"summary": {"warnings": N, ...}}`
   - **Summary includes coverage percentage** (when `--coverage` flag is used): `{"summary": {"coverage_percent": X.X, ...}}`
-  - **Detailed warnings list** (with `--print-warnings` flag): `{"warnings": [{"file": "...", "line": N, "message": "..."}]}`
+  - **Detailed warnings list** (with `--warnings` flag): `{"warnings": [{"file": "...", "line": N, "message": "..."}]}`
   - **Default behavior** (without flag): Only shows warning count in summary, omits detailed warnings array to reduce token usage
   - **Quiet mode** (with `--quiet` or `-q` flag): Produces no output when build succeeds with zero warnings and zero errors
   - **Coverage data** (with `--coverage` flag):
@@ -257,7 +257,7 @@ The tool outputs structured data optimized for coding agents in two formats:
 - Tabular format for uniform arrays (errors, warnings, tests, coverage files)
 - Indentation-based structure (similar to YAML)
 - Human-readable while optimized for machine parsing
-- Works with all existing flags (`--quiet`, `--coverage`, `--print-warnings`)
+- Works with all existing flags (`--quiet`, `--coverage`, `--warnings`)
 - Ideal for reducing LLM API costs
 
 **Example TOON Output:**
