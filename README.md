@@ -1,5 +1,9 @@
 # xcsift
 
+[![Release](https://github.com/ldomaradzki/xcsift/actions/workflows/release.yml/badge.svg)](https://github.com/ldomaradzki/xcsift/actions/workflows/release.yml)
+
+![Example](.github/images/example.png)
+
 A Swift command-line tool to parse and format xcodebuild/SPM output for coding agents, optimized for token efficiency.
 
 ## Overview
