@@ -80,6 +80,24 @@ struct BuildSummary: Codable {
         case buildTime = "build_time"
         case coveragePercent = "coverage_percent"
     }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(errors, forKey: .errors)
+        try container.encode(warnings, forKey: .warnings)
+        try container.encode(failedTests, forKey: .failedTests)
+
+        // Only encode optional fields if they have values
+        if let passedTests = passedTests {
+            try container.encode(passedTests, forKey: .passedTests)
+        }
+        if let buildTime = buildTime {
+            try container.encode(buildTime, forKey: .buildTime)
+        }
+        if let coveragePercent = coveragePercent {
+            try container.encode(coveragePercent, forKey: .coveragePercent)
+        }
+    }
 }
 
 struct BuildError: Codable {
