@@ -1,5 +1,9 @@
 # xcsift
 
+[![Release](https://github.com/ldomaradzki/xcsift/actions/workflows/release.yml/badge.svg)](https://github.com/ldomaradzki/xcsift/actions/workflows/release.yml)
+
+![Example](.github/images/example.png)
+
 A Swift command-line tool to parse and format xcodebuild/SPM output for coding agents, optimized for token efficiency.
 
 ## Overview
@@ -31,7 +35,15 @@ brew install xcsift
 brew install https://raw.githubusercontent.com/ldomaradzki/xcsift/master/homebrew-formula/xcsift.rb
 ```
 
-### Option 2: mise
+### Option 2: Mint
+
+If you use [Mint](https://github.com/yonaskolb/mint) for managing Swift command-line tools:
+
+```bash
+mint install ldomaradzki/xcsift
+```
+
+### Option 3: mise
 
 If you use [mise](https://mise.jdx.dev/) for managing development tools:
 
@@ -46,7 +58,7 @@ mise use -g xcsift
 
 This will automatically download the latest binary from GitHub releases.
 
-### Option 3: Build from Source
+### Option 4: Build from Source
 
 ```bash
 git clone https://github.com/ldomaradzki/xcsift.git
