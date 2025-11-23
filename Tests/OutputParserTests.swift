@@ -106,19 +106,13 @@ final class OutputParserTests: XCTestCase {
         Building for debugging...
         Build failed after 5.7 seconds
         """
-        
+
         let result = parser.parse(input: input)
-        
+
         XCTAssertEqual(result.summary.buildTime, "5.7 seconds")
         XCTAssertNil(result.summary.passedTests)
     }
-    
-    func testDeprecatedFunction() {
-        let parser = OutputParser()
-        let _ = parser.deprecatedFunction()
-        parser.functionWithUnusedVariable()
-    }
-    
+
     func testParseCompileError() {
         let parser = OutputParser()
         let input = """
