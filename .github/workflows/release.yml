@@ -10,27 +10,68 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    strategy:
+      matrix:
+        include:
+          - os: macos-15
+            platform: macos-arm64
+            arch: arm64
+            build-path: arm64-apple-macosx/release
+          - os: ubuntu-latest
+            platform: linux-x64
+            arch: x86_64
+            build-path: x86_64-unknown-linux-gnu/release
+            container: swift:6.0
+
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+
     steps:
+      - name: Install dependencies (Linux)
+        if: matrix.platform == 'linux-x64'
+        run: apt-get update && apt-get install -y curl
+
       - uses: actions/checkout@v4
 
-      - name: Select Xcode 16
+      - name: Select Xcode 16 (macOS)
+        if: matrix.platform == 'macos-arm64'
         run: sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
 
-      - name: Build for Apple Silicon
+      - name: Replace version placeholder
         run: |
-          # Replace version in source code with git tag (strip v prefix)
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
-          sed -i '' "s/VERSION_PLACEHOLDER/$VERSION/g" Sources/main.swift
-          swift build -c release --arch arm64
-            
+          if [ "${{ matrix.platform }}" = "macos-arm64" ]; then
+            sed -i '' "s/VERSION_PLACEHOLDER/$VERSION/g" Sources/main.swift
+          else
+            sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" Sources/main.swift
+          fi
+
+      - name: Build release binary
+        run: swift build -c release --arch ${{ matrix.arch }}
+
       - name: Create release archive
         run: |
-          tar -czf xcsift-${{ github.ref_name }}-macos-arm64.tar.gz -C .build/arm64-apple-macosx/release xcsift
-          
+          tar -czf xcsift-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz \
+            -C .build/${{ matrix.build-path }} xcsift
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcsift-${{ matrix.platform }}
+          path: xcsift-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: xcsift-${{ github.ref_name }}-macos-arm64.tar.gz
+          files: artifacts/*/xcsift-*.tar.gz
           generate_release_notes: true
