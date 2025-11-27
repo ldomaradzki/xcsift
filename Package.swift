@@ -1,12 +1,9 @@
 // swift-tools-version: 6.0
 import PackageDescription
-import Foundation
 
 let package = Package(
     name: "xcsift",
-    platforms: [
-        .macOS(.v15)
-    ],
+    platforms: [.macOS(.v15)],
     products: [
         .executable(
             name: "xcsift",
@@ -36,4 +33,3 @@ let package = Package(
         )
     ]
 )
-

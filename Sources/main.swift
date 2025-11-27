@@ -1,7 +1,20 @@
 import ArgumentParser
 import Foundation
+#if canImport(Darwin)
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 import TOONEncoder
+
+// MARK: - Stderr Helper
+
+/// Thread-safe wrapper for writing to stderr
+private func writeToStderr(_ message: String) {
+    FileHandle.standardError.write(Data(message.utf8))
+}
 
 // MARK: - Format Types
 
@@ -135,7 +148,7 @@ struct XCSift: ParsableCommand {
 
             // Warn if target filter was extracted but no coverage data was found
             if let filter = targetFilter, coverageData == nil {
-                fputs("Warning: Target '\(filter)' was detected but no matching coverage data was found.\n", stderr)
+                writeToStderr("Warning: Target '\(filter)' was detected but no matching coverage data was found.\n")
             }
         }
 
@@ -200,10 +213,10 @@ struct XCSift: ParsableCommand {
             if let toonString = String(data: toonData, encoding: .utf8) {
                 print(toonString)
             } else {
-                fputs("Error: TOON data is not valid UTF-8\n", stderr)
+                writeToStderr("Error: TOON data is not valid UTF-8\n")
             }
         } catch {
-            fputs("Error encoding TOON: \(error)\n", stderr)
+            writeToStderr("Error encoding TOON: \(error)\n")
         }
     }
     
