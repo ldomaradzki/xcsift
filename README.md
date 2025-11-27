@@ -1,6 +1,10 @@
 # xcsift
 
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fldomaradzki%2Fxcsift%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/ldomaradzki/xcsift)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fldomaradzki%2Fxcsift%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/ldomaradzki/xcsift)
+[![CI](https://github.com/ldomaradzki/xcsift/actions/workflows/ci.yml/badge.svg)](https://github.com/ldomaradzki/xcsift/actions/workflows/ci.yml)
 [![Release](https://github.com/ldomaradzki/xcsift/actions/workflows/release.yml/badge.svg)](https://github.com/ldomaradzki/xcsift/actions/workflows/release.yml)
+[![License](https://img.shields.io/github/license/ldomaradzki/xcsift.svg)](LICENSE.md)
 
 ![Example](.github/images/example.png)
 
