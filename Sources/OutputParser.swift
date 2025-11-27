@@ -62,6 +62,108 @@ struct BuildResult: Codable {
             try container.encode(coverage, forKey: .coverage)
         }
     }
+
+    // MARK: - GitHub Actions Output
+
+    /// Formats the build result as GitHub Actions workflow commands
+    func formatGitHubActions() -> String {
+        var output: [String] = []
+
+        // Format errors as ::error commands
+        for error in errors {
+            output.append(formatGitHubActionsError(error))
+        }
+
+        // Format warnings as ::warning commands
+        if printWarnings {
+            for warning in warnings {
+                output.append(formatGitHubActionsWarning(warning))
+            }
+        }
+
+        // Format failed tests as ::error commands
+        for test in failedTests {
+            output.append(formatGitHubActionsTest(test))
+        }
+
+        // Add summary notice
+        let summaryMessage = buildSummaryMessage()
+        output.append("::notice ::\(summaryMessage)")
+
+        return output.joined(separator: "\n")
+    }
+
+    private func formatGitHubActionsError(_ error: BuildError) -> String {
+        let fileComponents = formatFileComponents(file: error.file, line: error.line, column: error.column)
+        return "::\("error") \(fileComponents)::\(error.message)"
+    }
+
+    private func formatGitHubActionsWarning(_ warning: BuildWarning) -> String {
+        let fileComponents = formatFileComponents(file: warning.file, line: warning.line, column: warning.column)
+        return "::\("warning") \(fileComponents)::\(warning.message)"
+    }
+
+    private func formatGitHubActionsTest(_ test: FailedTest) -> String {
+        var fileComponents = formatFileComponents(file: test.file, line: test.line, column: test.column)
+        // Add test name as title for better visibility in GitHub Actions
+        if !fileComponents.isEmpty {
+            fileComponents += ","
+        }
+        fileComponents += "title=\(test.test)"
+        return "::\("error") \(fileComponents)::\(test.message)"
+    }
+
+    private func formatFileComponents(file: String?, line: Int?, column: Int?) -> String {
+        guard let file = file else {
+            return ""
+        }
+
+        guard let line = line else {
+            return "file=\(file)"
+        }
+
+        if let column = column {
+            return "file=\(file),line=\(line),col=\(column)"
+        }
+
+        return "file=\(file),line=\(line)"
+    }
+
+    private func buildSummaryMessage() -> String {
+        var parts: [String] = []
+
+        if status == "success" {
+            parts.append("Build succeeded")
+        } else {
+            parts.append("Build failed")
+        }
+
+        if summary.errors > 0 {
+            parts.append("\(summary.errors) error\(summary.errors == 1 ? "" : "s")")
+        }
+
+        if summary.warnings > 0 {
+            parts.append("\(summary.warnings) warning\(summary.warnings == 1 ? "" : "s")")
+        }
+
+        if summary.failedTests > 0 {
+            parts.append("\(summary.failedTests) failed test\(summary.failedTests == 1 ? "" : "s")")
+        }
+
+        if let passedTests = summary.passedTests, passedTests > 0 {
+            parts.append("\(passedTests) passed test\(passedTests == 1 ? "" : "s")")
+        }
+
+        if let buildTime = summary.buildTime {
+            parts.append("in \(buildTime)")
+        }
+
+        if let coveragePercent = summary.coveragePercent {
+            parts.append(String(format: "%.1f%% coverage", coveragePercent))
+        }
+
+        return parts.joined(separator: ", ")
+    }
 }
 
 struct BuildSummary: Codable {
@@ -104,12 +206,26 @@ struct BuildError: Codable {
     let file: String?
     let line: Int?
     let message: String
+
+    // Internal only - used for GitHub Actions format, not encoded to JSON/TOON
+    var column: Int? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case file, line, message
+    }
 }
 
 struct BuildWarning: Codable {
     let file: String?
     let line: Int?
     let message: String
+
+    // Internal only - used for GitHub Actions format, not encoded to JSON/TOON
+    var column: Int? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case file, line, message
+    }
 }
 
 struct FailedTest: Codable {
@@ -117,6 +233,13 @@ struct FailedTest: Codable {
     let message: String
     let file: String?
     let line: Int?
+
+    // Internal only - used for GitHub Actions format, not encoded to JSON/TOON
+    var column: Int? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case test, message, file, line
+    }
 }
 
 struct CodeCoverage: Codable {
@@ -426,17 +549,18 @@ class OutputParser {
             ":"
             Capture(OneOrMore(.digit))
             ":"
-            OneOrMore(.digit)
+            Capture(OneOrMore(.digit))
             ": error: "
             Capture(OneOrMore(.any, .reluctant))
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: fileLineColumnError) {
             let file = String(match.1)
             let lineNumber = Int(String(match.2))
-            let message = String(match.3)
-            return BuildError(file: file, line: lineNumber, message: message)
+            let columnNumber = Int(String(match.3))
+            let message = String(match.4)
+            return BuildError(file: file, line: lineNumber, message: message, column: columnNumber)
         }
         
         // Pattern: file:line: error: message
@@ -545,7 +669,7 @@ class OutputParser {
             ":"
             Capture(OneOrMore(.digit))
             ":"
-            OneOrMore(.digit)
+            Capture(OneOrMore(.digit))
             ": warning: "
             Capture(OneOrMore(.any, .reluctant))
             Anchor.endOfSubject
@@ -554,8 +678,9 @@ class OutputParser {
         if let match = line.firstMatch(of: fileLineColumnWarning) {
             let file = String(match.1)
             let lineNumber = Int(String(match.2))
-            let message = String(match.3)
-            return BuildWarning(file: file, line: lineNumber, message: message)
+            let columnNumber = Int(String(match.3))
+            let message = String(match.4)
+            return BuildWarning(file: file, line: lineNumber, message: message, column: columnNumber)
         }
 
         // Pattern: file:line: warning: message

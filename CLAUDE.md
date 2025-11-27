@@ -308,3 +308,49 @@ For the same build output with 1 error and 3 warnings:
 - Integrating with existing JSON-based tooling
 - Maximum compatibility with JSON parsers
 - Pretty-printed output for human debugging
+
+### GitHub Actions Integration (automatic on CI)
+
+When running on GitHub Actions (`GITHUB_ACTIONS=true`), xcsift automatically appends workflow annotations after the JSON/TOON output. This creates inline annotations in PRs and the Actions UI.
+
+**Behavior Matrix:**
+
+| Environment | Format Flag | Output |
+|-------------|-------------|--------|
+| Local | (none) | JSON |
+| Local | `-f json` | JSON |
+| Local | `-f toon` | TOON |
+| Local | `-f github-actions` | Annotations only |
+| CI | (none) | JSON + Annotations |
+| CI | `-f json` | JSON + Annotations |
+| CI | `-f toon` | TOON + Annotations |
+| CI | `-f github-actions` | Annotations only |
+
+**Example CI Output:**
+```
+{
+  "status": "failed",
+  "summary": { "errors": 1, "warnings": 2 }
+}
+::error file=main.swift,line=15,col=5::use of undeclared identifier 'unknown'
+::warning file=Parser.swift,line=20,col=10::immutable value 'result' was never used
+::notice ::Build failed, 1 error, 2 warnings
+```
+
+**Annotations Format:**
+- `::error file=X,line=Y,col=Z::message` — compile errors, test failures
+- `::warning file=X,line=Y,col=Z::message` — compiler warnings
+- `::notice ::summary` — build summary
+
+**Usage in CI:**
+```yaml
+# GitHub Actions workflow
+- name: Build
+  run: xcodebuild build 2>&1 | xcsift  # JSON + annotations automatic
+
+- name: Build with TOON
+  run: xcodebuild build 2>&1 | xcsift -f toon  # TOON + annotations automatic
+
+- name: Annotations only (no JSON/TOON)
+  run: xcodebuild build 2>&1 | xcsift -f github-actions
+```

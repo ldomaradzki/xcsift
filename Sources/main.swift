@@ -21,6 +21,7 @@ private func writeToStderr(_ message: String) {
 enum FormatType: String, ExpressibleByArgument {
     case json
     case toon
+    case githubActions = "github-actions"
 }
 
 enum TOONDelimiterType: String, ExpressibleByArgument {
@@ -62,9 +63,9 @@ struct XCSift: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "xcsift",
         abstract: "A Swift tool to parse and format xcodebuild output for coding agents",
-        usage: "xcodebuild [options] 2>&1 | xcsift [--format|-f json|toon] [--toon-delimiter comma|tab|pipe] [--toon-length-marker none|hash] [--warnings|-w] [--Werror|-W] [--quiet|-q] [--coverage|-c] [--version|-v] [--help|-h]",
+        usage: "xcodebuild [options] 2>&1 | xcsift [--format|-f json|toon|github-actions] [--toon-delimiter comma|tab|pipe] [--toon-length-marker none|hash] [--warnings|-w] [--Werror|-W] [--quiet|-q] [--coverage|-c] [--version|-v] [--help|-h]",
         discussion: """
-        xcsift parses xcodebuild/SPM output and formats it as JSON or TOON.
+        xcsift parses xcodebuild/SPM output and formats it as JSON, TOON, or GitHub Actions.
 
         Important: Always use 2>&1 to redirect stderr to stdout.
 
@@ -82,6 +83,10 @@ struct XCSift: ParsableCommand {
         TOON format (30-60% fewer tokens for LLMs):
           xcodebuild build 2>&1 | xcsift -f toon
           swift test 2>&1 | xcsift -f toon -w -c
+
+        GitHub Actions (auto-appended on CI):
+          On CI, JSON/TOON output is followed by GitHub Actions annotations.
+          Use -f github-actions for annotations only (no JSON/TOON).
 
         Configuration options:
           --toon-delimiter [comma|tab|pipe]  # Default: comma
@@ -111,8 +116,13 @@ struct XCSift: ParsableCommand {
     @Flag(name: .long, help: "Include detailed per-file coverage data (default: summary only)")
     var coverageDetails: Bool = false
 
-    @Option(name: [.customShort("f"), .long], help: "Output format (json or toon). Default: json")
+    @Option(name: [.customShort("f"), .long], help: "Output format (json, toon, or github-actions). Default: json. On CI, annotations are auto-appended.")
     var format: FormatType = .json
+
+    /// Detects if running in GitHub Actions CI environment
+    private var isCI: Bool {
+        ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == "true"
+    }
 
     @Option(name: .long, help: "TOON delimiter (comma, tab, or pipe). Default: comma")
     var toonDelimiter: TOONDelimiterType = .comma
@@ -178,10 +188,22 @@ struct XCSift: ParsableCommand {
             return
         }
 
-        if format == .toon {
+        switch format {
+        case .githubActions:
+            // Explicit github-actions format: only annotations
+            outputGitHubActions(result)
+        case .toon:
             outputTOON(result)
-        } else {
+            // Auto-append GitHub Actions annotations on CI
+            if isCI {
+                outputGitHubActions(result)
+            }
+        case .json:
             outputJSON(result)
+            // Auto-append GitHub Actions annotations on CI
+            if isCI {
+                outputGitHubActions(result)
+            }
         }
     }
     
@@ -219,7 +241,12 @@ struct XCSift: ParsableCommand {
             writeToStderr("Error encoding TOON: \(error)\n")
         }
     }
-    
+
+    private func outputGitHubActions(_ result: BuildResult) {
+        let output = result.formatGitHubActions()
+        print(output)
+    }
+
 }
 
 XCSift.main()
