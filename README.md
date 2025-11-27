@@ -291,6 +291,11 @@ swift test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash
 | **Code coverage** | Auto-converts | No | No |
 | **Build time** | Fast | Fast | Slower |
 
+## Platform Support
+
+- **macOS 15+**: Full support including code coverage
+- **Linux (Swift 6.0+)**: Build/test parsing supported; coverage features unavailable
+
 ## Development
 
 ### Running Tests

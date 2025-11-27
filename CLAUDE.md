@@ -206,6 +206,18 @@ swift test --filter OutputParserTests.testParseError
 - **Foundation**: Core Swift framework for regex, JSON encoding, string processing
 - **XCTest**: Testing framework (test target only)
 
+## Platform Support
+
+- **macOS 15+**: Full support including code coverage conversion
+- **Linux (Swift 6.0+)**: Full support for build/test parsing; coverage features use macOS-specific tools (`xcrun`) and return `nil` on Linux
+
+### Linux Compatibility Notes
+
+When modifying code, ensure Linux compatibility:
+- Use conditional imports: `#if canImport(Darwin)` / `#elseif canImport(Glibc)` / `#elseif canImport(Musl)`
+- Avoid `fputs(..., stderr)` — use `FileHandle.standardError.write()` for Swift 6 concurrency safety
+- CI runs on both macOS and Linux (see `.github/workflows/ci.yml`)
+
 ## Output Formats
 
 The tool outputs structured data optimized for coding agents in two formats:
