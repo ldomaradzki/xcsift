@@ -1127,7 +1127,7 @@ class OutputParser {
         }
 
         var isDirectory: ObjCBool = false
-        fileManager.fileExists(atPath: coveragePath, isDirectory: &isDirectory)
+        _ = fileManager.fileExists(atPath: coveragePath, isDirectory: &isDirectory)
 
         if isDirectory.boolValue {
             guard let files = try? fileManager.contentsOfDirectory(atPath: coveragePath) else {
