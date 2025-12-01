@@ -250,6 +250,108 @@ final class TOONFormatTests: XCTestCase {
         XCTAssertTrue(toonString!.contains("[#1]{"), "Should show [#1]{ for array of 1 element")
     }
 
+    // MARK: - TOON 3.0 Key Folding Tests
+
+    func testTOONKeyFoldingDisabledByDefault() throws {
+        let encoder = TOONEncoder()
+        // Verify default value is disabled
+        XCTAssertEqual(encoder.keyFolding, .disabled, "Key folding should be disabled by default")
+    }
+
+    func testTOONKeyFoldingSafe() throws {
+        // Test that safe key folding can be configured
+        let encoder = TOONEncoder()
+        encoder.keyFolding = .safe
+        XCTAssertEqual(encoder.keyFolding, .safe, "Key folding should be set to safe")
+    }
+
+    func testTOONFlattenDepthDefault() throws {
+        let encoder = TOONEncoder()
+        // Default flattenDepth should be Int.max (unlimited)
+        XCTAssertEqual(encoder.flattenDepth, Int.max, "Flatten depth should default to max")
+    }
+
+    func testTOONFlattenDepthCustom() throws {
+        let encoder = TOONEncoder()
+        encoder.flattenDepth = 3
+        XCTAssertEqual(encoder.flattenDepth, 3, "Flatten depth should be set to custom value")
+    }
+
+    func testTOONKeyFoldingWithBuildResult() throws {
+        let parser = OutputParser()
+        let input = """
+        main.swift:15:5: error: use of undeclared identifier 'unknown'
+        """
+        let result = parser.parse(input: input)
+
+        // Test with key folding enabled
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        encoder.keyFolding = .safe
+
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        // Output should still be valid TOON
+        XCTAssertTrue(toonString!.contains("status: failed"))
+        XCTAssertTrue(toonString!.contains("errors"))
+    }
+
+    func testTOONKeyFoldingWithFlattenDepth() throws {
+        let parser = OutputParser()
+        let input = "Build complete!"
+        let coverage = CodeCoverage(
+            lineCoverage: 85.5,
+            files: [
+                FileCoverage(path: "/path/to/file.swift", name: "file.swift", lineCoverage: 85.5, coveredLines: 85, executableLines: 100)
+            ]
+        )
+        let result = parser.parse(input: input, printWarnings: false, coverage: coverage, printCoverageDetails: true)
+
+        // Test with key folding and custom flatten depth
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        encoder.keyFolding = .safe
+        encoder.flattenDepth = 2
+
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        // Output should still be valid TOON with coverage data
+        XCTAssertTrue(toonString!.contains("status: success"))
+        XCTAssertTrue(toonString!.contains("coverage_percent: 85.5"))
+    }
+
+    func testTOON30CombinedConfiguration() throws {
+        // Test combining all TOON 3.0 features
+        let parser = OutputParser()
+        let input = """
+        main.swift:15:5: error: use of undeclared identifier 'unknown'
+        Parser.swift:20:10: warning: unused variable
+        """
+        let result = parser.parse(input: input, printWarnings: true)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .pipe
+        encoder.lengthMarker = .hash
+        encoder.keyFolding = .safe
+        encoder.flattenDepth = 5
+
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        // Verify basic structure is preserved
+        XCTAssertTrue(toonString!.contains("status: failed"))
+        XCTAssertTrue(toonString!.contains("|"), "Should use pipe delimiter")
+        XCTAssertTrue(toonString!.contains("[#"), "Should use hash length marker")
+    }
+
     // MARK: - Benchmark Tests
 
     func testBenchmarkSmallOutput() throws {
