@@ -126,6 +126,22 @@ swift build 2>&1 | xcsift --format toon --toon-length-marker hash
 # Combine configuration options
 xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter tab --toon-length-marker hash -w -c
 swift test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash --coverage-details
+
+# TOON 3.0 Key Folding - collapses nested single-key objects into dotted paths
+# Key folding options (default: disabled):
+# - disabled: Normal nested output (default)
+# - safe: Collapses {a:{b:{c:1}}} → a.b.c: 1 when all keys are valid identifiers
+
+# Enable key folding for more compact output
+xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe
+swift build 2>&1 | xcsift --format toon --toon-key-folding safe
+
+# Flatten depth - limits how deep key folding goes (default: unlimited)
+xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 3
+swift build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 2
+
+# Combine all TOON 3.0 options
+xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash --toon-key-folding safe --toon-flatten-depth 5 -w -c
 ```
 
 ## Architecture
@@ -187,12 +203,20 @@ Tests are in `Tests/OutputParserTests.swift` using XCTest framework. Test cases 
 - Target extraction from xcodebuild output
 - Coverage target filtering
 - Summary-only vs details mode for coverage output
-- **TOON format encoding** (8 tests):
+- **TOON format encoding** (22 tests):
   - Basic TOON encoding
   - TOON with errors, warnings, and failed tests
   - TOON with code coverage
   - Token efficiency verification (30-60% reduction)
   - Summary-only vs details mode in TOON format
+  - **TOON 3.0 features** (7 tests):
+    - Key folding disabled by default
+    - Key folding safe mode
+    - Flatten depth default value
+    - Flatten depth custom configuration
+    - Key folding with build results
+    - Key folding combined with flatten depth
+    - Combined TOON 3.0 configuration
 
 Run individual tests:
 ```bash

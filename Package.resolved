@@ -1,5 +1,5 @@
 {
-  "originHash" : "fe181572dd461e3fc8f7fe443542a2fed2cbc01c79ed45b4670fd35c2524bc2c",
+  "originHash" : "bd8172da84552a55de816db12c58a8ae269a9f26a61f98beffa3a68f7165cef7",
   "pins" : [
     {
       "identity" : "swift-argument-parser",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mattt/TOONEncoder.git",
       "state" : {
-        "revision" : "643f4f26483f0d16f54738a6faf3ee78b92c4366",
-        "version" : "0.1.1"
+        "revision" : "8a2a61a9d0804d1d9cd65d05a0913e8d21038032",
+        "version" : "0.2.0"
       }
     }
   ],

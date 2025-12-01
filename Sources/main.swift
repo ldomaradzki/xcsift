@@ -50,6 +50,18 @@ enum TOONLengthMarkerType: String, ExpressibleByArgument {
     }
 }
 
+enum TOONKeyFoldingType: String, ExpressibleByArgument {
+    case disabled
+    case safe
+
+    var toonKeyFolding: TOONEncoder.KeyFolding {
+        switch self {
+        case .disabled: return .disabled
+        case .safe: return .safe
+        }
+    }
+}
+
 func getVersion() -> String {
     // Try to get version from git tag during build
     #if DEBUG
@@ -91,6 +103,8 @@ struct XCSift: ParsableCommand {
         Configuration options:
           --toon-delimiter [comma|tab|pipe]  # Default: comma
           --toon-length-marker [none|hash]   # Default: none
+          --toon-key-folding [disabled|safe] # Default: disabled (TOON 3.0)
+          --toon-flatten-depth N             # Default: unlimited (TOON 3.0)
         """,
         helpNames: [.short, .long]
     )
@@ -129,6 +143,12 @@ struct XCSift: ParsableCommand {
 
     @Option(name: .long, help: "TOON length marker (none or hash). Default: none")
     var toonLengthMarker: TOONLengthMarkerType = .none
+
+    @Option(name: .long, help: "TOON key folding (disabled or safe). Default: disabled. When safe, nested single-key objects collapse to dotted paths (TOON 3.0)")
+    var toonKeyFolding: TOONKeyFoldingType = .disabled
+
+    @Option(name: .long, help: "TOON flatten depth limit for key folding. Default: unlimited (TOON 3.0)")
+    var toonFlattenDepth: Int?
 
     func run() throws {
         if version {
@@ -229,6 +249,10 @@ struct XCSift: ParsableCommand {
         encoder.indent = 2
         encoder.delimiter = toonDelimiter.toonDelimiter
         encoder.lengthMarker = toonLengthMarker.toonLengthMarker
+        encoder.keyFolding = toonKeyFolding.toonKeyFolding
+        if let depth = toonFlattenDepth {
+            encoder.flattenDepth = depth
+        }
 
         do {
             let toonData = try encoder.encode(result)
