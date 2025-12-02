@@ -103,8 +103,8 @@ struct XCSift: ParsableCommand {
         Configuration options:
           --toon-delimiter [comma|tab|pipe]  # Default: comma
           --toon-length-marker [none|hash]   # Default: none
-          --toon-key-folding [disabled|safe] # Default: disabled (TOON 3.0)
-          --toon-flatten-depth N             # Default: unlimited (TOON 3.0)
+          --toon-key-folding [disabled|safe] # Default: disabled
+          --toon-flatten-depth N             # Default: unlimited
         """,
         helpNames: [.short, .long]
     )
@@ -144,10 +144,10 @@ struct XCSift: ParsableCommand {
     @Option(name: .long, help: "TOON length marker (none or hash). Default: none")
     var toonLengthMarker: TOONLengthMarkerType = .none
 
-    @Option(name: .long, help: "TOON key folding (disabled or safe). Default: disabled. When safe, nested single-key objects collapse to dotted paths (TOON 3.0)")
+    @Option(name: .long, help: "TOON key folding (disabled or safe). Default: disabled. When safe, nested single-key objects collapse to dotted paths")
     var toonKeyFolding: TOONKeyFoldingType = .disabled
 
-    @Option(name: .long, help: "TOON flatten depth limit for key folding. Default: unlimited (TOON 3.0)")
+    @Option(name: .long, help: "TOON flatten depth limit for key folding. Default: unlimited")
     var toonFlattenDepth: Int?
 
     func run() throws {

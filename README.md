@@ -27,6 +27,7 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 - **Target filtering** - Automatically filters xcodebuild coverage to tested target only
 - **Summary-only mode** - Default coverage output includes only percentage (token-efficient)
 - **Quiet mode** - Suppress output when build succeeds with no warnings or errors
+- **Werror mode** - Treat warnings as errors (build fails if warnings present)
 
 ## Installation
 
@@ -99,6 +100,10 @@ xcodebuild build 2>&1 | xcsift -w
 xcodebuild build 2>&1 | xcsift --quiet
 swift build 2>&1 | xcsift -q
 
+# Werror mode - treat warnings as errors (build fails if warnings present)
+xcodebuild build 2>&1 | xcsift --Werror
+swift build 2>&1 | xcsift -W
+
 # Code coverage - automatic conversion from .profraw or .xcresult to JSON
 # Default: summary-only mode (line coverage percentage only - token-efficient)
 # xcodebuild automatically searches ~/Library/Developer/Xcode/DerivedData for latest .xcresult
@@ -136,6 +141,10 @@ xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift -f toon -c
 
 # Combine all flags
 xcodebuild test 2>&1 | xcsift -f toon -w -c --coverage-details
+
+# TOON key folding - collapse nested objects to dotted paths
+xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe
+swift build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 3
 
 # GitHub Actions format (auto-detected when GITHUB_ACTIONS=true)
 # Creates workflow annotations visible in PR and Actions UI
@@ -289,6 +298,40 @@ xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter tab --toon-length-marker 
 
 # Pipe-delimited with hash markers for complex data
 swift test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash --coverage-details
+```
+
+### TOON Key Folding
+
+Key folding collapses nested single-key objects into dotted paths for more compact output.
+
+**Key Folding Options** (`--toon-key-folding [disabled|safe]`):
+- `disabled` (default): Normal nested output
+  ```toon
+  summary:
+    errors: 1
+    warnings: 0
+  ```
+
+- `safe`: Collapses nested single-key objects to dotted paths
+  ```bash
+  xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe
+  # Transforms {a:{b:{c:1}}} → a.b.c: 1 when all keys are valid identifiers
+  ```
+
+**Flatten Depth** (`--toon-flatten-depth N`):
+- Limits how deep key folding goes (default: unlimited)
+  ```bash
+  # Limit folding to 3 levels deep
+  xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 3
+
+  # Limit folding to 2 levels deep
+  swift build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 2
+  ```
+
+**Combined Key Folding Configuration:**
+```bash
+# All TOON options together
+xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash --toon-key-folding safe --toon-flatten-depth 5 -w -c
 ```
 
 ### GitHub Actions Format (Auto-Appended on CI)
