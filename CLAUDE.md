@@ -46,6 +46,10 @@ xcodebuild build 2>&1 | xcsift --warnings
 swift build 2>&1 | xcsift --quiet
 xcodebuild build 2>&1 | xcsift -q
 
+# Werror mode - treat warnings as errors (build fails if warnings present)
+swift build 2>&1 | xcsift --Werror
+xcodebuild build 2>&1 | xcsift -W
+
 # Code coverage - automatically converts .profraw/.xcresult to JSON (no manual conversion needed!)
 
 # SPM: auto-detects and converts .profraw files (summary-only by default)
@@ -127,7 +131,7 @@ swift build 2>&1 | xcsift --format toon --toon-length-marker hash
 xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter tab --toon-length-marker hash -w -c
 swift test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash --coverage-details
 
-# TOON 3.0 Key Folding - collapses nested single-key objects into dotted paths
+# TOON Key Folding - collapses nested single-key objects into dotted paths
 # Key folding options (default: disabled):
 # - disabled: Normal nested output (default)
 # - safe: Collapses {a:{b:{c:1}}} → a.b.c: 1 when all keys are valid identifiers
@@ -140,7 +144,7 @@ swift build 2>&1 | xcsift --format toon --toon-key-folding safe
 xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 3
 swift build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 2
 
-# Combine all TOON 3.0 options
+# Combine all TOON options
 xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash --toon-key-folding safe --toon-flatten-depth 5 -w -c
 ```
 
@@ -209,14 +213,14 @@ Tests are in `Tests/OutputParserTests.swift` using XCTest framework. Test cases 
   - TOON with code coverage
   - Token efficiency verification (30-60% reduction)
   - Summary-only vs details mode in TOON format
-  - **TOON 3.0 features** (7 tests):
+  - **TOON key folding features** (7 tests):
     - Key folding disabled by default
     - Key folding safe mode
     - Flatten depth default value
     - Flatten depth custom configuration
     - Key folding with build results
     - Key folding combined with flatten depth
-    - Combined TOON 3.0 configuration
+    - Combined TOON configuration
 
 Run individual tests:
 ```bash

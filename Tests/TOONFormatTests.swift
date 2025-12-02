@@ -250,7 +250,7 @@ final class TOONFormatTests: XCTestCase {
         XCTAssertTrue(toonString!.contains("[#1]{"), "Should show [#1]{ for array of 1 element")
     }
 
-    // MARK: - TOON 3.0 Key Folding Tests
+    // MARK: - TOON Key Folding Tests
 
     func testTOONKeyFoldingDisabledByDefault() throws {
         let encoder = TOONEncoder()
@@ -326,8 +326,8 @@ final class TOONFormatTests: XCTestCase {
         XCTAssertTrue(toonString!.contains("coverage_percent: 85.5"))
     }
 
-    func testTOON30CombinedConfiguration() throws {
-        // Test combining all TOON 3.0 features
+    func testTOONCombinedConfiguration() throws {
+        // Test combining all TOON key folding features
         let parser = OutputParser()
         let input = """
         main.swift:15:5: error: use of undeclared identifier 'unknown'
