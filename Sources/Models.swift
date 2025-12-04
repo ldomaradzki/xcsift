@@ -1,0 +1,277 @@
+import Foundation
+
+struct BuildResult: Codable {
+    let status: String
+    let summary: BuildSummary
+    let errors: [BuildError]
+    let warnings: [BuildWarning]
+    let failedTests: [FailedTest]
+    let coverage: CodeCoverage?
+    let printWarnings: Bool
+    let printCoverageDetails: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case status, summary, errors, warnings, coverage
+        case failedTests = "failed_tests"
+    }
+
+    init(
+        status: String,
+        summary: BuildSummary,
+        errors: [BuildError],
+        warnings: [BuildWarning],
+        failedTests: [FailedTest],
+        coverage: CodeCoverage?,
+        printWarnings: Bool,
+        printCoverageDetails: Bool = false
+    ) {
+        self.status = status
+        self.summary = summary
+        self.errors = errors
+        self.warnings = warnings
+        self.failedTests = failedTests
+        self.coverage = coverage
+        self.printWarnings = printWarnings
+        self.printCoverageDetails = printCoverageDetails
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        status = try container.decode(String.self, forKey: .status)
+        summary = try container.decode(BuildSummary.self, forKey: .summary)
+        errors = try container.decodeIfPresent([BuildError].self, forKey: .errors) ?? []
+        warnings = try container.decodeIfPresent([BuildWarning].self, forKey: .warnings) ?? []
+        failedTests = try container.decodeIfPresent([FailedTest].self, forKey: .failedTests) ?? []
+        coverage = try container.decodeIfPresent(CodeCoverage.self, forKey: .coverage)
+        printWarnings = false
+        printCoverageDetails = false
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(status, forKey: .status)
+        try container.encode(summary, forKey: .summary)
+
+        if !errors.isEmpty {
+            try container.encode(errors, forKey: .errors)
+        }
+
+        if printWarnings && !warnings.isEmpty {
+            try container.encode(warnings, forKey: .warnings)
+        }
+
+        if !failedTests.isEmpty {
+            try container.encode(failedTests, forKey: .failedTests)
+        }
+
+        // Only output coverage section in details mode
+        // In summary-only mode, coverage_percent in summary is sufficient
+        if let coverage = coverage, printCoverageDetails {
+            try container.encode(coverage, forKey: .coverage)
+        }
+    }
+
+    // MARK: - GitHub Actions Output
+
+    /// Formats the build result as GitHub Actions workflow commands
+    func formatGitHubActions() -> String {
+        var output: [String] = []
+
+        // Format errors as ::error commands
+        for error in errors {
+            output.append(formatGitHubActionsError(error))
+        }
+
+        // Format warnings as ::warning commands
+        if printWarnings {
+            for warning in warnings {
+                output.append(formatGitHubActionsWarning(warning))
+            }
+        }
+
+        // Format failed tests as ::error commands
+        for test in failedTests {
+            output.append(formatGitHubActionsTest(test))
+        }
+
+        // Add summary notice
+        let summaryMessage = buildSummaryMessage()
+        output.append("::notice ::\(summaryMessage)")
+
+        return output.joined(separator: "\n")
+    }
+
+    private func formatGitHubActionsError(_ error: BuildError) -> String {
+        let fileComponents = formatFileComponents(file: error.file, line: error.line, column: error.column)
+        return "::\("error") \(fileComponents)::\(error.message)"
+    }
+
+    private func formatGitHubActionsWarning(_ warning: BuildWarning) -> String {
+        let fileComponents = formatFileComponents(file: warning.file, line: warning.line, column: warning.column)
+        return "::\("warning") \(fileComponents)::\(warning.message)"
+    }
+
+    private func formatGitHubActionsTest(_ test: FailedTest) -> String {
+        var fileComponents = formatFileComponents(file: test.file, line: test.line, column: test.column)
+        // Add test name as title for better visibility in GitHub Actions
+        if !fileComponents.isEmpty {
+            fileComponents += ","
+        }
+        fileComponents += "title=\(test.test)"
+        return "::\("error") \(fileComponents)::\(test.message)"
+    }
+
+    private func formatFileComponents(file: String?, line: Int?, column: Int?) -> String {
+        guard let file = file else {
+            return ""
+        }
+
+        guard let line = line else {
+            return "file=\(file)"
+        }
+
+        if let column = column {
+            return "file=\(file),line=\(line),col=\(column)"
+        }
+
+        return "file=\(file),line=\(line)"
+    }
+
+    private func buildSummaryMessage() -> String {
+        var parts: [String] = []
+
+        if status == "success" {
+            parts.append("Build succeeded")
+        } else {
+            parts.append("Build failed")
+        }
+
+        if summary.errors > 0 {
+            parts.append("\(summary.errors) error\(summary.errors == 1 ? "" : "s")")
+        }
+
+        if summary.warnings > 0 {
+            parts.append("\(summary.warnings) warning\(summary.warnings == 1 ? "" : "s")")
+        }
+
+        if summary.failedTests > 0 {
+            parts.append("\(summary.failedTests) failed test\(summary.failedTests == 1 ? "" : "s")")
+        }
+
+        if let passedTests = summary.passedTests, passedTests > 0 {
+            parts.append("\(passedTests) passed test\(passedTests == 1 ? "" : "s")")
+        }
+
+        if let buildTime = summary.buildTime {
+            parts.append("in \(buildTime)")
+        }
+
+        if let coveragePercent = summary.coveragePercent {
+            parts.append(String(format: "%.1f%% coverage", coveragePercent))
+        }
+
+        return parts.joined(separator: ", ")
+    }
+}
+
+struct BuildSummary: Codable {
+    let errors: Int
+    let warnings: Int
+    let failedTests: Int
+    let passedTests: Int?
+    let buildTime: String?
+    let coveragePercent: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case errors
+        case warnings
+        case failedTests = "failed_tests"
+        case passedTests = "passed_tests"
+        case buildTime = "build_time"
+        case coveragePercent = "coverage_percent"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(errors, forKey: .errors)
+        try container.encode(warnings, forKey: .warnings)
+        try container.encode(failedTests, forKey: .failedTests)
+
+        // Only encode optional fields if they have values
+        if let passedTests = passedTests {
+            try container.encode(passedTests, forKey: .passedTests)
+        }
+        if let buildTime = buildTime {
+            try container.encode(buildTime, forKey: .buildTime)
+        }
+        if let coveragePercent = coveragePercent {
+            try container.encode(coveragePercent, forKey: .coveragePercent)
+        }
+    }
+}
+
+struct BuildError: Codable {
+    let file: String?
+    let line: Int?
+    let message: String
+
+    // Internal only - used for GitHub Actions format, not encoded to JSON/TOON
+    var column: Int? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case file, line, message
+    }
+}
+
+struct BuildWarning: Codable {
+    let file: String?
+    let line: Int?
+    let message: String
+
+    // Internal only - used for GitHub Actions format, not encoded to JSON/TOON
+    var column: Int? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case file, line, message
+    }
+}
+
+struct FailedTest: Codable {
+    let test: String
+    let message: String
+    let file: String?
+    let line: Int?
+
+    // Internal only - used for GitHub Actions format, not encoded to JSON/TOON
+    var column: Int? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case test, message, file, line
+    }
+}
+
+struct CodeCoverage: Codable {
+    let lineCoverage: Double
+    let files: [FileCoverage]
+
+    enum CodingKeys: String, CodingKey {
+        case lineCoverage = "line_coverage"
+        case files
+    }
+}
+
+struct FileCoverage: Codable {
+    let path: String
+    let name: String
+    let lineCoverage: Double
+    let coveredLines: Int
+    let executableLines: Int
+
+    enum CodingKeys: String, CodingKey {
+        case path
+        case name
+        case lineCoverage = "line_coverage"
+        case coveredLines = "covered_lines"
+        case executableLines = "executable_lines"
+    }
+}

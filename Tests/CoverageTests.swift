@@ -84,7 +84,7 @@ final class CoverageTests: XCTestCase {
     }
 
     func testParseCoverageFromNonExistentPath() {
-        let coverage = OutputParser.parseCoverageFromPath("/nonexistent/path")
+        let coverage = CoverageParser.parseCoverageFromPath("/nonexistent/path")
         _ = coverage
     }
 
@@ -149,7 +149,7 @@ final class CoverageTests: XCTestCase {
         }
 
         // Parse the xcodebuild format
-        let coverage = OutputParser.parseCoverageFromPath(testFile.path)
+        let coverage = CoverageParser.parseCoverageFromPath(testFile.path)
 
         XCTAssertNotNil(coverage)
         XCTAssertEqual(coverage?.files.count, 2)
@@ -203,7 +203,7 @@ final class CoverageTests: XCTestCase {
         }
 
         // Parse the SPM format
-        let coverage = OutputParser.parseCoverageFromPath(testFile.path)
+        let coverage = CoverageParser.parseCoverageFromPath(testFile.path)
 
         XCTAssertNotNil(coverage)
         XCTAssertEqual(coverage?.files.count, 2)
@@ -244,14 +244,14 @@ final class CoverageTests: XCTestCase {
             try? FileManager.default.removeItem(at: testFile)
         }
 
-        let coverage = OutputParser.parseCoverageFromPath(testFile.path)
+        let coverage = CoverageParser.parseCoverageFromPath(testFile.path)
 
         XCTAssertNotNil(coverage)
         XCTAssertEqual(coverage?.lineCoverage ?? 0, 90.0, accuracy: 0.1)
     }
 
     func testParseEmptyPathTriggersAutoDetection() {
-        let coverage = OutputParser.parseCoverageFromPath("")
+        let coverage = CoverageParser.parseCoverageFromPath("")
         _ = coverage
     }
 
@@ -282,7 +282,7 @@ final class CoverageTests: XCTestCase {
             try? FileManager.default.removeItem(at: testFile)
         }
 
-        let coverage = OutputParser.parseCoverageFromPath(testFile.path)
+        let coverage = CoverageParser.parseCoverageFromPath(testFile.path)
 
         XCTAssertNotNil(coverage)
         XCTAssertEqual(coverage?.lineCoverage ?? 0, 50.0, accuracy: 0.1)
@@ -298,7 +298,7 @@ final class CoverageTests: XCTestCase {
             try? FileManager.default.removeItem(at: xcresultPath)
         }
 
-        let coverage = OutputParser.parseCoverageFromPath(xcresultPath.path)
+        let coverage = CoverageParser.parseCoverageFromPath(xcresultPath.path)
         _ = coverage
     }
 
@@ -347,7 +347,7 @@ final class CoverageTests: XCTestCase {
             try? FileManager.default.removeItem(at: testFile)
         }
 
-        let coverage = OutputParser.parseCoverageFromPath(testFile.path)
+        let coverage = CoverageParser.parseCoverageFromPath(testFile.path)
 
         XCTAssertNotNil(coverage)
         XCTAssertEqual(coverage?.files.count, 3)
@@ -371,7 +371,7 @@ final class CoverageTests: XCTestCase {
             try? FileManager.default.removeItem(at: testFile)
         }
 
-        let coverage = OutputParser.parseCoverageFromPath(testFile.path)
+        let coverage = CoverageParser.parseCoverageFromPath(testFile.path)
 
         XCTAssertNil(coverage)
     }
@@ -393,7 +393,7 @@ final class CoverageTests: XCTestCase {
             try? FileManager.default.removeItem(at: testFile)
         }
 
-        let coverage = OutputParser.parseCoverageFromPath(testFile.path)
+        let coverage = CoverageParser.parseCoverageFromPath(testFile.path)
 
         XCTAssertNil(coverage)
     }
@@ -422,7 +422,7 @@ final class CoverageTests: XCTestCase {
             try? FileManager.default.removeItem(at: testFile)
         }
 
-        let coverage = OutputParser.parseCoverageFromPath(testFile.path)
+        let coverage = CoverageParser.parseCoverageFromPath(testFile.path)
 
         XCTAssertNotNil(coverage)
         XCTAssertEqual(coverage?.lineCoverage ?? 0, 85.0, accuracy: 0.1)
@@ -455,7 +455,7 @@ final class CoverageTests: XCTestCase {
             try? FileManager.default.removeItem(at: testFile)
         }
 
-        let coverage = OutputParser.parseCoverageFromPath(testFile.path)
+        let coverage = CoverageParser.parseCoverageFromPath(testFile.path)
 
         XCTAssertNotNil(coverage)
         XCTAssertEqual(coverage?.lineCoverage ?? -1, 0.0, accuracy: 0.01)
@@ -489,7 +489,7 @@ final class CoverageTests: XCTestCase {
             try? FileManager.default.removeItem(at: testFile)
         }
 
-        let coverage = OutputParser.parseCoverageFromPath(testFile.path)
+        let coverage = CoverageParser.parseCoverageFromPath(testFile.path)
 
         XCTAssertNotNil(coverage)
         XCTAssertEqual(coverage?.lineCoverage ?? 0, 100.0, accuracy: 0.01)
@@ -572,7 +572,7 @@ final class CoverageTests: XCTestCase {
             try? FileManager.default.removeItem(at: testFile)
         }
 
-        let coverage = OutputParser.parseCoverageFromPath(testFile.path, targetFilter: "MyApp")
+        let coverage = CoverageParser.parseCoverageFromPath(testFile.path, targetFilter: "MyApp")
 
         XCTAssertNotNil(coverage)
         XCTAssertEqual(coverage?.files.count, 1)
@@ -618,7 +618,7 @@ final class CoverageTests: XCTestCase {
             try? FileManager.default.removeItem(at: testFile)
         }
 
-        let coverage = OutputParser.parseCoverageFromPath(testFile.path, targetFilter: "MyModule")
+        let coverage = CoverageParser.parseCoverageFromPath(testFile.path, targetFilter: "MyModule")
 
         XCTAssertNotNil(coverage)
         XCTAssertEqual(coverage?.files.count, 1)
