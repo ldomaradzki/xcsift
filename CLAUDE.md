@@ -179,6 +179,7 @@ The codebase follows a simple two-component architecture:
 
 ### Key Features
 - **Error/Warning Parsing**: Multiple regex patterns handle various Xcode error formats
+- **Linker Error Parsing**: Captures undefined symbols, missing frameworks/libraries, architecture mismatches, and duplicate symbols
 - **Test Failure Detection**: XCUnit assertion failures and general test failures
 - **Build Time Extraction**: Captures build duration from output
 - **File/Line Mapping**: Extracts precise source locations for navigation
@@ -198,9 +199,17 @@ The codebase follows a simple two-component architecture:
 
 ## Testing
 
-Tests are in `Tests/OutputParserTests.swift` using XCTest framework. Test cases cover:
+Tests are in `Tests/*.swift` using XCTest framework. Test cases cover:
 - Error parsing from various Xcode formats
 - Warning detection
+- **Linker error parsing** (11 tests):
+  - Undefined symbol errors
+  - Multiple undefined symbols
+  - Architecture mismatch errors
+  - Framework/library not found
+  - Duplicate symbols
+  - Mixed compiler and linker errors
+  - Swift mangled symbols
 - Failed test extraction
 - Multi-error scenarios
 - Build time parsing
@@ -213,9 +222,10 @@ Tests are in `Tests/OutputParserTests.swift` using XCTest framework. Test cases 
 - Target extraction from xcodebuild output
 - Coverage target filtering
 - Summary-only vs details mode for coverage output
-- **TOON format encoding** (22 tests):
+- **TOON format encoding** (24 tests):
   - Basic TOON encoding
   - TOON with errors, warnings, and failed tests
+  - TOON with linker errors
   - TOON with code coverage
   - Token efficiency verification (30-60% reduction)
   - Summary-only vs details mode in TOON format
@@ -258,10 +268,11 @@ The tool outputs structured data optimized for coding agents in two formats:
 
 ### JSON Format (default)
 
-- **JSON**: Structured format with `status`, `summary`, `errors`, `warnings` (optional), `failed_tests`, `coverage` (optional)
-  - **Summary always includes warning count**: `{"summary": {"warnings": N, ...}}`
+- **JSON**: Structured format with `status`, `summary`, `errors`, `warnings` (optional), `failed_tests`, `linker_errors` (optional), `coverage` (optional)
+  - **Summary always includes warning and linker error counts**: `{"summary": {"warnings": N, "linker_errors": N, ...}}`
   - **Summary includes coverage percentage** (when `--coverage` flag is used): `{"summary": {"coverage_percent": X.X, ...}}`
   - **Detailed warnings list** (with `--warnings` flag): `{"warnings": [{"file": "...", "line": N, "message": "..."}]}`
+  - **Linker errors**: `{"linker_errors": [{"symbol": "...", "architecture": "...", "referenced_from": "...", "message": "..."}]}`
   - **Default behavior** (without flag): Only shows warning count in summary, omits detailed warnings array to reduce token usage
   - **Quiet mode** (with `--quiet` or `-q` flag): Produces no output when build succeeds with zero warnings and zero errors
   - **Coverage data** (with `--coverage` flag):

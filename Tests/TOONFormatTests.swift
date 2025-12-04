@@ -508,6 +508,58 @@ final class TOONFormatTests: XCTestCase {
         }
     }
 
+    // MARK: - Linker Error TOON Tests
+
+    func testTOONEncoderWithLinkerErrors() throws {
+        let parser = OutputParser()
+        let input = """
+            Undefined symbols for architecture arm64:
+              "_OBJC_CLASS_$_MissingClass", referenced from:
+                  objc-class-ref in ViewController.o
+            ld: symbol(s) not found for architecture arm64
+            """
+        let result = parser.parse(input: input)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("status: failed"))
+        XCTAssertTrue(toonString!.contains("linker_errors: 1"))
+        XCTAssertTrue(toonString!.contains("linker_errors[1]{"))
+        XCTAssertTrue(toonString!.contains("_OBJC_CLASS_$_MissingClass"))
+        XCTAssertTrue(toonString!.contains("arm64"))
+        XCTAssertTrue(toonString!.contains("ViewController.o"))
+    }
+
+    func testTOONEncoderWithMixedLinkerAndCompilerErrors() throws {
+        let parser = OutputParser()
+        let input = """
+            main.swift:10:5: error: use of undeclared identifier 'foo'
+            Undefined symbols for architecture arm64:
+              "_bar", referenced from:
+                  _main in main.o
+            ld: symbol(s) not found for architecture arm64
+            """
+        let result = parser.parse(input: input)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("status: failed"))
+        XCTAssertTrue(toonString!.contains("errors: 1"))
+        XCTAssertTrue(toonString!.contains("linker_errors: 1"))
+        XCTAssertTrue(toonString!.contains("errors[1]{"))
+        XCTAssertTrue(toonString!.contains("linker_errors[1]{"))
+    }
+
     // MARK: - Helper Methods
 
     private func measureJSONSize(_ result: BuildResult) throws -> Int {

@@ -6,6 +6,7 @@ struct BuildResult: Codable {
     let errors: [BuildError]
     let warnings: [BuildWarning]
     let failedTests: [FailedTest]
+    let linkerErrors: [LinkerError]
     let coverage: CodeCoverage?
     let printWarnings: Bool
     let printCoverageDetails: Bool
@@ -13,6 +14,7 @@ struct BuildResult: Codable {
     enum CodingKeys: String, CodingKey {
         case status, summary, errors, warnings, coverage
         case failedTests = "failed_tests"
+        case linkerErrors = "linker_errors"
     }
 
     init(
@@ -21,6 +23,7 @@ struct BuildResult: Codable {
         errors: [BuildError],
         warnings: [BuildWarning],
         failedTests: [FailedTest],
+        linkerErrors: [LinkerError] = [],
         coverage: CodeCoverage?,
         printWarnings: Bool,
         printCoverageDetails: Bool = false
@@ -30,6 +33,7 @@ struct BuildResult: Codable {
         self.errors = errors
         self.warnings = warnings
         self.failedTests = failedTests
+        self.linkerErrors = linkerErrors
         self.coverage = coverage
         self.printWarnings = printWarnings
         self.printCoverageDetails = printCoverageDetails
@@ -42,6 +46,7 @@ struct BuildResult: Codable {
         errors = try container.decodeIfPresent([BuildError].self, forKey: .errors) ?? []
         warnings = try container.decodeIfPresent([BuildWarning].self, forKey: .warnings) ?? []
         failedTests = try container.decodeIfPresent([FailedTest].self, forKey: .failedTests) ?? []
+        linkerErrors = try container.decodeIfPresent([LinkerError].self, forKey: .linkerErrors) ?? []
         coverage = try container.decodeIfPresent(CodeCoverage.self, forKey: .coverage)
         printWarnings = false
         printCoverageDetails = false
@@ -64,6 +69,10 @@ struct BuildResult: Codable {
             try container.encode(failedTests, forKey: .failedTests)
         }
 
+        if !linkerErrors.isEmpty {
+            try container.encode(linkerErrors, forKey: .linkerErrors)
+        }
+
         // Only output coverage section in details mode
         // In summary-only mode, coverage_percent in summary is sufficient
         if let coverage = coverage, printCoverageDetails {
@@ -80,6 +89,11 @@ struct BuildResult: Codable {
         // Format errors as ::error commands
         for error in errors {
             output.append(formatGitHubActionsError(error))
+        }
+
+        // Format linker errors as ::error commands
+        for linkerError in linkerErrors {
+            output.append(formatGitHubActionsLinkerError(linkerError))
         }
 
         // Format warnings as ::warning commands
@@ -104,6 +118,16 @@ struct BuildResult: Codable {
     private func formatGitHubActionsError(_ error: BuildError) -> String {
         let fileComponents = formatFileComponents(file: error.file, line: error.line, column: error.column)
         return "::\("error") \(fileComponents)::\(error.message)"
+    }
+
+    private func formatGitHubActionsLinkerError(_ linkerError: LinkerError) -> String {
+        if !linkerError.symbol.isEmpty {
+            let details =
+                "Undefined symbol '\(linkerError.symbol)' for \(linkerError.architecture), referenced from \(linkerError.referencedFrom)"
+            return "::error ::\(details)"
+        } else {
+            return "::error ::\(linkerError.message)"
+        }
     }
 
     private func formatGitHubActionsWarning(_ warning: BuildWarning) -> String {
@@ -150,6 +174,10 @@ struct BuildResult: Codable {
             parts.append("\(summary.errors) error\(summary.errors == 1 ? "" : "s")")
         }
 
+        if summary.linkerErrors > 0 {
+            parts.append("\(summary.linkerErrors) linker error\(summary.linkerErrors == 1 ? "" : "s")")
+        }
+
         if summary.warnings > 0 {
             parts.append("\(summary.warnings) warning\(summary.warnings == 1 ? "" : "s")")
         }
@@ -178,6 +206,7 @@ struct BuildSummary: Codable {
     let errors: Int
     let warnings: Int
     let failedTests: Int
+    let linkerErrors: Int
     let passedTests: Int?
     let buildTime: String?
     let coveragePercent: Double?
@@ -186,9 +215,28 @@ struct BuildSummary: Codable {
         case errors
         case warnings
         case failedTests = "failed_tests"
+        case linkerErrors = "linker_errors"
         case passedTests = "passed_tests"
         case buildTime = "build_time"
         case coveragePercent = "coverage_percent"
+    }
+
+    init(
+        errors: Int,
+        warnings: Int,
+        failedTests: Int,
+        linkerErrors: Int = 0,
+        passedTests: Int?,
+        buildTime: String?,
+        coveragePercent: Double?
+    ) {
+        self.errors = errors
+        self.warnings = warnings
+        self.failedTests = failedTests
+        self.linkerErrors = linkerErrors
+        self.passedTests = passedTests
+        self.buildTime = buildTime
+        self.coveragePercent = coveragePercent
     }
 
     func encode(to encoder: Encoder) throws {
@@ -196,6 +244,7 @@ struct BuildSummary: Codable {
         try container.encode(errors, forKey: .errors)
         try container.encode(warnings, forKey: .warnings)
         try container.encode(failedTests, forKey: .failedTests)
+        try container.encode(linkerErrors, forKey: .linkerErrors)
 
         // Only encode optional fields if they have values
         if let passedTests = passedTests {
@@ -273,5 +322,33 @@ struct FileCoverage: Codable {
         case lineCoverage = "line_coverage"
         case coveredLines = "covered_lines"
         case executableLines = "executable_lines"
+    }
+}
+
+struct LinkerError: Codable {
+    let symbol: String
+    let architecture: String
+    let referencedFrom: String
+    let message: String
+
+    enum CodingKeys: String, CodingKey {
+        case symbol
+        case architecture
+        case referencedFrom = "referenced_from"
+        case message
+    }
+
+    init(symbol: String, architecture: String, referencedFrom: String, message: String = "") {
+        self.symbol = symbol
+        self.architecture = architecture
+        self.referencedFrom = referencedFrom
+        self.message = message
+    }
+
+    init(message: String) {
+        self.symbol = ""
+        self.architecture = ""
+        self.referencedFrom = ""
+        self.message = message
     }
 }
