@@ -31,7 +31,7 @@ jobs:
         if: matrix.platform == 'linux-x64'
         run: apt-get update && apt-get install -y curl
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Select Xcode 16 (macOS)
         if: matrix.platform == 'macos-arm64'
