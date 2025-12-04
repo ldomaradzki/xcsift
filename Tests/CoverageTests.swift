@@ -41,9 +41,9 @@ final class CoverageTests: XCTestCase {
 
         let parser = OutputParser()
         let input = """
-        Building for debugging...
-        Build complete!
-        """
+            Building for debugging...
+            Build complete!
+            """
 
         let result = parser.parse(input: input, coverage: coverage, printCoverageDetails: true)
 
@@ -65,9 +65,9 @@ final class CoverageTests: XCTestCase {
     func testBuildResultWithoutCoverage() {
         let parser = OutputParser()
         let input = """
-        Building for debugging...
-        Build complete!
-        """
+            Building for debugging...
+            Build complete!
+            """
 
         let result = parser.parse(input: input)
 
@@ -119,26 +119,26 @@ final class CoverageTests: XCTestCase {
     func testParseXcodebuildCoverageFormat() throws {
         // Create a temporary xcodebuild-format coverage file
         let xcodebuildJSON = """
-        {
-          "targets": [{
-            "name": "MyTarget",
-            "files": [
-              {
-                "path": "/path/to/main.swift",
-                "lineCoverage": 0.90,
-                "coveredLines": 45,
-                "executableLines": 50
-              },
-              {
-                "path": "/path/to/helper.swift",
-                "lineCoverage": 0.80,
-                "coveredLines": 40,
-                "executableLines": 50
-              }
-            ]
-          }]
-        }
-        """
+            {
+              "targets": [{
+                "name": "MyTarget",
+                "files": [
+                  {
+                    "path": "/path/to/main.swift",
+                    "lineCoverage": 0.90,
+                    "coveredLines": 45,
+                    "executableLines": 50
+                  },
+                  {
+                    "path": "/path/to/helper.swift",
+                    "lineCoverage": 0.80,
+                    "coveredLines": 40,
+                    "executableLines": 50
+                  }
+                ]
+              }]
+            }
+            """
 
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("xcodebuild-coverage.json")
@@ -168,31 +168,31 @@ final class CoverageTests: XCTestCase {
     func testParseSPMCoverageFormat() throws {
         // Create a temporary SPM-format coverage file
         let spmJSON = """
-        {
-          "data": [{
-            "files": [
-              {
-                "filename": "/path/to/main.swift",
-                "summary": {
-                  "lines": {
-                    "covered": 45,
-                    "count": 50
+            {
+              "data": [{
+                "files": [
+                  {
+                    "filename": "/path/to/main.swift",
+                    "summary": {
+                      "lines": {
+                        "covered": 45,
+                        "count": 50
+                      }
+                    }
+                  },
+                  {
+                    "filename": "/path/to/helper.swift",
+                    "summary": {
+                      "lines": {
+                        "covered": 40,
+                        "count": 50
+                      }
+                    }
                   }
-                }
-              },
-              {
-                "filename": "/path/to/helper.swift",
-                "summary": {
-                  "lines": {
-                    "covered": 40,
-                    "count": 50
-                  }
-                }
-              }
-            ]
-          }]
-        }
-        """
+                ]
+              }]
+            }
+            """
 
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("spm-coverage.json")
@@ -222,19 +222,19 @@ final class CoverageTests: XCTestCase {
     func testXcodebuildCoverageWithPercentageFormat() throws {
         // Test xcodebuild format with percentage (85.0) instead of decimal (0.85)
         let xcodebuildJSON = """
-        {
-          "targets": [{
-            "files": [
-              {
-                "path": "/path/to/main.swift",
-                "lineCoverage": 90.0,
-                "coveredLines": 45,
-                "executableLines": 50
-              }
-            ]
-          }]
-        }
-        """
+            {
+              "targets": [{
+                "files": [
+                  {
+                    "path": "/path/to/main.swift",
+                    "lineCoverage": 90.0,
+                    "coveredLines": 45,
+                    "executableLines": 50
+                  }
+                ]
+              }]
+            }
+            """
 
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("xcodebuild-percent.json")
@@ -257,22 +257,22 @@ final class CoverageTests: XCTestCase {
 
     func testParseExplicitPathThatExists() throws {
         let spmJSON = """
-        {
-          "data": [{
-            "files": [
-              {
-                "filename": "/path/to/test.swift",
-                "summary": {
-                  "lines": {
-                    "covered": 10,
-                    "count": 20
+            {
+              "data": [{
+                "files": [
+                  {
+                    "filename": "/path/to/test.swift",
+                    "summary": {
+                      "lines": {
+                        "covered": 10,
+                        "count": 20
+                      }
+                    }
                   }
-                }
-              }
-            ]
-          }]
-        }
-        """
+                ]
+              }]
+            }
+            """
 
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("explicit-coverage.json")
@@ -304,40 +304,40 @@ final class CoverageTests: XCTestCase {
 
     func testMultipleFilesInCoverageCalculation() throws {
         let spmJSON = """
-        {
-          "data": [{
-            "files": [
-              {
-                "filename": "/path/to/file1.swift",
-                "summary": {
-                  "lines": {
-                    "covered": 80,
-                    "count": 100
+            {
+              "data": [{
+                "files": [
+                  {
+                    "filename": "/path/to/file1.swift",
+                    "summary": {
+                      "lines": {
+                        "covered": 80,
+                        "count": 100
+                      }
+                    }
+                  },
+                  {
+                    "filename": "/path/to/file2.swift",
+                    "summary": {
+                      "lines": {
+                        "covered": 40,
+                        "count": 100
+                      }
+                    }
+                  },
+                  {
+                    "filename": "/path/to/file3.swift",
+                    "summary": {
+                      "lines": {
+                        "covered": 60,
+                        "count": 100
+                      }
+                    }
                   }
-                }
-              },
-              {
-                "filename": "/path/to/file2.swift",
-                "summary": {
-                  "lines": {
-                    "covered": 40,
-                    "count": 100
-                  }
-                }
-              },
-              {
-                "filename": "/path/to/file3.swift",
-                "summary": {
-                  "lines": {
-                    "covered": 60,
-                    "count": 100
-                  }
-                }
-              }
-            ]
-          }]
-        }
-        """
+                ]
+              }]
+            }
+            """
 
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("multi-file-coverage.json")
@@ -358,10 +358,10 @@ final class CoverageTests: XCTestCase {
 
     func testInvalidJSONReturnsNil() throws {
         let invalidJSON = """
-        {
-          "invalid": "format"
-        }
-        """
+            {
+              "invalid": "format"
+            }
+            """
 
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("invalid-coverage.json")
@@ -378,12 +378,12 @@ final class CoverageTests: XCTestCase {
 
     func testEmptyFilesArrayReturnsNil() throws {
         let emptyJSON = """
-        {
-          "data": [{
-            "files": []
-          }]
-        }
-        """
+            {
+              "data": [{
+                "files": []
+              }]
+            }
+            """
 
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("empty-coverage.json")
@@ -400,19 +400,19 @@ final class CoverageTests: XCTestCase {
 
     func testXcodebuildFormatWithDecimalCoverage() throws {
         let xcodebuildJSON = """
-        {
-          "targets": [{
-            "files": [
-              {
-                "path": "/path/to/main.swift",
-                "lineCoverage": 0.85,
-                "coveredLines": 85,
-                "executableLines": 100
-              }
-            ]
-          }]
-        }
-        """
+            {
+              "targets": [{
+                "files": [
+                  {
+                    "path": "/path/to/main.swift",
+                    "lineCoverage": 0.85,
+                    "coveredLines": 85,
+                    "executableLines": 100
+                  }
+                ]
+              }]
+            }
+            """
 
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("xcodebuild-decimal.json")
@@ -430,22 +430,22 @@ final class CoverageTests: XCTestCase {
 
     func testZeroCoverageHandling() throws {
         let spmJSON = """
-        {
-          "data": [{
-            "files": [
-              {
-                "filename": "/path/to/uncovered.swift",
-                "summary": {
-                  "lines": {
-                    "covered": 0,
-                    "count": 50
+            {
+              "data": [{
+                "files": [
+                  {
+                    "filename": "/path/to/uncovered.swift",
+                    "summary": {
+                      "lines": {
+                        "covered": 0,
+                        "count": 50
+                      }
+                    }
                   }
-                }
-              }
-            ]
-          }]
-        }
-        """
+                ]
+              }]
+            }
+            """
 
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("zero-coverage.json")
@@ -464,22 +464,22 @@ final class CoverageTests: XCTestCase {
 
     func testFullCoverageHandling() throws {
         let spmJSON = """
-        {
-          "data": [{
-            "files": [
-              {
-                "filename": "/path/to/perfect.swift",
-                "summary": {
-                  "lines": {
-                    "covered": 100,
-                    "count": 100
+            {
+              "data": [{
+                "files": [
+                  {
+                    "filename": "/path/to/perfect.swift",
+                    "summary": {
+                      "lines": {
+                        "covered": 100,
+                        "count": 100
+                      }
+                    }
                   }
-                }
-              }
-            ]
-          }]
-        }
-        """
+                ]
+              }]
+            }
+            """
 
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("full-coverage.json")
@@ -499,9 +499,9 @@ final class CoverageTests: XCTestCase {
     func testExtractTestedTarget() {
         let parser = OutputParser()
         let input = """
-        Test Suite 'MyAppTests.xctest' started at 2025-01-05 10:30:00.000
-        Test Suite 'LoginTests' started at 2025-01-05 10:30:00.100
-        """
+            Test Suite 'MyAppTests.xctest' started at 2025-01-05 10:30:00.000
+            Test Suite 'LoginTests' started at 2025-01-05 10:30:00.100
+            """
 
         let target = parser.extractTestedTarget(from: input)
 
@@ -512,9 +512,9 @@ final class CoverageTests: XCTestCase {
     func testExtractTestedTargetSkipsAllTests() {
         let parser = OutputParser()
         let input = """
-        Test Suite 'All tests' started at 2025-01-05 10:30:00.000
-        Test Suite 'SampleAppTests.xctest' started at 2025-01-05 10:30:00.100
-        """
+            Test Suite 'All tests' started at 2025-01-05 10:30:00.000
+            Test Suite 'SampleAppTests.xctest' started at 2025-01-05 10:30:00.100
+            """
 
         let target = parser.extractTestedTarget(from: input)
 
@@ -525,9 +525,9 @@ final class CoverageTests: XCTestCase {
     func testExtractTestedTargetNotFound() {
         let parser = OutputParser()
         let input = """
-        Building for debugging...
-        Build complete!
-        """
+            Building for debugging...
+            Build complete!
+            """
 
         let target = parser.extractTestedTarget(from: input)
 
@@ -536,33 +536,33 @@ final class CoverageTests: XCTestCase {
 
     func testCoverageTargetFiltering() throws {
         let xcodebuildJSON = """
-        {
-          "targets": [
             {
-              "name": "MyApp.app",
-              "files": [
+              "targets": [
                 {
-                  "path": "/path/to/MyFile.swift",
-                  "lineCoverage": 0.85,
-                  "coveredLines": 85,
-                  "executableLines": 100
-                }
-              ]
-            },
-            {
-              "name": "OtherApp.app",
-              "files": [
+                  "name": "MyApp.app",
+                  "files": [
+                    {
+                      "path": "/path/to/MyFile.swift",
+                      "lineCoverage": 0.85,
+                      "coveredLines": 85,
+                      "executableLines": 100
+                    }
+                  ]
+                },
                 {
-                  "path": "/path/to/OtherFile.swift",
-                  "lineCoverage": 0.50,
-                  "coveredLines": 50,
-                  "executableLines": 100
+                  "name": "OtherApp.app",
+                  "files": [
+                    {
+                      "path": "/path/to/OtherFile.swift",
+                      "lineCoverage": 0.50,
+                      "coveredLines": 50,
+                      "executableLines": 100
+                    }
+                  ]
                 }
               ]
             }
-          ]
-        }
-        """
+            """
 
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("filtered-coverage.json")
@@ -582,33 +582,33 @@ final class CoverageTests: XCTestCase {
 
     func testCoverageExcludesTestBundles() throws {
         let xcodebuildJSON = """
-        {
-          "targets": [
             {
-              "name": "MyModule.framework",
-              "files": [
+              "targets": [
                 {
-                  "path": "/path/to/MyFile.swift",
-                  "lineCoverage": 0.50,
-                  "coveredLines": 50,
-                  "executableLines": 100
-                }
-              ]
-            },
-            {
-              "name": "MyModuleTests.xctest",
-              "files": [
+                  "name": "MyModule.framework",
+                  "files": [
+                    {
+                      "path": "/path/to/MyFile.swift",
+                      "lineCoverage": 0.50,
+                      "coveredLines": 50,
+                      "executableLines": 100
+                    }
+                  ]
+                },
                 {
-                  "path": "/path/to/MyModuleTests.swift",
-                  "lineCoverage": 1.0,
-                  "coveredLines": 100,
-                  "executableLines": 100
+                  "name": "MyModuleTests.xctest",
+                  "files": [
+                    {
+                      "path": "/path/to/MyModuleTests.swift",
+                      "lineCoverage": 1.0,
+                      "coveredLines": 100,
+                      "executableLines": 100
+                    }
+                  ]
                 }
               ]
             }
-          ]
-        }
-        """
+            """
 
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("exclude-tests-coverage.json")
@@ -632,7 +632,13 @@ final class CoverageTests: XCTestCase {
         let coverage = CodeCoverage(
             lineCoverage: 75.5,
             files: [
-                FileCoverage(path: "/path/to/file.swift", name: "file.swift", lineCoverage: 75.5, coveredLines: 75, executableLines: 100)
+                FileCoverage(
+                    path: "/path/to/file.swift",
+                    name: "file.swift",
+                    lineCoverage: 75.5,
+                    coveredLines: 75,
+                    executableLines: 100
+                )
             ]
         )
 
@@ -655,7 +661,13 @@ final class CoverageTests: XCTestCase {
         let coverage = CodeCoverage(
             lineCoverage: 75.5,
             files: [
-                FileCoverage(path: "/path/to/file.swift", name: "file.swift", lineCoverage: 75.5, coveredLines: 75, executableLines: 100)
+                FileCoverage(
+                    path: "/path/to/file.swift",
+                    name: "file.swift",
+                    lineCoverage: 75.5,
+                    coveredLines: 75,
+                    executableLines: 100
+                )
             ]
         )
 

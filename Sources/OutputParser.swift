@@ -16,7 +16,16 @@ struct BuildResult: Codable {
         case failedTests = "failed_tests"
     }
 
-    init(status: String, summary: BuildSummary, errors: [BuildError], warnings: [BuildWarning], failedTests: [FailedTest], coverage: CodeCoverage?, printWarnings: Bool, printCoverageDetails: Bool = false) {
+    init(
+        status: String,
+        summary: BuildSummary,
+        errors: [BuildError],
+        warnings: [BuildWarning],
+        failedTests: [FailedTest],
+        coverage: CodeCoverage?,
+        printWarnings: Bool,
+        printCoverageDetails: Bool = false
+    ) {
         self.status = status
         self.summary = summary
         self.errors = errors
@@ -279,7 +288,13 @@ class OutputParser {
     private var passedTestsCount: Int = 0
     private var seenPassedTestNames: Set<String> = []
 
-    func parse(input: String, printWarnings: Bool = false, warningsAsErrors: Bool = false, coverage: CodeCoverage? = nil, printCoverageDetails: Bool = false) -> BuildResult {
+    func parse(
+        input: String,
+        printWarnings: Bool = false,
+        warningsAsErrors: Bool = false,
+        coverage: CodeCoverage? = nil,
+        printCoverageDetails: Bool = false
+    ) -> BuildResult {
         resetState()
         let lines = input.split(separator: "\n", omittingEmptySubsequences: false)
 
@@ -294,11 +309,13 @@ class OutputParser {
         if warningsAsErrors && !warnings.isEmpty {
             // Convert warnings to errors
             for warning in warnings {
-                finalErrors.append(BuildError(
-                    file: warning.file,
-                    line: warning.line,
-                    message: warning.message
-                ))
+                finalErrors.append(
+                    BuildError(
+                        file: warning.file,
+                        line: warning.line,
+                        message: warning.message
+                    )
+                )
             }
             finalWarnings = []
         }
@@ -378,7 +395,7 @@ class OutputParser {
         passedTestsCount = 0
         seenPassedTestNames = []
     }
-    
+
     private func parseLine(_ line: String) {
         // Quick filters to avoid regex on irrelevant lines
         if line.isEmpty || line.count > 5000 {
@@ -386,16 +403,10 @@ class OutputParser {
         }
 
         // Fast path checks before expensive regex
-        let containsRelevant = line.contains("error:") ||
-                               line.contains("warning:") ||
-                               line.contains("failed") ||
-                               line.contains("passed") ||
-                               line.contains("✘") ||
-                               line.contains("✓") ||
-                               line.contains("❌") ||
-                               line.contains("Build succeeded") ||
-                               line.contains("Build failed") ||
-                               line.contains("Executed")
+        let containsRelevant =
+            line.contains("error:") || line.contains("warning:") || line.contains("failed") || line.contains("passed")
+            || line.contains("✘") || line.contains("✓") || line.contains("❌") || line.contains("Build succeeded")
+            || line.contains("Build failed") || line.contains("Executed")
 
         if !containsRelevant {
             return
@@ -428,7 +439,7 @@ class OutputParser {
             buildTime = time
         }
     }
-    
+
     private func normalizeTestName(_ testName: String) -> String {
         // Convert "-[xcsiftTests.OutputParserTests testFirstFailingTest]" to "xcsiftTests.OutputParserTests testFirstFailingTest"
         if testName.hasPrefix("-[") && testName.hasSuffix("]") {
@@ -437,22 +448,22 @@ class OutputParser {
         }
         return testName
     }
-    
+
     private func hasSeenSimilarTest(_ normalizedTestName: String) -> Bool {
         return seenTestNames.contains(normalizedTestName)
     }
-    
+
     /// Checks if a line looks like JSON output (e.g., from the tool's own output or other JSON sources)
     /// This prevents false positives when parsing build output that contains JSON
     private func isJSONLikeLine(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
-        
+
         // Check for JSON-like patterns:
         // 1. Lines that start with quotes and contain colon (JSON key-value pairs)
         // 2. Lines containing JSON structure like "key" : "value"
         // 3. Lines with escaped quotes and backslashes typical of JSON
         // 4. Lines that are indented and contain JSON-like structures (common in formatted JSON)
-        
+
         // Pattern: "key" : "value" or "key" : value
         let jsonKeyValuePattern = Regex {
             Optionally(OneOrMore(.whitespace))
@@ -463,22 +474,22 @@ class OutputParser {
             ":"
             Optionally(OneOrMore(.whitespace))
         }
-        
+
         if trimmed.firstMatch(of: jsonKeyValuePattern) != nil {
             return true
         }
-        
+
         // Check for JSON array/object markers at start
         if trimmed.hasPrefix("{") || trimmed.hasPrefix("[") || trimmed.hasPrefix("}") || trimmed.hasPrefix("]") {
             return true
         }
-        
+
         // Check for lines with multiple escaped characters (common in JSON)
         // Pattern like "\\(message)\"" suggests JSON escaping
         if line.contains("\\\"") && line.contains("\"") && line.contains(":") {
             return true
         }
-        
+
         // Check for indented lines that look like JSON (common in formatted JSON output)
         // Lines starting with spaces/tabs followed by quotes are likely JSON
         if line.hasPrefix(" ") || line.hasPrefix("\t") {
@@ -491,39 +502,41 @@ class OutputParser {
                 return true
             }
         }
-        
+
         // Check for lines that contain "error:" but are clearly JSON (e.g., error messages in JSON)
         // Pattern: lines with quotes, colons, and escaped characters that contain "error:"
         if line.contains("error:") {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            
+
             // If line starts with "error:" (even if indented), it's likely a real error, not JSON
             // UNLESS it's clearly JSON structure like "error" : "value"
             if trimmed.hasPrefix("\"") && trimmed.contains("\"") && trimmed.contains(":") {
                 // This looks like JSON: "error" : "value" or "errors" : [...]
                 return true
             }
-            
+
             // If it's indented and has JSON-like structure (quoted keys), it's probably JSON
             if (line.hasPrefix(" ") || line.hasPrefix("\t")) && trimmed.hasPrefix("\"") {
                 return true
             }
-            
+
             // If it has escaped quotes and looks like JSON structure, but NOT if it starts with "error:"
             // (lines starting with "error:" are likely real errors, not JSON)
             if !trimmed.hasPrefix("error:") {
                 let hasQuotedStrings = line.contains("\"") && line.contains(":")
                 let hasEscapedContent = line.contains("\\") && line.contains("\"")
                 // If it has escaped quotes and looks like JSON structure (but not a file path)
-                if hasEscapedContent && hasQuotedStrings && !line.contains("file:") && !line.contains(".swift:") && !line.contains(".m:") && !line.contains(".h:") {
+                if hasEscapedContent && hasQuotedStrings && !line.contains("file:") && !line.contains(".swift:")
+                    && !line.contains(".m:") && !line.contains(".h:")
+                {
                     return true
                 }
             }
         }
-        
+
         return false
     }
-    
+
     private func recordPassedTest(named testName: String) {
         let normalizedTestName = normalizeTestName(testName)
         guard seenPassedTestNames.insert(normalizedTestName).inserted else {
@@ -531,13 +544,13 @@ class OutputParser {
         }
         passedTestsCount += 1
     }
-    
+
     private func parseError(_ line: String) -> BuildError? {
         // Skip JSON-like lines (e.g., "  \"message\" : \"\\\\(message)\\\"\"")
         if isJSONLikeLine(line) {
             return nil
         }
-        
+
         // Skip visual error lines (e.g., "    |   `- error: message")
         if line.hasPrefix(" ") && (line.contains("|") || line.contains("`")) {
             return nil
@@ -562,7 +575,7 @@ class OutputParser {
             let message = String(match.4)
             return BuildError(file: file, line: lineNumber, message: message, column: columnNumber)
         }
-        
+
         // Pattern: file:line: error: message
         let fileLineError = Regex {
             Capture(OneOrMore(.any, .reluctant))
@@ -572,14 +585,14 @@ class OutputParser {
             Capture(OneOrMore(.any, .reluctant))
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: fileLineError) {
             let file = String(match.1)
             let lineNumber = Int(String(match.2))
             let message = String(match.3)
             return BuildError(file: file, line: lineNumber, message: message)
         }
-        
+
         // Pattern: file: error: message
         let fileError = Regex {
             Capture(OneOrMore(.any, .reluctant))
@@ -587,13 +600,13 @@ class OutputParser {
             Capture(OneOrMore(.any, .reluctant))
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: fileError) {
             let file = String(match.1)
             let message = String(match.2)
             return BuildError(file: file, line: nil, message: message)
         }
-        
+
         // Pattern: file:line: Fatal error: message
         let fileFatalError = Regex {
             Capture(OneOrMore(.any, .reluctant))
@@ -603,14 +616,14 @@ class OutputParser {
             Capture(OneOrMore(.any, .reluctant))
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: fileFatalError) {
             let file = String(match.1)
             let lineNumber = Int(String(match.2))
             let message = String(match.3)
             return BuildError(file: file, line: lineNumber, message: message)
         }
-        
+
         // Pattern: file: Fatal error: message
         let fatalError = Regex {
             Capture(OneOrMore(.any, .reluctant))
@@ -618,37 +631,37 @@ class OutputParser {
             Capture(OneOrMore(.any, .reluctant))
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: fatalError) {
             let file = String(match.1)
             let message = String(match.2)
             return BuildError(file: file, line: nil, message: message)
         }
-        
+
         // Pattern: ❌ message
         let emojiError = Regex {
             "❌ "
             Capture(OneOrMore(.any, .reluctant))
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: emojiError) {
             let message = String(match.1)
             return BuildError(file: nil, line: nil, message: message)
         }
-        
+
         // Pattern: error: message
         let simpleError = Regex {
             "error: "
             Capture(OneOrMore(.any, .reluctant))
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: simpleError) {
             let message = String(match.1)
             return BuildError(file: nil, line: nil, message: message)
         }
-        
+
         return nil
     }
 
@@ -657,7 +670,7 @@ class OutputParser {
         if isJSONLikeLine(line) {
             return nil
         }
-        
+
         // Skip visual warning lines (e.g., "    |   `- warning: message")
         if line.hasPrefix(" ") && (line.contains("|") || line.contains("`")) {
             return nil
@@ -739,13 +752,13 @@ class OutputParser {
             Optionally(".")
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: testCasePassedPattern) {
             let testName = String(match.1)
             recordPassedTest(named: testName)
             return true
         }
-        
+
         let swiftTestingPassedPattern = Regex {
             "✓ Test \""
             Capture(OneOrMore(.any, .reluctant))
@@ -753,20 +766,21 @@ class OutputParser {
             OneOrMore(.any, .reluctant)
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: swiftTestingPassedPattern) {
             let testName = String(match.1)
             recordPassedTest(named: testName)
             return true
         }
-        
+
         return false
     }
-    
-    
+
     private func parseFailedTest(_ line: String) -> FailedTest? {
         // Handle XCUnit test failures specifically first
-        if line.contains("XCTAssertEqual failed") || line.contains("XCTAssertTrue failed") || line.contains("XCTAssertFalse failed") {
+        if line.contains("XCTAssertEqual failed") || line.contains("XCTAssertTrue failed")
+            || line.contains("XCTAssertFalse failed")
+        {
             // Pattern: file:line: error: -[ClassName testMethod] : XCTAssert... failed: details
             let xctestPattern = Regex {
                 Capture(OneOrMore(.any, .reluctant))
@@ -778,7 +792,7 @@ class OutputParser {
                 Capture(OneOrMore(.any, .reluctant))
                 Anchor.endOfSubject
             }
-            
+
             if let match = line.firstMatch(of: xctestPattern) {
                 let file = String(match.1)
                 let lineNumber = Int(String(match.2))
@@ -786,22 +800,32 @@ class OutputParser {
                 let message = String(match.4)
                 return FailedTest(test: testName, message: message, file: file, line: lineNumber)
             }
-            
+
             // Fallback: extract test name from -[ClassName testMethod] format
             let testNamePattern = Regex {
                 "-["
                 Capture(OneOrMore(.any, .reluctant))
                 "]"
             }
-            
+
             if let match = line.firstMatch(of: testNamePattern) {
                 let testName = String(match.1)
-                return FailedTest(test: testName, message: line.trimmingCharacters(in: .whitespaces), file: nil, line: nil)
+                return FailedTest(
+                    test: testName,
+                    message: line.trimmingCharacters(in: .whitespaces),
+                    file: nil,
+                    line: nil
+                )
             }
-            
-            return FailedTest(test: "Test assertion", message: line.trimmingCharacters(in: .whitespaces), file: nil, line: nil)
+
+            return FailedTest(
+                test: "Test assertion",
+                message: line.trimmingCharacters(in: .whitespaces),
+                file: nil,
+                line: nil
+            )
         }
-        
+
         // Pattern: Test Case 'TestName' failed (time)
         let testCasePattern = Regex {
             "Test Case '"
@@ -812,13 +836,13 @@ class OutputParser {
             Optionally(".")
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: testCasePattern) {
             let test = String(match.1)
             let message = String(match.2)
             return FailedTest(test: test, message: message, file: nil, line: nil)
         }
-        
+
         // Pattern: ✘ Test "name" recorded an issue at file:line:column: message
         let swiftTestingIssuePattern = Regex {
             "✘ Test \""
@@ -833,7 +857,7 @@ class OutputParser {
             Capture(OneOrMore(.any, .reluctant))
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: swiftTestingIssuePattern) {
             let test = String(match.1)
             let file = String(match.2)
@@ -841,7 +865,7 @@ class OutputParser {
             let message = String(match.4)
             return FailedTest(test: test, message: message, file: file, line: lineNumber)
         }
-        
+
         // Pattern: ✘ Test "name" failed after time with N issues.
         let swiftTestingFailedPattern = Regex {
             "✘ Test \""
@@ -855,12 +879,12 @@ class OutputParser {
             "."
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: swiftTestingFailedPattern) {
             let test = String(match.1)
             return FailedTest(test: test, message: "Test failed", file: nil, line: nil)
         }
-        
+
         // Pattern: ❌ testname (message)
         let emojiTestPattern = Regex {
             "❌ "
@@ -870,13 +894,13 @@ class OutputParser {
             ")"
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: emojiTestPattern) {
             let test = String(match.1)
             let message = String(match.2)
             return FailedTest(test: test, message: message, file: nil, line: nil)
         }
-        
+
         // Pattern: testname (message) failed
         let testFailedPattern = Regex {
             Capture(OneOrMore(.any, .reluctant))
@@ -885,13 +909,13 @@ class OutputParser {
             ") failed"
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: testFailedPattern) {
             let test = String(match.1)
             let message = String(match.2)
             return FailedTest(test: test, message: message, file: nil, line: nil)
         }
-        
+
         // Pattern: generic failed test with colon
         let colonFailedPattern = Regex {
             Capture(OneOrMore(.any, .reluctant))
@@ -901,16 +925,16 @@ class OutputParser {
             Capture(OneOrMore(.any, .reluctant))
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: colonFailedPattern) {
             let test = String(match.1)
             let message = String(match.2)
             return FailedTest(test: test, message: message, file: nil, line: nil)
         }
-        
+
         return nil
     }
-    
+
     private func parseBuildTime(_ line: String) -> String? {
         // Pattern: Build succeeded in time
         let buildSucceededPattern = Regex {
@@ -918,22 +942,22 @@ class OutputParser {
             Capture(OneOrMore(.any, .reluctant))
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: buildSucceededPattern) {
             return String(match.1)
         }
-        
+
         // Pattern: Build failed after time
         let buildFailedPattern = Regex {
             "Build failed after "
             Capture(OneOrMore(.any, .reluctant))
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: buildFailedPattern) {
             return String(match.1)
         }
-        
+
         // Pattern: Executed N tests, with N failures (N unexpected) in time (seconds) seconds
         let executedTestsPattern = Regex {
             "Executed "
@@ -953,7 +977,7 @@ class OutputParser {
             ") seconds"
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: executedTestsPattern) {
             if let total = Int(match.1) {
                 executedTestsCount = total
@@ -963,7 +987,7 @@ class OutputParser {
             }
             return String(match.4)
         }
-        
+
         let executedTestsSimplePattern = Regex {
             "Executed "
             Capture(OneOrMore(.digit))
@@ -979,7 +1003,7 @@ class OutputParser {
             Optionally(".")
             Anchor.endOfSubject
         }
-        
+
         if let match = line.firstMatch(of: executedTestsSimplePattern) {
             if let total = Int(match.1) {
                 executedTestsCount = total
@@ -1072,7 +1096,8 @@ class OutputParser {
         let buildDir = ".build"
 
         guard fileManager.fileExists(atPath: buildDir),
-              let enumerator = fileManager.enumerator(atPath: buildDir) else {
+            let enumerator = fileManager.enumerator(atPath: buildDir)
+        else {
             return nil
         }
 
@@ -1090,8 +1115,9 @@ class OutputParser {
                     var isDirectory: ObjCBool = false
 
                     if fileManager.fileExists(atPath: itemPath, isDirectory: &isDirectory),
-                       !isDirectory.boolValue,
-                       !item.hasSuffix(".dSYM") {
+                        !isDirectory.boolValue,
+                        !item.hasSuffix(".dSYM")
+                    {
                         return itemPath
                     }
                 }
@@ -1184,7 +1210,8 @@ class OutputParser {
 
         for path in paths {
             if let attrs = try? fileManager.attributesOfItem(atPath: path),
-               let modDate = attrs[.modificationDate] as? Date {
+                let modDate = attrs[.modificationDate] as? Date
+            {
                 if newestDate == nil || modDate > newestDate! {
                     newestDate = modDate
                     newestBundle = path
@@ -1203,7 +1230,8 @@ class OutputParser {
         }
 
         guard let jsonData = jsonOutput.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+            let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
+        else {
             return nil
         }
 
@@ -1230,7 +1258,7 @@ class OutputParser {
                 ".build/arm64-unknown-linux-gnu/debug/codecov",
                 ".build/x86_64-unknown-linux-gnu/debug/codecov",
                 "DerivedData",
-                "."
+                ".",
             ]
 
             var foundPath: String?
@@ -1357,13 +1385,15 @@ class OutputParser {
 
                 let name = (filename as NSString).lastPathComponent
 
-                fileCoverages.append(FileCoverage(
-                    path: filename,
-                    name: name,
-                    lineCoverage: lineCoverage,
-                    coveredLines: covered,
-                    executableLines: executable
-                ))
+                fileCoverages.append(
+                    FileCoverage(
+                        path: filename,
+                        name: name,
+                        lineCoverage: lineCoverage,
+                        coveredLines: covered,
+                        executableLines: executable
+                    )
+                )
 
                 totalCovered += covered
                 totalExecutable += executable
@@ -1381,8 +1411,9 @@ class OutputParser {
 
     private static func parseSPMFormat(json: [String: Any]) -> CodeCoverage? {
         guard let dataArray = json["data"] as? [[String: Any]],
-              let firstData = dataArray.first,
-              let filesArray = firstData["files"] as? [[String: Any]] else {
+            let firstData = dataArray.first,
+            let filesArray = firstData["files"] as? [[String: Any]]
+        else {
             return nil
         }
 
@@ -1392,23 +1423,26 @@ class OutputParser {
 
         for fileData in filesArray {
             guard let filename = fileData["filename"] as? String,
-                  let summary = fileData["summary"] as? [String: Any],
-                  let lines = summary["lines"] as? [String: Any],
-                  let covered = lines["covered"] as? Int,
-                  let count = lines["count"] as? Int else {
+                let summary = fileData["summary"] as? [String: Any],
+                let lines = summary["lines"] as? [String: Any],
+                let covered = lines["covered"] as? Int,
+                let count = lines["count"] as? Int
+            else {
                 continue
             }
 
             let coverage = count > 0 ? (Double(covered) / Double(count)) * 100.0 : 0.0
             let name = (filename as NSString).lastPathComponent
 
-            fileCoverages.append(FileCoverage(
-                path: filename,
-                name: name,
-                lineCoverage: coverage,
-                coveredLines: covered,
-                executableLines: count
-            ))
+            fileCoverages.append(
+                FileCoverage(
+                    path: filename,
+                    name: name,
+                    lineCoverage: coverage,
+                    coveredLines: covered,
+                    executableLines: count
+                )
+            )
 
             totalCovered += covered
             totalExecutable += count

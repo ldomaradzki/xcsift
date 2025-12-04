@@ -19,6 +19,12 @@ swift build -c release
 swift test
 ```
 
+### Formatting
+**IMPORTANT:** Always run before committing changes:
+```bash
+swift format --recursive --in-place Sources Tests
+```
+
 ### Installation
 ```bash
 swift build -c release
