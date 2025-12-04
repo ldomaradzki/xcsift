@@ -7,10 +7,10 @@ final class ParsingTests: XCTestCase {
     func testParseError() {
         let parser = OutputParser()
         let input = """
-        main.swift:15:5: error: use of undeclared identifier 'unknown'
-        unknown = 5
-        ^
-        """
+            main.swift:15:5: error: use of undeclared identifier 'unknown'
+            unknown = 5
+            ^
+            """
 
         let result = parser.parse(input: input)
 
@@ -22,13 +22,12 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.errors[0].message, "use of undeclared identifier 'unknown'")
     }
 
-
     func testParseSuccessfulBuild() {
         let parser = OutputParser()
         let input = """
-        Building for debugging...
-        Build complete!
-        """
+            Building for debugging...
+            Build complete!
+            """
 
         let result = parser.parse(input: input)
 
@@ -41,9 +40,9 @@ final class ParsingTests: XCTestCase {
     func testFailingTest() {
         let parser = OutputParser()
         let input = """
-        Test Case 'LoginTests.testInvalidCredentials' failed (0.045 seconds).
-        XCTAssertEqual failed: Expected valid login
-        """
+            Test Case 'LoginTests.testInvalidCredentials' failed (0.045 seconds).
+            XCTAssertEqual failed: Expected valid login
+            """
 
         let result = parser.parse(input: input)
 
@@ -58,10 +57,10 @@ final class ParsingTests: XCTestCase {
     func testMultipleErrors() {
         let parser = OutputParser()
         let input = """
-        UserService.swift:45:12: error: cannot find 'invalidFunction' in scope
-        NetworkManager.swift:23:5: error: use of undeclared identifier 'unknownVariable'
-        AppDelegate.swift:67:8: warning: unused variable 'config'
-        """
+            UserService.swift:45:12: error: cannot find 'invalidFunction' in scope
+            NetworkManager.swift:23:5: error: use of undeclared identifier 'unknownVariable'
+            AppDelegate.swift:67:8: warning: unused variable 'config'
+            """
 
         let result = parser.parse(input: input)
 
@@ -87,8 +86,8 @@ final class ParsingTests: XCTestCase {
     func testWrongFileReference() {
         let parser = OutputParser()
         let input = """
-        NonexistentFile.swift:999:1: error: file not found
-        """
+            NonexistentFile.swift:999:1: error: file not found
+            """
 
         let result = parser.parse(input: input)
 
@@ -103,9 +102,9 @@ final class ParsingTests: XCTestCase {
     func testBuildTimeExtraction() {
         let parser = OutputParser()
         let input = """
-        Building for debugging...
-        Build failed after 5.7 seconds
-        """
+            Building for debugging...
+            Build failed after 5.7 seconds
+            """
 
         let result = parser.parse(input: input)
 
@@ -116,10 +115,10 @@ final class ParsingTests: XCTestCase {
     func testParseCompileError() {
         let parser = OutputParser()
         let input = """
-        UserManager.swift:42:10: error: cannot find 'undefinedVariable' in scope
-        print(undefinedVariable)
-        ^
-        """
+            UserManager.swift:42:10: error: cannot find 'undefinedVariable' in scope
+            print(undefinedVariable)
+            ^
+            """
 
         let result = parser.parse(input: input)
 
@@ -134,9 +133,9 @@ final class ParsingTests: XCTestCase {
     func testPassedTestCountFromExecutedSummary() {
         let parser = OutputParser()
         let input = """
-        Test Case 'SampleTests.testExample' passed (0.001 seconds).
-        Executed 5 tests, with 0 failures (0 unexpected) in 5.017 (5.020) seconds
-        """
+            Test Case 'SampleTests.testExample' passed (0.001 seconds).
+            Executed 5 tests, with 0 failures (0 unexpected) in 5.017 (5.020) seconds
+            """
 
         let result = parser.parse(input: input)
 
@@ -148,8 +147,8 @@ final class ParsingTests: XCTestCase {
     func testPassedTestCountFromPassLineOnly() {
         let parser = OutputParser()
         let input = """
-        Test Case 'SampleTests.testExample' passed (0.001 seconds).
-        """
+            Test Case 'SampleTests.testExample' passed (0.001 seconds).
+            """
 
         let result = parser.parse(input: input)
 
@@ -164,14 +163,14 @@ final class ParsingTests: XCTestCase {
         // 2. Visual caret line with pipe and backtick
         // We should only capture the first one
         let input = """
-        /Users/test/project/Tests/TestFile.swift:16:34: error: missing argument for parameter 'fragments' in call
-         14 |             kind: "class",
-         15 |             language: "swift",
-         16 |             structuredContent: []
-            |                                  `- error: missing argument for parameter 'fragments' in call
-         17 |         )
-         18 |
-        """
+            /Users/test/project/Tests/TestFile.swift:16:34: error: missing argument for parameter 'fragments' in call
+             14 |             kind: "class",
+             15 |             language: "swift",
+             16 |             structuredContent: []
+                |                                  `- error: missing argument for parameter 'fragments' in call
+             17 |         )
+             18 |
+            """
 
         let result = parser.parse(input: input)
 
@@ -202,8 +201,8 @@ final class ParsingTests: XCTestCase {
     func testParseWarning() {
         let parser = OutputParser()
         let input = """
-        AppDelegate.swift:67:8: warning: unused variable 'config'
-        """
+            AppDelegate.swift:67:8: warning: unused variable 'config'
+            """
 
         let result = parser.parse(input: input)
 
@@ -218,10 +217,10 @@ final class ParsingTests: XCTestCase {
     func testParseMultipleWarnings() {
         let parser = OutputParser()
         let input = """
-        UserService.swift:45:12: warning: variable 'temp' was never used
-        NetworkManager.swift:23:5: warning: initialization of immutable value 'data' was never used
-        AppDelegate.swift:67:8: warning: unused variable 'config'
-        """
+            UserService.swift:45:12: warning: variable 'temp' was never used
+            NetworkManager.swift:23:5: warning: initialization of immutable value 'data' was never used
+            AppDelegate.swift:67:8: warning: unused variable 'config'
+            """
 
         let result = parser.parse(input: input)
 
@@ -233,10 +232,10 @@ final class ParsingTests: XCTestCase {
     func testParseErrorsAndWarnings() {
         let parser = OutputParser()
         let input = """
-        UserService.swift:45:12: error: cannot find 'invalidFunction' in scope
-        NetworkManager.swift:23:5: warning: variable 'temp' was never used
-        AppDelegate.swift:67:8: warning: unused variable 'config'
-        """
+            UserService.swift:45:12: error: cannot find 'invalidFunction' in scope
+            NetworkManager.swift:23:5: warning: variable 'temp' was never used
+            AppDelegate.swift:67:8: warning: unused variable 'config'
+            """
 
         let result = parser.parse(input: input)
 
@@ -250,8 +249,8 @@ final class ParsingTests: XCTestCase {
     func testPrintWarningsFlagFalse() {
         let parser = OutputParser()
         let input = """
-        AppDelegate.swift:67:8: warning: unused variable 'config'
-        """
+            AppDelegate.swift:67:8: warning: unused variable 'config'
+            """
 
         let result = parser.parse(input: input, printWarnings: false)
 
@@ -271,8 +270,8 @@ final class ParsingTests: XCTestCase {
     func testPrintWarningsFlagTrue() {
         let parser = OutputParser()
         let input = """
-        AppDelegate.swift:67:8: warning: unused variable 'config'
-        """
+            AppDelegate.swift:67:8: warning: unused variable 'config'
+            """
 
         let result = parser.parse(input: input, printWarnings: true)
 
@@ -292,11 +291,11 @@ final class ParsingTests: XCTestCase {
     func testSwiftTestingSummaryPassed() {
         let parser = OutputParser()
         let input = """
-        ✓ Test "LocaleUrlTag handles deep paths correctly in default locale" passed after 0.022 seconds.
-        ✓ Test "LocaleUrlTag generates correct URLs in non-default locale (en)" passed after 0.022 seconds.
-        ✓ Test "LocaleUrlTag handles deep paths correctly in non-default locale" passed after 0.023 seconds.
-        Test run with 23 tests in 5 suites passed after 0.031 seconds.
-        """
+            ✓ Test "LocaleUrlTag handles deep paths correctly in default locale" passed after 0.022 seconds.
+            ✓ Test "LocaleUrlTag generates correct URLs in non-default locale (en)" passed after 0.022 seconds.
+            ✓ Test "LocaleUrlTag handles deep paths correctly in non-default locale" passed after 0.023 seconds.
+            Test run with 23 tests in 5 suites passed after 0.031 seconds.
+            """
 
         let result = parser.parse(input: input)
 
@@ -327,36 +326,36 @@ final class ParsingTests: XCTestCase {
         // This simulates the actual problematic case: Swift compiler warning/note lines
         // with string interpolation patterns that were incorrectly parsed as errors
         let input = """
-        /Path/To/File.swift:79:41: warning: string interpolation produces a debug description for an optional value; did you mean to make this explicit?
+            /Path/To/File.swift:79:41: warning: string interpolation produces a debug description for an optional value; did you mean to make this explicit?
 
-            return "Encryption error: \\(message)"
+                return "Encryption error: \\(message)"
 
-                                        ^~~~~~~
+                                            ^~~~~~~
 
-        /Path/To/File.swift:79:41: note: use 'String(describing:)' to silence this warning
+            /Path/To/File.swift:79:41: note: use 'String(describing:)' to silence this warning
 
-            return "Encryption error: \\(message)"
+                return "Encryption error: \\(message)"
 
-                                        ^~~~~~~
+                                            ^~~~~~~
 
-                                        String(describing:  )
+                                            String(describing:  )
 
-        /Path/To/File.swift:79:41: note: provide a default value to avoid this warning
+            /Path/To/File.swift:79:41: note: provide a default value to avoid this warning
 
-            return "Encryption error: \\(message)"
+                return "Encryption error: \\(message)"
 
-                                        ^~~~~~~
+                                            ^~~~~~~
 
-                                                ?? <#default value#>
-        """
+                                                    ?? <#default value#>
+            """
 
         let result = parser.parse(input: input)
 
         // Should parse the warning correctly, but NOT parse the note lines as errors
         // The note lines contain \\(message) pattern which shouldn't be treated as error messages
-        XCTAssertEqual(result.status, "success") // No actual errors, just warnings
+        XCTAssertEqual(result.status, "success")  // No actual errors, just warnings
         XCTAssertEqual(result.summary.errors, 0)
-        XCTAssertEqual(result.summary.warnings, 1) // Should parse the warning
+        XCTAssertEqual(result.summary.warnings, 1)  // Should parse the warning
         XCTAssertEqual(result.errors.count, 0)
     }
 
@@ -365,11 +364,11 @@ final class ParsingTests: XCTestCase {
         // Mix of compiler note lines (with interpolation patterns) and actual errors
         // Should only parse the real errors, not the note lines
         let input = """
-        /Path/To/File.swift:79:41: note: use 'String(describing:)' to silence this warning
-            return "Encryption error: \\(message)"
-                                        ^~~~~~~
-        main.swift:15:5: error: use of undeclared identifier 'unknown'
-        """
+            /Path/To/File.swift:79:41: note: use 'String(describing:)' to silence this warning
+                return "Encryption error: \\(message)"
+                                            ^~~~~~~
+            main.swift:15:5: error: use of undeclared identifier 'unknown'
+            """
 
         let result = parser.parse(input: input)
 

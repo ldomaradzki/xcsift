@@ -19,7 +19,7 @@ let package = Package(
             name: "xcsift",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                .product(name: "TOONEncoder", package: "TOONEncoder")
+                .product(name: "TOONEncoder", package: "TOONEncoder"),
             ]
         ),
         .testTarget(
@@ -28,8 +28,8 @@ let package = Package(
             path: "Tests",
             resources: [
                 .copy("Fixtures/build.txt"),
-                .copy("Fixtures/swift-testing-output.txt")
+                .copy("Fixtures/swift-testing-output.txt"),
             ]
-        )
+        ),
     ]
 )

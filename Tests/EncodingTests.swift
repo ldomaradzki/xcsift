@@ -10,9 +10,9 @@ final class EncodingTests: XCTestCase {
     func testJSONOmitsNilOptionalFields() throws {
         let parser = OutputParser()
         let input = """
-        Building for debugging...
-        Build complete!
-        """
+            Building for debugging...
+            Build complete!
+            """
         let result = parser.parse(input: input)
 
         // Verify that optional fields are nil
@@ -40,14 +40,20 @@ final class EncodingTests: XCTestCase {
     func testJSONIncludesNonNilOptionalFields() throws {
         let parser = OutputParser()
         let input = """
-        Test Case 'SampleTests.testExample' passed (0.001 seconds).
-        Executed 5 tests, with 0 failures (0 unexpected) in 5.017 (5.020) seconds
-        """
+            Test Case 'SampleTests.testExample' passed (0.001 seconds).
+            Executed 5 tests, with 0 failures (0 unexpected) in 5.017 (5.020) seconds
+            """
 
         let coverage = CodeCoverage(
             lineCoverage: 85.5,
             files: [
-                FileCoverage(path: "/path/to/file.swift", name: "file.swift", lineCoverage: 85.5, coveredLines: 85, executableLines: 100)
+                FileCoverage(
+                    path: "/path/to/file.swift",
+                    name: "file.swift",
+                    lineCoverage: 85.5,
+                    coveredLines: 85,
+                    executableLines: 100
+                )
             ]
         )
         let result = parser.parse(input: input, coverage: coverage, printCoverageDetails: false)
@@ -74,9 +80,9 @@ final class EncodingTests: XCTestCase {
     func testTOONOmitsNilOptionalFields() throws {
         let parser = OutputParser()
         let input = """
-        Building for debugging...
-        Build complete!
-        """
+            Building for debugging...
+            Build complete!
+            """
         let result = parser.parse(input: input)
 
         // Verify that optional fields are nil
@@ -105,14 +111,20 @@ final class EncodingTests: XCTestCase {
     func testTOONIncludesNonNilOptionalFields() throws {
         let parser = OutputParser()
         let input = """
-        Test Case 'SampleTests.testExample' passed (0.001 seconds).
-        Executed 5 tests, with 0 failures (0 unexpected) in 5.017 (5.020) seconds
-        """
+            Test Case 'SampleTests.testExample' passed (0.001 seconds).
+            Executed 5 tests, with 0 failures (0 unexpected) in 5.017 (5.020) seconds
+            """
 
         let coverage = CodeCoverage(
             lineCoverage: 85.5,
             files: [
-                FileCoverage(path: "/path/to/file.swift", name: "file.swift", lineCoverage: 85.5, coveredLines: 85, executableLines: 100)
+                FileCoverage(
+                    path: "/path/to/file.swift",
+                    name: "file.swift",
+                    lineCoverage: 85.5,
+                    coveredLines: 85,
+                    executableLines: 100
+                )
             ]
         )
         let result = parser.parse(input: input, coverage: coverage, printCoverageDetails: false)

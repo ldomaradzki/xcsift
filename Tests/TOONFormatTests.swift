@@ -10,8 +10,8 @@ final class TOONFormatTests: XCTestCase {
     func testTOONEncoderBasic() throws {
         let parser = OutputParser()
         let input = """
-        main.swift:15:5: error: use of undeclared identifier 'unknown'
-        """
+            main.swift:15:5: error: use of undeclared identifier 'unknown'
+            """
         let result = parser.parse(input: input)
 
         let encoder = TOONEncoder()
@@ -29,9 +29,9 @@ final class TOONFormatTests: XCTestCase {
     func testTOONEncoderWithWarnings() throws {
         let parser = OutputParser()
         let input = """
-        Parser.swift:20:10: warning: immutable value 'result' was never used
-        Parser.swift:25:10: warning: variable 'foo' was never mutated
-        """
+            Parser.swift:20:10: warning: immutable value 'result' was never used
+            Parser.swift:25:10: warning: variable 'foo' was never mutated
+            """
         let result = parser.parse(input: input, printWarnings: true)
 
         let encoder = TOONEncoder()
@@ -50,10 +50,10 @@ final class TOONFormatTests: XCTestCase {
     func testTOONEncoderWithErrorsAndWarnings() throws {
         let parser = OutputParser()
         let input = """
-        main.swift:15:5: error: use of undeclared identifier 'unknown'
-        Parser.swift:20:10: warning: immutable value 'result' was never used
-        ** BUILD FAILED **
-        """
+            main.swift:15:5: error: use of undeclared identifier 'unknown'
+            Parser.swift:20:10: warning: immutable value 'result' was never used
+            ** BUILD FAILED **
+            """
         let result = parser.parse(input: input, printWarnings: true)
 
         let encoder = TOONEncoder()
@@ -76,7 +76,13 @@ final class TOONFormatTests: XCTestCase {
         let coverage = CodeCoverage(
             lineCoverage: 85.5,
             files: [
-                FileCoverage(path: "/path/to/file.swift", name: "file.swift", lineCoverage: 85.5, coveredLines: 85, executableLines: 100)
+                FileCoverage(
+                    path: "/path/to/file.swift",
+                    name: "file.swift",
+                    lineCoverage: 85.5,
+                    coveredLines: 85,
+                    executableLines: 100
+                )
             ]
         )
         let result = parser.parse(input: input, printWarnings: false, coverage: coverage, printCoverageDetails: true)
@@ -97,12 +103,12 @@ final class TOONFormatTests: XCTestCase {
     func testTOONTokenEfficiency() throws {
         let parser = OutputParser()
         let input = """
-        main.swift:15:5: error: use of undeclared identifier 'unknown'
-        Parser.swift:20:10: warning: immutable value 'result' was never used
-        Parser.swift:25:10: warning: variable 'foo' was never mutated
-        Model.swift:30:15: warning: initialization of immutable value 'bar' was never used
-        ** BUILD FAILED **
-        """
+            main.swift:15:5: error: use of undeclared identifier 'unknown'
+            Parser.swift:20:10: warning: immutable value 'result' was never used
+            Parser.swift:25:10: warning: variable 'foo' was never mutated
+            Model.swift:30:15: warning: initialization of immutable value 'bar' was never used
+            ** BUILD FAILED **
+            """
         let result = parser.parse(input: input, printWarnings: true)
 
         // JSON encoding
@@ -127,9 +133,9 @@ final class TOONFormatTests: XCTestCase {
     func testTOONEncoderWithFailedTests() throws {
         let parser = OutputParser()
         let input = """
-        Test Case 'LoginTests.testInvalidCredentials' failed (0.045 seconds).
-        XCTAssertEqual failed: Expected valid login
-        """
+            Test Case 'LoginTests.testInvalidCredentials' failed (0.045 seconds).
+            XCTAssertEqual failed: Expected valid login
+            """
         let result = parser.parse(input: input)
 
         let encoder = TOONEncoder()
@@ -148,9 +154,9 @@ final class TOONFormatTests: XCTestCase {
     func testTOONEncoderSuccessfulBuild() throws {
         let parser = OutputParser()
         let input = """
-        Building for debugging...
-        Build complete!
-        """
+            Building for debugging...
+            Build complete!
+            """
         let result = parser.parse(input: input)
 
         let encoder = TOONEncoder()
@@ -172,7 +178,13 @@ final class TOONFormatTests: XCTestCase {
         let coverage = CodeCoverage(
             lineCoverage: 75.5,
             files: [
-                FileCoverage(path: "/path/to/file.swift", name: "file.swift", lineCoverage: 75.5, coveredLines: 75, executableLines: 100)
+                FileCoverage(
+                    path: "/path/to/file.swift",
+                    name: "file.swift",
+                    lineCoverage: 75.5,
+                    coveredLines: 75,
+                    executableLines: 100
+                )
             ]
         )
         let result = parser.parse(input: input, printWarnings: false, coverage: coverage, printCoverageDetails: false)
@@ -195,9 +207,9 @@ final class TOONFormatTests: XCTestCase {
     func testTOONWithTabDelimiter() throws {
         let parser = OutputParser()
         let input = """
-        main.swift:15:5: error: use of undeclared identifier 'unknown'
-        Parser.swift:20:10: warning: immutable value 'result' was never used
-        """
+            main.swift:15:5: error: use of undeclared identifier 'unknown'
+            Parser.swift:20:10: warning: immutable value 'result' was never used
+            """
         let result = parser.parse(input: input, printWarnings: true)
 
         let encoder = TOONEncoder()
@@ -214,9 +226,9 @@ final class TOONFormatTests: XCTestCase {
     func testTOONWithPipeDelimiter() throws {
         let parser = OutputParser()
         let input = """
-        main.swift:15:5: error: use of undeclared identifier 'unknown'
-        Parser.swift:20:10: warning: immutable value 'result' was never used
-        """
+            main.swift:15:5: error: use of undeclared identifier 'unknown'
+            Parser.swift:20:10: warning: immutable value 'result' was never used
+            """
         let result = parser.parse(input: input, printWarnings: true)
 
         let encoder = TOONEncoder()
@@ -233,9 +245,9 @@ final class TOONFormatTests: XCTestCase {
     func testTOONWithHashLengthMarker() throws {
         let parser = OutputParser()
         let input = """
-        main.swift:15:5: error: use of undeclared identifier 'unknown'
-        Parser.swift:20:10: warning: unused variable
-        """
+            main.swift:15:5: error: use of undeclared identifier 'unknown'
+            Parser.swift:20:10: warning: unused variable
+            """
         let result = parser.parse(input: input, printWarnings: true)
 
         let encoder = TOONEncoder()
@@ -280,8 +292,8 @@ final class TOONFormatTests: XCTestCase {
     func testTOONKeyFoldingWithBuildResult() throws {
         let parser = OutputParser()
         let input = """
-        main.swift:15:5: error: use of undeclared identifier 'unknown'
-        """
+            main.swift:15:5: error: use of undeclared identifier 'unknown'
+            """
         let result = parser.parse(input: input)
 
         // Test with key folding enabled
@@ -305,7 +317,13 @@ final class TOONFormatTests: XCTestCase {
         let coverage = CodeCoverage(
             lineCoverage: 85.5,
             files: [
-                FileCoverage(path: "/path/to/file.swift", name: "file.swift", lineCoverage: 85.5, coveredLines: 85, executableLines: 100)
+                FileCoverage(
+                    path: "/path/to/file.swift",
+                    name: "file.swift",
+                    lineCoverage: 85.5,
+                    coveredLines: 85,
+                    executableLines: 100
+                )
             ]
         )
         let result = parser.parse(input: input, printWarnings: false, coverage: coverage, printCoverageDetails: true)
@@ -330,9 +348,9 @@ final class TOONFormatTests: XCTestCase {
         // Test combining all TOON key folding features
         let parser = OutputParser()
         let input = """
-        main.swift:15:5: error: use of undeclared identifier 'unknown'
-        Parser.swift:20:10: warning: unused variable
-        """
+            main.swift:15:5: error: use of undeclared identifier 'unknown'
+            Parser.swift:20:10: warning: unused variable
+            """
         let result = parser.parse(input: input, printWarnings: true)
 
         let encoder = TOONEncoder()
@@ -370,15 +388,15 @@ final class TOONFormatTests: XCTestCase {
     func testBenchmarkMediumOutput() throws {
         let parser = OutputParser()
         let input = """
-        main.swift:15:5: error: use of undeclared identifier 'unknown'
-        Parser.swift:20:10: warning: immutable value 'result' was never used
-        Parser.swift:25:10: warning: variable 'foo' was never mutated
-        Model.swift:30:15: warning: initialization of immutable value 'bar' was never used
-        View.swift:40:8: warning: 'oldFunction()' is deprecated
-        Controller.swift:50:12: warning: missing documentation
-        Test Case 'LoginTests.testInvalidCredentials' failed (0.045 seconds).
-        Test Case 'UITests.testButtonTap' failed (0.032 seconds).
-        """
+            main.swift:15:5: error: use of undeclared identifier 'unknown'
+            Parser.swift:20:10: warning: immutable value 'result' was never used
+            Parser.swift:25:10: warning: variable 'foo' was never mutated
+            Model.swift:30:15: warning: initialization of immutable value 'bar' was never used
+            View.swift:40:8: warning: 'oldFunction()' is deprecated
+            Controller.swift:50:12: warning: missing documentation
+            Test Case 'LoginTests.testInvalidCredentials' failed (0.045 seconds).
+            Test Case 'UITests.testButtonTap' failed (0.032 seconds).
+            """
         let result = parser.parse(input: input, printWarnings: true)
 
         let jsonSize = try measureJSONSize(result)
@@ -392,27 +410,45 @@ final class TOONFormatTests: XCTestCase {
     func testBenchmarkLargeOutputWithCoverage() throws {
         let parser = OutputParser()
         let input = """
-        main.swift:15:5: error: use of undeclared identifier 'unknown'
-        main.swift:20:5: error: cannot find 'invalidFunc' in scope
-        main.swift:25:5: error: type 'String' has no member 'invalidProperty'
-        Parser.swift:20:10: warning: unused variable 'result'
-        Parser.swift:25:10: warning: variable 'foo' was never mutated
-        Model.swift:30:15: warning: 'bar' was never used
-        View.swift:40:8: warning: 'oldFunction()' is deprecated
-        Controller.swift:50:12: warning: missing documentation
-        Service.swift:60:5: warning: unused import 'Foundation'
-        Helper.swift:70:10: warning: variable 'temp' was never mutated
-        Test Case 'LoginTests.test1' failed (0.045 seconds).
-        Test Case 'LoginTests.test2' failed (0.032 seconds).
-        Test Case 'UITests.test1' failed (0.050 seconds).
-        """
+            main.swift:15:5: error: use of undeclared identifier 'unknown'
+            main.swift:20:5: error: cannot find 'invalidFunc' in scope
+            main.swift:25:5: error: type 'String' has no member 'invalidProperty'
+            Parser.swift:20:10: warning: unused variable 'result'
+            Parser.swift:25:10: warning: variable 'foo' was never mutated
+            Model.swift:30:15: warning: 'bar' was never used
+            View.swift:40:8: warning: 'oldFunction()' is deprecated
+            Controller.swift:50:12: warning: missing documentation
+            Service.swift:60:5: warning: unused import 'Foundation'
+            Helper.swift:70:10: warning: variable 'temp' was never mutated
+            Test Case 'LoginTests.test1' failed (0.045 seconds).
+            Test Case 'LoginTests.test2' failed (0.032 seconds).
+            Test Case 'UITests.test1' failed (0.050 seconds).
+            """
 
         let coverage = CodeCoverage(
             lineCoverage: 75.5,
             files: [
-                FileCoverage(path: "/path/to/file1.swift", name: "file1.swift", lineCoverage: 85.0, coveredLines: 85, executableLines: 100),
-                FileCoverage(path: "/path/to/file2.swift", name: "file2.swift", lineCoverage: 70.0, coveredLines: 70, executableLines: 100),
-                FileCoverage(path: "/path/to/file3.swift", name: "file3.swift", lineCoverage: 90.0, coveredLines: 90, executableLines: 100)
+                FileCoverage(
+                    path: "/path/to/file1.swift",
+                    name: "file1.swift",
+                    lineCoverage: 85.0,
+                    coveredLines: 85,
+                    executableLines: 100
+                ),
+                FileCoverage(
+                    path: "/path/to/file2.swift",
+                    name: "file2.swift",
+                    lineCoverage: 70.0,
+                    coveredLines: 70,
+                    executableLines: 100
+                ),
+                FileCoverage(
+                    path: "/path/to/file3.swift",
+                    name: "file3.swift",
+                    lineCoverage: 90.0,
+                    coveredLines: 90,
+                    executableLines: 100
+                ),
             ]
         )
 
@@ -451,7 +487,7 @@ final class TOONFormatTests: XCTestCase {
             "test.swift:5:1: warning: 🚨 deprecated function",
 
             // Very long messages
-            String(repeating: "very long error message with lots of text ", count: 100)
+            String(repeating: "very long error message with lots of text ", count: 100),
         ]
 
         for input in testCases {
