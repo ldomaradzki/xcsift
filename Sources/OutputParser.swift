@@ -1186,7 +1186,7 @@ class OutputParser {
     }
 
     /// Finds the most recent .xcresult bundle in Xcode DerivedData using shell find
-    private static func findLatestXCResultInDerivedData() -> String? {
+    private static func findLatestXCResultInDerivedData(projectHint: String? = nil) -> String? {
         let fileManager = FileManager.default
         let homeDir = fileManager.homeDirectoryForCurrentUser.path
         let derivedDataPath = (homeDir as NSString).appendingPathComponent("Library/Developer/Xcode/DerivedData")
@@ -1195,7 +1195,26 @@ class OutputParser {
             return nil
         }
 
-        let findArgs = ["find", derivedDataPath, "-name", "*.xcresult", "-type", "d", "-mtime", "-7"]
+        // If we have a project hint, search only in matching project directories
+        let searchPaths: [String]
+        if let hint = projectHint {
+            // Find project directories matching the hint (e.g., "MyProject-abcdef123")
+            let projectDirs = (try? fileManager.contentsOfDirectory(atPath: derivedDataPath))?
+                .filter { $0.hasPrefix("\(hint)-") || $0.hasPrefix("\(hint)Tests-") }
+                .map { (derivedDataPath as NSString).appendingPathComponent($0) }
+                .filter { fileManager.fileExists(atPath: $0) }
+
+            guard let dirs = projectDirs, !dirs.isEmpty else {
+                // Project hint provided but no matching directory found
+                // Return nil to allow fallback to SPM paths
+                return nil
+            }
+            searchPaths = dirs
+        } else {
+            searchPaths = [derivedDataPath]
+        }
+
+        let findArgs = ["find"] + searchPaths + ["-name", "*.xcresult", "-type", "d", "-mtime", "-7"]
         guard let output = runShellCommand("/usr/bin/env", args: findArgs) else {
             return nil
         }
@@ -1247,7 +1266,7 @@ class OutputParser {
             coveragePath = path
         } else {
             // Auto-detect: try xcodebuild first (DerivedData), then SPM paths
-            if let latestXCResult = findLatestXCResultInDerivedData() {
+            if let latestXCResult = findLatestXCResultInDerivedData(projectHint: targetFilter) {
                 return convertXCResultToJSON(xcresultPath: latestXCResult, targetFilter: targetFilter)
             }
 
