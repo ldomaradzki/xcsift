@@ -189,7 +189,7 @@ struct XCSift: ParsableCommand {
         if coverage {
             let path = coveragePath ?? ""
             let targetFilter = parser.extractTestedTarget(from: input)
-            coverageData = OutputParser.parseCoverageFromPath(path, targetFilter: targetFilter)
+            coverageData = CoverageParser.parseCoverageFromPath(path, targetFilter: targetFilter)
 
             // Warn if target filter was extracted but no coverage data was found
             if let filter = targetFilter, coverageData == nil {
