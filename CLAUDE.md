@@ -199,10 +199,26 @@ The codebase follows a simple two-component architecture:
 
 ## Testing
 
-Tests are in `Tests/*.swift` using XCTest framework. Test cases cover:
+Tests are in `Tests/*.swift` using XCTest framework.
+
+### Test Fixtures
+
+Real-world output samples are stored in `Tests/Fixtures/` for integration tests:
+- **build.txt** (~2.7MB) - Large successful xcodebuild output for performance testing
+- **swift-testing-output.txt** (~11KB) - Swift Testing output with 23 passed tests
+- **linker-error-output.txt** - Real linker error output with undefined symbols
+
+To add new fixtures:
+1. Create the file in `Tests/Fixtures/`
+2. Add to `Package.swift` resources: `.copy("Fixtures/your-file.txt")`
+3. Load in tests via `Bundle.module.url(forResource: "your-file", withExtension: "txt")`
+
+### Test Coverage
+
+Test cases cover:
 - Error parsing from various Xcode formats
 - Warning detection
-- **Linker error parsing** (11 tests):
+- **Linker error parsing** (12 tests):
   - Undefined symbol errors
   - Multiple undefined symbols
   - Architecture mismatch errors
@@ -210,6 +226,7 @@ Tests are in `Tests/*.swift` using XCTest framework. Test cases cover:
   - Duplicate symbols
   - Mixed compiler and linker errors
   - Swift mangled symbols
+  - Real-world linker error output (fixture-based test)
 - Failed test extraction
 - Multi-error scenarios
 - Build time parsing

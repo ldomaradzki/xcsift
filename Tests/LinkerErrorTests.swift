@@ -214,4 +214,30 @@ final class LinkerErrorTests: XCTestCase {
         XCTAssertEqual(result.linkerErrors.count, 1)
         XCTAssertEqual(result.linkerErrors[0].symbol, "_$s7MyModule0A5ClassCACycfC")
     }
+
+    // MARK: - Real World Fixture Test
+
+    func testRealWorldLinkerErrorOutput() throws {
+        let parser = OutputParser()
+
+        let fixtureURL = Bundle.module.url(forResource: "linker-error-output", withExtension: "txt")!
+        let input = try String(contentsOf: fixtureURL, encoding: .utf8)
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.linkerErrors, 2)
+        XCTAssertEqual(result.linkerErrors.count, 2)
+
+        // Verify both symbols are parsed
+        let symbols = result.linkerErrors.map { $0.symbol }
+        XCTAssertTrue(symbols.contains("__another_missing_symbol"))
+        XCTAssertTrue(symbols.contains("__nonexistent_function"))
+
+        // Verify architecture
+        XCTAssertTrue(result.linkerErrors.allSatisfy { $0.architecture == "arm64" })
+
+        // Verify referenced from
+        XCTAssertTrue(result.linkerErrors.allSatisfy { $0.referencedFrom == "main-1.o" })
+    }
 }
