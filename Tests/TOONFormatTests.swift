@@ -1,5 +1,5 @@
 import XCTest
-import TOONEncoder
+import ToonFormat
 @testable import xcsift
 
 /// Tests for TOON format encoding and configuration
@@ -242,26 +242,6 @@ final class TOONFormatTests: XCTestCase {
         XCTAssertFalse(toonString!.contains(",15,"), "Should not use comma for values")
     }
 
-    func testTOONWithHashLengthMarker() throws {
-        let parser = OutputParser()
-        let input = """
-            main.swift:15:5: error: use of undeclared identifier 'unknown'
-            Parser.swift:20:10: warning: unused variable
-            """
-        let result = parser.parse(input: input, printWarnings: true)
-
-        let encoder = TOONEncoder()
-        encoder.indent = 2
-        encoder.delimiter = .comma
-        encoder.lengthMarker = .hash
-        let toonData = try encoder.encode(result)
-        let toonString = String(data: toonData, encoding: .utf8)
-
-        XCTAssertNotNil(toonString)
-        XCTAssertTrue(toonString!.contains("[#"), "Should use hash length marker")
-        XCTAssertTrue(toonString!.contains("[#1]{"), "Should show [#1]{ for array of 1 element")
-    }
-
     // MARK: - TOON Key Folding Tests
 
     func testTOONKeyFoldingDisabledByDefault() throws {
@@ -356,7 +336,6 @@ final class TOONFormatTests: XCTestCase {
         let encoder = TOONEncoder()
         encoder.indent = 2
         encoder.delimiter = .pipe
-        encoder.lengthMarker = .hash
         encoder.keyFolding = .safe
         encoder.flattenDepth = 5
 
@@ -367,7 +346,6 @@ final class TOONFormatTests: XCTestCase {
         // Verify basic structure is preserved
         XCTAssertTrue(toonString!.contains("status: failed"))
         XCTAssertTrue(toonString!.contains("|"), "Should use pipe delimiter")
-        XCTAssertTrue(toonString!.contains("[#"), "Should use hash length marker")
     }
 
     // MARK: - Benchmark Tests

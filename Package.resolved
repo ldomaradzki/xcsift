@@ -1,5 +1,5 @@
 {
-  "originHash" : "bd8172da84552a55de816db12c58a8ae269a9f26a61f98beffa3a68f7165cef7",
+  "originHash" : "8e823e894e580255ab0050f310402fe7e44233b051c15077bc2e607caa8e7695",
   "pins" : [
     {
       "identity" : "swift-argument-parser",
@@ -11,12 +11,12 @@
       }
     },
     {
-      "identity" : "toonencoder",
+      "identity" : "toon-swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mattt/TOONEncoder.git",
+      "location" : "https://github.com/toon-format/toon-swift.git",
       "state" : {
-        "revision" : "8a2a61a9d0804d1d9cd65d05a0913e8d21038032",
-        "version" : "0.2.0"
+        "revision" : "2561ea3a337c2fa42c307c0c44fdbad358c7c49c",
+        "version" : "0.3.0"
       }
     }
   ],
