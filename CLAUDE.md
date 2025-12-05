@@ -125,18 +125,6 @@ swift build 2>&1 | xcsift --format toon --toon-delimiter tab
 # Pipe delimiter - alternative when data contains many commas
 xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe
 
-# Length marker options (default: none):
-# - none: [3]{file,line,message}: (default, most compact)
-# - hash: [#3]{file,line,message}: (Ruby/Perl-style length prefix)
-
-# Hash length marker - adds # prefix to array counts
-xcodebuild build 2>&1 | xcsift -f toon --toon-length-marker hash
-swift build 2>&1 | xcsift --format toon --toon-length-marker hash
-
-# Combine configuration options
-xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter tab --toon-length-marker hash -w -c
-swift test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash --coverage-details
-
 # TOON Key Folding - collapses nested single-key objects into dotted paths
 # Key folding options (default: disabled):
 # - disabled: Normal nested output (default)
@@ -151,7 +139,7 @@ xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-de
 swift build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 2
 
 # Combine all TOON options
-xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash --toon-key-folding safe --toon-flatten-depth 5 -w -c
+xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-key-folding safe --toon-flatten-depth 5 -w -c
 ```
 
 ## Architecture
@@ -236,7 +224,7 @@ swift test --filter OutputParserTests.testParseError
 ## Dependencies
 
 - **Swift ArgumentParser**: CLI argument handling (Package.swift dependency)
-- **TOONEncoder**: Token-Oriented Object Notation encoder for efficient LLM output (Package.swift dependency)
+- **ToonFormat** (toon-swift): Token-Oriented Object Notation encoder for efficient LLM output (Package.swift dependency)
 - **Foundation**: Core Swift framework for regex, JSON encoding, string processing
 - **XCTest**: Testing framework (test target only)
 
