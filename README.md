@@ -21,7 +21,7 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 - **TOON format support** - Token-Oriented Object Notation optimized for LLM consumption
 - **GitHub Actions integration** - Auto-detected workflow commands with inline PR annotations
 - **Structured error reporting** - Clear categorization of errors, warnings, and test failures
-- **Linker error parsing** - Captures undefined symbols, missing frameworks/libraries, architecture mismatches
+- **Linker error parsing** - Captures undefined symbols, missing frameworks/libraries, architecture mismatches, and duplicate symbols with conflicting file paths
 - **File/line number extraction** - Easy navigation to problematic code locations
 - **Build status summary** - Quick overview of build results
 - **Automatic code coverage conversion** - Converts .profraw (SPM) and .xcresult (xcodebuild) to JSON automatically
@@ -209,7 +209,7 @@ xcodebuild build 2>&1 | xcsift -f github-actions
 }
 ```
 
-#### Linker errors (build fails before tests run)
+#### Linker errors - undefined symbols
 
 ```json
 {
@@ -225,7 +225,34 @@ xcodebuild build 2>&1 | xcsift -f github-actions
       "symbol": "_OBJC_CLASS_$_MissingClass",
       "architecture": "arm64",
       "referenced_from": "ViewController.o",
-      "message": ""
+      "message": "",
+      "conflicting_files": []
+    }
+  ]
+}
+```
+
+#### Linker errors - duplicate symbols
+
+```json
+{
+  "status": "failed",
+  "summary": {
+    "errors": 0,
+    "warnings": 0,
+    "failed_tests": 0,
+    "linker_errors": 1
+  },
+  "linker_errors": [
+    {
+      "symbol": "_globalConfiguration",
+      "architecture": "arm64",
+      "referenced_from": "",
+      "message": "",
+      "conflicting_files": [
+        "/path/to/ConfigA.o",
+        "/path/to/ConfigB.o"
+      ]
     }
   ]
 }
@@ -234,11 +261,11 @@ xcodebuild build 2>&1 | xcsift -f github-actions
 **Note on warnings:** By default, only the warning count appears in `summary.warnings`. The detailed `warnings` array (shown above) is only included when using the `--warnings` flag. This reduces token usage for coding agents that don't need to process every warning.
 
 **Note on linker errors:** The `linker_errors` array is automatically included when linker errors are detected. Supported error types:
-- Undefined symbols (missing classes, functions, variables)
+- Undefined symbols (missing classes, functions, variables) - uses `referenced_from` field
 - Missing frameworks (`ld: framework not found`)
 - Missing libraries (`ld: library not found for -l`)
 - Architecture mismatches (`building for iOS Simulator, but linking in dylib built for iOS`)
-- Duplicate symbols
+- Duplicate symbols - uses `conflicting_files` array to show which object files contain the duplicate
 
 **Note on coverage:** The `coverage` section is only included when using the `--coverage-details` flag:
 - **Summary-only mode** (default): Only includes coverage percentage in summary for maximum token efficiency

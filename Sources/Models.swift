@@ -330,12 +330,14 @@ struct LinkerError: Codable {
     let architecture: String
     let referencedFrom: String
     let message: String
+    let conflictingFiles: [String]
 
     enum CodingKeys: String, CodingKey {
         case symbol
         case architecture
         case referencedFrom = "referenced_from"
         case message
+        case conflictingFiles = "conflicting_files"
     }
 
     init(symbol: String, architecture: String, referencedFrom: String, message: String = "") {
@@ -343,6 +345,7 @@ struct LinkerError: Codable {
         self.architecture = architecture
         self.referencedFrom = referencedFrom
         self.message = message
+        self.conflictingFiles = []
     }
 
     init(message: String) {
@@ -350,5 +353,14 @@ struct LinkerError: Codable {
         self.architecture = ""
         self.referencedFrom = ""
         self.message = message
+        self.conflictingFiles = []
+    }
+
+    init(symbol: String, architecture: String, conflictingFiles: [String]) {
+        self.symbol = symbol
+        self.architecture = architecture
+        self.referencedFrom = ""
+        self.message = ""
+        self.conflictingFiles = conflictingFiles
     }
 }

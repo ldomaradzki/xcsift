@@ -122,10 +122,62 @@ final class LinkerErrorTests: XCTestCase {
 
         XCTAssertEqual(result.status, "failed")
         XCTAssertEqual(result.linkerErrors.count, 1)
+        XCTAssertEqual(result.linkerErrors[0].symbol, "_someGlobalVar")
+        XCTAssertEqual(result.linkerErrors[0].architecture, "arm64")
+        XCTAssertEqual(result.linkerErrors[0].conflictingFiles.count, 2)
+        XCTAssertEqual(result.linkerErrors[0].conflictingFiles[0], "/path/to/FileA.o")
+        XCTAssertEqual(result.linkerErrors[0].conflictingFiles[1], "/path/to/FileB.o")
+    }
+
+    func testParseDuplicateSymbolWithDoubleQuotes() {
+        let parser = OutputParser()
+        let input = """
+            duplicate symbol "_anotherSymbol" in:
+                /path/to/First.o
+                /path/to/Second.o
+            ld: 1 duplicate symbol for architecture x86_64
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.linkerErrors.count, 1)
+        XCTAssertEqual(result.linkerErrors[0].symbol, "_anotherSymbol")
+        XCTAssertEqual(result.linkerErrors[0].architecture, "x86_64")
+        XCTAssertEqual(result.linkerErrors[0].conflictingFiles.count, 2)
+    }
+
+    func testParseDuplicateSymbolJSONEncoding() throws {
+        let parser = OutputParser()
+        let input = """
+            duplicate symbol '_testSymbol' in:
+                /path/to/ModuleA.o
+                /path/to/ModuleB.o
+            ld: 1 duplicate symbol for architecture arm64
+            """
+
+        let result = parser.parse(input: input)
+
+        // Verify parsing worked
+        XCTAssertEqual(result.linkerErrors.count, 1, "Expected 1 linker error")
+        XCTAssertEqual(result.linkerErrors[0].conflictingFiles.count, 2, "Expected 2 conflicting files")
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let jsonData = try encoder.encode(result)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+
+        XCTAssertTrue(jsonString.contains("\"conflicting_files\""), "JSON should contain conflicting_files key")
         XCTAssertTrue(
-            result.linkerErrors[0].symbol.contains("_someGlobalVar")
-                || result.linkerErrors[0].message.contains("duplicate symbol")
+            jsonString.contains("\\/path\\/to\\/ModuleA.o"),
+            "JSON should contain ModuleA.o path (escaped)"
         )
+        XCTAssertTrue(
+            jsonString.contains("\\/path\\/to\\/ModuleB.o"),
+            "JSON should contain ModuleB.o path (escaped)"
+        )
+        XCTAssertTrue(jsonString.contains("\"symbol\""), "JSON should contain symbol key")
+        XCTAssertTrue(jsonString.contains("\"_testSymbol\""), "JSON should contain symbol value")
     }
 
     // MARK: - Framework Not Found

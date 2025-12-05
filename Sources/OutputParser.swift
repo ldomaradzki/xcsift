@@ -17,6 +17,10 @@ class OutputParser {
     private var currentLinkerArchitecture: String?
     private var pendingLinkerSymbol: String?
 
+    // Duplicate symbol parsing state
+    private var pendingDuplicateSymbol: String?
+    private var pendingConflictingFiles: [String] = []
+
     // MARK: - Static Regex Patterns (compiled once)
 
     // Error patterns
@@ -401,6 +405,8 @@ class OutputParser {
         seenPassedTestNames = []
         currentLinkerArchitecture = nil
         pendingLinkerSymbol = nil
+        pendingDuplicateSymbol = nil
+        pendingConflictingFiles = []
     }
 
     private func parseLine(_ line: String) {
@@ -505,9 +511,25 @@ class OutputParser {
             return true
         }
 
-        // Pattern: "duplicate symbol '_symbolName' in:"
+        // Pattern: "duplicate symbol '_symbolName' in:" - start multi-line duplicate symbol parsing
         if trimmed.hasPrefix("duplicate symbol '") || trimmed.hasPrefix("duplicate symbol \"") {
-            linkerErrors.append(LinkerError(message: trimmed))
+            // Extract symbol name from: duplicate symbol '_symbolName' in:
+            let quoteChar: Character = trimmed.hasPrefix("duplicate symbol '") ? "'" : "\""
+            let afterPrefix =
+                trimmed.hasPrefix("duplicate symbol '")
+                ? trimmed.dropFirst("duplicate symbol '".count) : trimmed.dropFirst("duplicate symbol \"".count)
+            if let endQuote = afterPrefix.firstIndex(of: quoteChar) {
+                pendingDuplicateSymbol = String(afterPrefix[..<endQuote])
+                pendingConflictingFiles = []
+            }
+            return true
+        }
+
+        // Pattern: "    /path/to/file.o" - conflicting file path (indented, part of duplicate symbol block)
+        if pendingDuplicateSymbol != nil && (trimmed.hasSuffix(".o") || trimmed.hasSuffix(".a"))
+            && (line.hasPrefix("    ") || line.hasPrefix("\t"))
+        {
+            pendingConflictingFiles.append(trimmed)
             return true
         }
 
@@ -517,11 +539,26 @@ class OutputParser {
             return true
         }
 
+        // Pattern: "ld: N duplicate symbol(s) for architecture arm64" - finalize duplicate symbol error
+        if trimmed.hasPrefix("ld: ") && trimmed.contains("duplicate symbol") {
+            // Finalize pending duplicate symbol if any
+            if let symbol = pendingDuplicateSymbol {
+                // Extract architecture from summary line
+                var arch = ""
+                if let archRange = trimmed.range(of: "for architecture ") {
+                    arch = String(trimmed[archRange.upperBound...])
+                }
+                linkerErrors.append(
+                    LinkerError(symbol: symbol, architecture: arch, conflictingFiles: pendingConflictingFiles)
+                )
+                pendingDuplicateSymbol = nil
+                pendingConflictingFiles = []
+            }
+            return true
+        }
+
         // Pattern: "ld: symbol(s) not found for architecture arm64" - just acknowledge, errors already captured
-        if trimmed.hasPrefix("ld: symbol(s) not found for architecture ")
-            || trimmed.hasPrefix("ld: 1 duplicate symbol for architecture ")
-            || trimmed.hasPrefix("ld: ") && trimmed.contains("duplicate symbol")
-        {
+        if trimmed.hasPrefix("ld: symbol(s) not found for architecture ") {
             // Already have the detailed errors, this is just the summary line
             return true
         }

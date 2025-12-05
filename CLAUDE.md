@@ -179,7 +179,7 @@ The codebase follows a simple two-component architecture:
 
 ### Key Features
 - **Error/Warning Parsing**: Multiple regex patterns handle various Xcode error formats
-- **Linker Error Parsing**: Captures undefined symbols, missing frameworks/libraries, architecture mismatches, and duplicate symbols
+- **Linker Error Parsing**: Captures undefined symbols, missing frameworks/libraries, architecture mismatches, and duplicate symbols (with structured conflicting file paths)
 - **Test Failure Detection**: XCUnit assertion failures and general test failures
 - **Build Time Extraction**: Captures build duration from output
 - **File/Line Mapping**: Extracts precise source locations for navigation
@@ -218,12 +218,14 @@ To add new fixtures:
 Test cases cover:
 - Error parsing from various Xcode formats
 - Warning detection
-- **Linker error parsing** (12 tests):
+- **Linker error parsing** (14 tests):
   - Undefined symbol errors
   - Multiple undefined symbols
   - Architecture mismatch errors
   - Framework/library not found
-  - Duplicate symbols
+  - Duplicate symbols with structured conflicting_files parsing
+  - Duplicate symbols with double quotes
+  - Duplicate symbols JSON encoding
   - Mixed compiler and linker errors
   - Swift mangled symbols
   - Real-world linker error output (fixture-based test)
@@ -289,7 +291,9 @@ The tool outputs structured data optimized for coding agents in two formats:
   - **Summary always includes warning and linker error counts**: `{"summary": {"warnings": N, "linker_errors": N, ...}}`
   - **Summary includes coverage percentage** (when `--coverage` flag is used): `{"summary": {"coverage_percent": X.X, ...}}`
   - **Detailed warnings list** (with `--warnings` flag): `{"warnings": [{"file": "...", "line": N, "message": "..."}]}`
-  - **Linker errors**: `{"linker_errors": [{"symbol": "...", "architecture": "...", "referenced_from": "...", "message": "..."}]}`
+  - **Linker errors**: Two types are supported:
+    - **Undefined symbols**: `{"linker_errors": [{"symbol": "_MissingClass", "architecture": "arm64", "referenced_from": "ViewController.o", "message": "", "conflicting_files": []}]}`
+    - **Duplicate symbols**: `{"linker_errors": [{"symbol": "_duplicateVar", "architecture": "arm64", "referenced_from": "", "message": "", "conflicting_files": ["/path/to/FileA.o", "/path/to/FileB.o"]}]}`
   - **Default behavior** (without flag): Only shows warning count in summary, omits detailed warnings array to reduce token usage
   - **Quiet mode** (with `--quiet` or `-q` flag): Produces no output when build succeeds with zero warnings and zero errors
   - **Coverage data** (with `--coverage` flag):

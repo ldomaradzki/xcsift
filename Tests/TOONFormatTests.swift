@@ -529,7 +529,8 @@ final class TOONFormatTests: XCTestCase {
         XCTAssertNotNil(toonString)
         XCTAssertTrue(toonString!.contains("status: failed"))
         XCTAssertTrue(toonString!.contains("linker_errors: 1"))
-        XCTAssertTrue(toonString!.contains("linker_errors[1]{"))
+        // LinkerError now has nested conflicting_files array, so tabular format is not used
+        XCTAssertTrue(toonString!.contains("linker_errors[1]:"))
         XCTAssertTrue(toonString!.contains("_OBJC_CLASS_$_MissingClass"))
         XCTAssertTrue(toonString!.contains("arm64"))
         XCTAssertTrue(toonString!.contains("ViewController.o"))
@@ -557,7 +558,8 @@ final class TOONFormatTests: XCTestCase {
         XCTAssertTrue(toonString!.contains("errors: 1"))
         XCTAssertTrue(toonString!.contains("linker_errors: 1"))
         XCTAssertTrue(toonString!.contains("errors[1]{"))
-        XCTAssertTrue(toonString!.contains("linker_errors[1]{"))
+        // LinkerError now has nested conflicting_files array, so tabular format is not used
+        XCTAssertTrue(toonString!.contains("linker_errors[1]:"))
     }
 
     // MARK: - Helper Methods
