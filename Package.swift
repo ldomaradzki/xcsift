@@ -12,14 +12,14 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.0.0"),
-        .package(url: "https://github.com/mattt/TOONEncoder.git", from: "0.2.0"),
+        .package(url: "https://github.com/toon-format/toon-swift.git", from: "0.1.0"),
     ],
     targets: [
         .executableTarget(
             name: "xcsift",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                .product(name: "TOONEncoder", package: "TOONEncoder"),
+                .product(name: "ToonFormat", package: "toon-swift"),
             ]
         ),
         .testTarget(
