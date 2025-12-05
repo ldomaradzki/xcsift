@@ -255,7 +255,7 @@ warnings[3]{file,line,message}:
 
 ### TOON Configuration
 
-TOON format can be customized with delimiter and length marker options for different use cases:
+TOON format can be customized with delimiter options for different use cases:
 
 **Delimiter Options** (`--toon-delimiter [comma|tab|pipe]`):
 - `comma` (default): CSV-style format, most compact

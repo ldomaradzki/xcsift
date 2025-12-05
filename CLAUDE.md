@@ -111,7 +111,7 @@ xcodebuild test 2>&1 | xcsift -f toon -w -c --coverage-details
 # - Ideal for LLM consumption and API cost reduction
 # - Works with all existing flags (--quiet, --coverage, --warnings)
 
-# TOON Configuration - customize delimiter and length markers
+# TOON Configuration - customize delimiter
 
 # Delimiter options (default: comma):
 # - comma: CSV-style format (default, most compact)
