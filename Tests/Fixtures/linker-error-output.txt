@@ -1,0 +1,8 @@
+error: link command failed with exit code 1 (use -v to see invocation)
+Undefined symbols for architecture arm64:
+  "__another_missing_symbol", referenced from:
+      main.main() -> () in main-1.o
+  "__nonexistent_function", referenced from:
+      main.main() -> () in main-1.o
+ld: symbol(s) not found for architecture arm64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
