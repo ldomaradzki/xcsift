@@ -1,3 +1,4 @@
+import TOONEncoder
 import XCTest
 
 @testable import xcsift
@@ -190,9 +191,10 @@ final class BuildInfoTests: XCTestCase {
 
         // Total build time is in summary
         XCTAssertEqual(result.summary.buildTime, "12.34s")
-        // SPM doesn't provide per-target timing or phases, so build_info is omitted
-        // (empty targets array means build_info won't be encoded)
-        XCTAssertEqual(result.buildInfo?.targets.count ?? 0, 0)
+        // Now SPM phases are parsed, so we get the target with Linking phase
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertEqual(result.buildInfo?.targets.first?.name, "xcsift")
+        XCTAssertTrue(result.buildInfo?.targets.first?.phases.contains("Linking") == true)
     }
 
     func testParseXcodebuildSucceededWithTime() {
@@ -451,5 +453,104 @@ final class BuildInfoTests: XCTestCase {
         // Should only have 1 CompileSwiftSources, not 3
         XCTAssertEqual(result.buildInfo?.targets[0].phases.count, 1)
         XCTAssertEqual(result.buildInfo?.targets[0].phases[0], "CompileSwiftSources")
+    }
+
+    // MARK: - SPM Phase Parsing
+
+    func testParseSPMCompilingPhase() {
+        let parser = OutputParser()
+        let input = """
+            [1/5] Compiling xcsift main.swift
+            [2/5] Compiling xcsift Parser.swift
+            [3/5] Linking xcsift
+            Build complete! (2.81s)
+            """
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertEqual(result.buildInfo?.targets.first?.name, "xcsift")
+        XCTAssertTrue(result.buildInfo?.targets.first?.phases.contains("Compiling") == true)
+        XCTAssertTrue(result.buildInfo?.targets.first?.phases.contains("Linking") == true)
+    }
+
+    func testParseSPMMultipleTargets() {
+        let parser = OutputParser()
+        let input = """
+            [1/10] Compiling ArgumentParser Option.swift
+            [2/10] Compiling ArgumentParser Parser.swift
+            [3/10] Compiling xcsift main.swift
+            [4/10] Linking xcsift
+            Build complete! (5.2s)
+            """
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 2)
+        // Order should be preserved
+        XCTAssertEqual(result.buildInfo?.targets[0].name, "ArgumentParser")
+        XCTAssertEqual(result.buildInfo?.targets[1].name, "xcsift")
+    }
+
+    func testSPMPluginCompilationIsSkipped() {
+        let parser = OutputParser()
+        let input = """
+            [1/1] Compiling plugin GenerateManual
+            [2/2] Compiling plugin GenerateDoccReference
+            Building for debugging...
+            [3/5] Compiling xcsift main.swift
+            Build complete! (2.81s)
+            """
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        XCTAssertNotNil(result.buildInfo)
+        // Should only have xcsift, not "plugin"
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertEqual(result.buildInfo?.targets.first?.name, "xcsift")
+    }
+
+    // MARK: - Target Order Preservation
+
+    func testTargetOrderPreserved() {
+        let parser = OutputParser()
+        let input = """
+            CompileSwiftSources normal arm64 (in target 'ZTarget' from project 'MyProject')
+            CompileSwiftSources normal arm64 (in target 'ATarget' from project 'MyProject')
+            CompileSwiftSources normal arm64 (in target 'MTarget' from project 'MyProject')
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 3)
+        // Order should be by appearance, not alphabetical
+        XCTAssertEqual(result.buildInfo?.targets[0].name, "ZTarget")
+        XCTAssertEqual(result.buildInfo?.targets[1].name, "ATarget")
+        XCTAssertEqual(result.buildInfo?.targets[2].name, "MTarget")
+    }
+
+    // MARK: - TOON Format with Build Info
+
+    func testTOONEncodingWithBuildInfo() throws {
+        let parser = OutputParser()
+        let input = """
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyProject')
+            Ld /path/to/binary normal (in target 'MyApp' from project 'MyProject')
+            Build target MyApp of project MyProject with configuration Debug (12.5s)
+            ** BUILD SUCCEEDED ** [15.3s]
+            """
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)!
+
+        XCTAssertTrue(toonString.contains("build_info:"))
+        XCTAssertTrue(toonString.contains("targets"))
+        XCTAssertTrue(toonString.contains("MyApp"))
+        XCTAssertTrue(toonString.contains("12.5s"))
+        XCTAssertTrue(toonString.contains("CompileSwiftSources"))
+        XCTAssertTrue(toonString.contains("Link"))
     }
 }
