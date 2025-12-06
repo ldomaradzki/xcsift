@@ -121,6 +121,9 @@ struct XCSift: ParsableCommand {
     @Flag(name: .long, help: "Include detailed per-file coverage data (default: summary only)")
     var coverageDetails: Bool = false
 
+    @Flag(name: .long, help: "Include per-target build phases and timing (xcodebuild only)")
+    var buildInfo: Bool = false
+
     @Option(
         name: [.customShort("f"), .long],
         help: "Output format (json, toon, or github-actions). Default: json. On CI, annotations are auto-appended."
@@ -186,7 +189,8 @@ struct XCSift: ParsableCommand {
             printWarnings: warnings,
             warningsAsErrors: warningsAsErrors,
             coverage: coverageData,
-            printCoverageDetails: coverageDetails
+            printCoverageDetails: coverageDetails,
+            printBuildInfo: buildInfo
         )
         outputResult(result, quiet: quiet)
     }

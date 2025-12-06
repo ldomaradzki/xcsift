@@ -1,8 +1,9 @@
 import XCTest
+
 @testable import xcsift
 
-/// Tests for build phases parsing and per-target timing extraction
-final class BuildPhasesTimingTests: XCTestCase {
+/// Tests for unified build info (phases + timing) extraction
+final class BuildInfoTests: XCTestCase {
 
     // MARK: - Build Phases Parsing Tests
 
@@ -10,29 +11,28 @@ final class BuildPhasesTimingTests: XCTestCase {
         let parser = OutputParser()
         let input = """
             CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyApp')
-                Compiling 42 swift files
             """
 
-        let result = parser.parse(input: input, printPhases: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
-        XCTAssertEqual(result.phases?.count, 1)
-        XCTAssertEqual(result.phases?[0].name, "CompileSwiftSources")
-        XCTAssertEqual(result.phases?[0].target, "MyApp")
-        XCTAssertEqual(result.phases?[0].files, 42)
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertEqual(result.buildInfo?.targets[0].name, "MyApp")
+        XCTAssertTrue(result.buildInfo?.targets[0].phases.contains("CompileSwiftSources") ?? false)
     }
 
     func testParseLinkPhase() {
         let parser = OutputParser()
         let input = """
             Ld /path/to/MyApp.app/MyApp normal (in target 'MyApp' from project 'MyApp')
-                cd /path/to/project
             """
 
-        let result = parser.parse(input: input, printPhases: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
-        XCTAssertEqual(result.phases?.count, 1)
-        XCTAssertEqual(result.phases?[0].name, "Link")
-        XCTAssertEqual(result.phases?[0].target, "MyApp")
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertEqual(result.buildInfo?.targets[0].name, "MyApp")
+        XCTAssertTrue(result.buildInfo?.targets[0].phases.contains("Link") ?? false)
     }
 
     func testParseCopyResourcesPhase() {
@@ -41,11 +41,11 @@ final class BuildPhasesTimingTests: XCTestCase {
             CopySwiftLibs /path/to/MyApp.app (in target 'MyApp' from project 'MyApp')
             """
 
-        let result = parser.parse(input: input, printPhases: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
-        XCTAssertEqual(result.phases?.count, 1)
-        XCTAssertEqual(result.phases?[0].name, "CopySwiftLibs")
-        XCTAssertEqual(result.phases?[0].target, "MyApp")
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertTrue(result.buildInfo?.targets[0].phases.contains("CopySwiftLibs") ?? false)
     }
 
     func testParseRunScriptPhase() {
@@ -54,40 +54,61 @@ final class BuildPhasesTimingTests: XCTestCase {
             PhaseScriptExecution Copy_Pods_Resources /path/to/script (in target 'MyApp' from project 'MyApp')
             """
 
-        let result = parser.parse(input: input, printPhases: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
-        XCTAssertEqual(result.phases?.count, 1)
-        XCTAssertEqual(result.phases?[0].name, "PhaseScriptExecution")
-        XCTAssertEqual(result.phases?[0].target, "MyApp")
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertTrue(result.buildInfo?.targets[0].phases.contains("PhaseScriptExecution") ?? false)
     }
 
-    func testMultiplePhasesAreCaptured() {
+    func testMultiplePhasesForSameTarget() {
         let parser = OutputParser()
         let input = """
             CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyApp')
-                Compiling 10 swift files
             Ld /path/to/MyApp.app/MyApp normal (in target 'MyApp' from project 'MyApp')
             CopySwiftLibs /path/to/MyApp.app (in target 'MyApp' from project 'MyApp')
             """
 
-        let result = parser.parse(input: input, printPhases: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
-        XCTAssertEqual(result.phases?.count, 3)
-        XCTAssertEqual(result.phases?[0].name, "CompileSwiftSources")
-        XCTAssertEqual(result.phases?[1].name, "Link")
-        XCTAssertEqual(result.phases?[2].name, "CopySwiftLibs")
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertEqual(result.buildInfo?.targets[0].name, "MyApp")
+        XCTAssertEqual(result.buildInfo?.targets[0].phases.count, 3)
+        XCTAssertTrue(result.buildInfo?.targets[0].phases.contains("CompileSwiftSources") ?? false)
+        XCTAssertTrue(result.buildInfo?.targets[0].phases.contains("Link") ?? false)
+        XCTAssertTrue(result.buildInfo?.targets[0].phases.contains("CopySwiftLibs") ?? false)
     }
 
-    func testPhasesOmittedByDefault() {
+    func testMultipleTargets() {
+        let parser = OutputParser()
+        let input = """
+            CompileSwiftSources normal arm64 (in target 'MyFramework' from project 'MyProject')
+            Ld /path/to/MyFramework.framework/MyFramework normal (in target 'MyFramework' from project 'MyProject')
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyProject')
+            Ld /path/to/MyApp.app/MyApp normal (in target 'MyApp' from project 'MyProject')
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 2)
+        // Targets are sorted alphabetically
+        let targetNames = result.buildInfo?.targets.map { $0.name } ?? []
+        XCTAssertTrue(targetNames.contains("MyApp"))
+        XCTAssertTrue(targetNames.contains("MyFramework"))
+    }
+
+    func testBuildInfoOmittedByDefault() {
         let parser = OutputParser()
         let input = """
             CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyApp')
             """
 
-        // Without printPhases flag, phases should be nil
-        let result = parser.parse(input: input, printPhases: false)
+        // Without printBuildInfo flag, buildInfo should be nil
+        let result = parser.parse(input: input, printBuildInfo: false)
 
-        XCTAssertNil(result.phases)
+        XCTAssertNil(result.buildInfo)
     }
 
     func testParseCompileSwiftDriverPhase() {
@@ -96,11 +117,11 @@ final class BuildPhasesTimingTests: XCTestCase {
             SwiftDriver\\ Compilation MyApp normal arm64 com.apple.xcode.tools.swift.compiler (in target 'MyApp' from project 'MyApp')
             """
 
-        let result = parser.parse(input: input, printPhases: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
-        XCTAssertEqual(result.phases?.count, 1)
-        XCTAssertEqual(result.phases?[0].name, "SwiftCompilation")
-        XCTAssertEqual(result.phases?[0].target, "MyApp")
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertTrue(result.buildInfo?.targets[0].phases.contains("SwiftCompilation") ?? false)
     }
 
     func testParseCompileClangPhase() {
@@ -109,11 +130,12 @@ final class BuildPhasesTimingTests: XCTestCase {
             CompileC /path/to/file.o /path/to/file.m normal arm64 (in target 'MyLib' from project 'MyProject')
             """
 
-        let result = parser.parse(input: input, printPhases: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
-        XCTAssertEqual(result.phases?.count, 1)
-        XCTAssertEqual(result.phases?[0].name, "CompileC")
-        XCTAssertEqual(result.phases?[0].target, "MyLib")
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertEqual(result.buildInfo?.targets[0].name, "MyLib")
+        XCTAssertTrue(result.buildInfo?.targets[0].phases.contains("CompileC") ?? false)
     }
 
     // MARK: - Target Timing Tests
@@ -125,13 +147,14 @@ final class BuildPhasesTimingTests: XCTestCase {
             ** BUILD SUCCEEDED ** [45.2s]
             """
 
-        let result = parser.parse(input: input, printTiming: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
-        XCTAssertNotNil(result.timing)
-        XCTAssertEqual(result.timing?.total, "45.2s")
-        XCTAssertEqual(result.timing?.targets.count, 1)
-        XCTAssertEqual(result.timing?.targets[0].name, "MyApp")
-        XCTAssertEqual(result.timing?.targets[0].duration, "23.1s")
+        // Total build time is in summary, not build_info (no duplication)
+        XCTAssertEqual(result.summary.buildTime, "45.2s")
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertEqual(result.buildInfo?.targets[0].name, "MyApp")
+        XCTAssertEqual(result.buildInfo?.targets[0].duration, "23.1s")
     }
 
     func testParseMultipleTargetsTiming() {
@@ -142,18 +165,20 @@ final class BuildPhasesTimingTests: XCTestCase {
             ** BUILD SUCCEEDED ** [45.2s]
             """
 
-        let result = parser.parse(input: input, printTiming: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
-        XCTAssertNotNil(result.timing)
-        XCTAssertEqual(result.timing?.total, "45.2s")
-        XCTAssertEqual(result.timing?.targets.count, 2)
-        XCTAssertEqual(result.timing?.targets[0].name, "MyFramework")
-        XCTAssertEqual(result.timing?.targets[0].duration, "12.4s")
-        XCTAssertEqual(result.timing?.targets[1].name, "MyApp")
-        XCTAssertEqual(result.timing?.targets[1].duration, "23.1s")
+        // Total build time is in summary
+        XCTAssertEqual(result.summary.buildTime, "45.2s")
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 2)
+        // Find targets by name
+        let appTarget = result.buildInfo?.targets.first { $0.name == "MyApp" }
+        let frameworkTarget = result.buildInfo?.targets.first { $0.name == "MyFramework" }
+        XCTAssertEqual(appTarget?.duration, "23.1s")
+        XCTAssertEqual(frameworkTarget?.duration, "12.4s")
     }
 
-    func testParseSPMTargetTiming() {
+    func testParseSPMTotalTiming() {
         let parser = OutputParser()
         let input = """
             Building for debugging...
@@ -161,10 +186,13 @@ final class BuildPhasesTimingTests: XCTestCase {
             Build complete! (12.34s)
             """
 
-        let result = parser.parse(input: input, printTiming: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
-        XCTAssertNotNil(result.timing)
-        XCTAssertEqual(result.timing?.total, "12.34s")
+        // Total build time is in summary
+        XCTAssertEqual(result.summary.buildTime, "12.34s")
+        // SPM doesn't provide per-target timing or phases, so build_info is omitted
+        // (empty targets array means build_info won't be encoded)
+        XCTAssertEqual(result.buildInfo?.targets.count ?? 0, 0)
     }
 
     func testParseXcodebuildSucceededWithTime() {
@@ -173,10 +201,12 @@ final class BuildPhasesTimingTests: XCTestCase {
             ** BUILD SUCCEEDED ** [32.5s]
             """
 
-        let result = parser.parse(input: input, printTiming: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
-        XCTAssertNotNil(result.timing)
-        XCTAssertEqual(result.timing?.total, "32.5s")
+        // Total build time is in summary
+        XCTAssertEqual(result.summary.buildTime, "32.5s")
+        // No target info, so build_info has empty targets
+        XCTAssertEqual(result.buildInfo?.targets.count ?? 0, 0)
     }
 
     func testParseXcodebuildFailedWithTime() {
@@ -186,23 +216,11 @@ final class BuildPhasesTimingTests: XCTestCase {
             ** BUILD FAILED ** [15.3s]
             """
 
-        let result = parser.parse(input: input, printTiming: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
-        XCTAssertNotNil(result.timing)
-        XCTAssertEqual(result.timing?.total, "15.3s")
+        // Total build time is in summary
+        XCTAssertEqual(result.summary.buildTime, "15.3s")
         XCTAssertEqual(result.status, "failed")
-    }
-
-    func testTimingOmittedByDefault() {
-        let parser = OutputParser()
-        let input = """
-            ** BUILD SUCCEEDED ** [32.5s]
-            """
-
-        // Without printTiming flag, timing should be nil
-        let result = parser.parse(input: input, printTiming: false)
-
-        XCTAssertNil(result.timing)
     }
 
     func testSummaryIncludesBuildTime() {
@@ -213,84 +231,129 @@ final class BuildPhasesTimingTests: XCTestCase {
 
         let result = parser.parse(input: input)
 
-        // build_time in summary should still work even without printTiming
+        // build_time in summary should still work even without printBuildInfo
         XCTAssertEqual(result.summary.buildTime, "32.5s")
     }
 
-    // MARK: - JSON Encoding Tests
+    // MARK: - Combined Phases + Timing Tests
 
-    func testJSONEncodingWithPhases() {
+    func testCombinedPhasesAndTiming() {
         let parser = OutputParser()
         let input = """
-            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyApp')
-                Compiling 10 swift files
-            Ld /path/to/MyApp.app/MyApp normal (in target 'MyApp' from project 'MyApp')
-            ** BUILD SUCCEEDED ** [15.0s]
-            """
-
-        let result = parser.parse(input: input, printPhases: true)
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
-        let jsonData = try! encoder.encode(result)
-        let jsonString = String(data: jsonData, encoding: .utf8)!
-
-        XCTAssertTrue(jsonString.contains("\"phases\""))
-        XCTAssertTrue(jsonString.contains("\"CompileSwiftSources\""))
-        XCTAssertTrue(jsonString.contains("\"Link\""))
-    }
-
-    func testJSONEncodingWithTiming() {
-        let parser = OutputParser()
-        let input = """
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyProject')
+            Ld /path/to/MyApp.app/MyApp normal (in target 'MyApp' from project 'MyProject')
             Build target MyApp of project MyProject with configuration Debug (23.1s)
             ** BUILD SUCCEEDED ** [45.2s]
             """
 
-        let result = parser.parse(input: input, printTiming: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        // Total build time is in summary
+        XCTAssertEqual(result.summary.buildTime, "45.2s")
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+
+        let target = result.buildInfo?.targets[0]
+        XCTAssertEqual(target?.name, "MyApp")
+        XCTAssertEqual(target?.duration, "23.1s")
+        XCTAssertEqual(target?.phases.count, 2)
+        XCTAssertTrue(target?.phases.contains("CompileSwiftSources") ?? false)
+        XCTAssertTrue(target?.phases.contains("Link") ?? false)
+    }
+
+    func testMultipleTargetsWithPhasesAndTiming() {
+        let parser = OutputParser()
+        let input = """
+            CompileSwiftSources normal arm64 (in target 'MyFramework' from project 'MyProject')
+            Ld /path/to/MyFramework.framework normal (in target 'MyFramework' from project 'MyProject')
+            Build target MyFramework of project MyProject with configuration Debug (12.4s)
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyProject')
+            Ld /path/to/MyApp.app/MyApp normal (in target 'MyApp' from project 'MyProject')
+            CopySwiftLibs /path/to/MyApp.app (in target 'MyApp' from project 'MyProject')
+            Build target MyApp of project MyProject with configuration Debug (23.1s)
+            ** BUILD SUCCEEDED ** [45.2s]
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        // Total build time is in summary
+        XCTAssertEqual(result.summary.buildTime, "45.2s")
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 2)
+
+        // Find targets by name
+        let appTarget = result.buildInfo?.targets.first { $0.name == "MyApp" }
+        let frameworkTarget = result.buildInfo?.targets.first { $0.name == "MyFramework" }
+
+        XCTAssertEqual(appTarget?.duration, "23.1s")
+        XCTAssertEqual(appTarget?.phases.count, 3)
+        XCTAssertTrue(appTarget?.phases.contains("CopySwiftLibs") ?? false)
+
+        XCTAssertEqual(frameworkTarget?.duration, "12.4s")
+        XCTAssertEqual(frameworkTarget?.phases.count, 2)
+    }
+
+    // MARK: - JSON Encoding Tests
+
+    func testJSONEncodingWithBuildInfo() {
+        let parser = OutputParser()
+        let input = """
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyApp')
+            Ld /path/to/MyApp.app/MyApp normal (in target 'MyApp' from project 'MyApp')
+            Build target MyApp of project MyProject with configuration Debug (23.1s)
+            ** BUILD SUCCEEDED ** [45.2s]
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         let jsonData = try! encoder.encode(result)
         let jsonString = String(data: jsonData, encoding: .utf8)!
 
-        XCTAssertTrue(jsonString.contains("\"timing\""))
-        XCTAssertTrue(jsonString.contains("\"total\":\"45.2s\""))
+        // build_info contains per-target info, total time is in summary
+        XCTAssertTrue(jsonString.contains("\"build_info\""))
+        XCTAssertTrue(jsonString.contains("\"build_time\":\"45.2s\""))  // In summary, not build_info
         XCTAssertTrue(jsonString.contains("\"targets\""))
         XCTAssertTrue(jsonString.contains("\"MyApp\""))
+        XCTAssertTrue(jsonString.contains("\"duration\":\"23.1s\""))
+        XCTAssertTrue(jsonString.contains("\"phases\""))
+        // No "total" field in build_info (it's in summary.build_time)
+        XCTAssertFalse(jsonString.contains("\"total\""))
     }
 
-    func testJSONEncodingOmitsEmptyPhasesAndTiming() {
+    func testJSONEncodingOmitsBuildInfoByDefault() {
         let parser = OutputParser()
         let input = """
-            Building for debugging...
-            Build complete!
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyApp')
+            ** BUILD SUCCEEDED ** [32.5s]
             """
 
-        let result = parser.parse(input: input, printPhases: false, printTiming: false)
+        let result = parser.parse(input: input, printBuildInfo: false)
 
         let encoder = JSONEncoder()
         let jsonData = try! encoder.encode(result)
         let jsonString = String(data: jsonData, encoding: .utf8)!
 
-        XCTAssertFalse(jsonString.contains("\"phases\""))
-        XCTAssertFalse(jsonString.contains("\"timing\""))
+        XCTAssertFalse(jsonString.contains("\"build_info\""))
+        // But summary should still have build_time
+        XCTAssertTrue(jsonString.contains("\"build_time\":\"32.5s\""))
     }
 
     // MARK: - Alternative xcodebuild formats
 
     func testParseTargetCompletedFormat() {
         let parser = OutputParser()
-        // Another common format from xcodebuild
         let input = """
             Build target 'MyApp' completed. (12.3s)
             """
 
-        let result = parser.parse(input: input, printTiming: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
-        XCTAssertEqual(result.timing?.targets.count, 1)
-        XCTAssertEqual(result.timing?.targets[0].name, "MyApp")
-        XCTAssertEqual(result.timing?.targets[0].duration, "12.3s")
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertEqual(result.buildInfo?.targets[0].name, "MyApp")
+        XCTAssertEqual(result.buildInfo?.targets[0].duration, "12.3s")
     }
 
     func testParseBuildSucceededNoTime() {
@@ -299,10 +362,94 @@ final class BuildPhasesTimingTests: XCTestCase {
             ** BUILD SUCCEEDED **
             """
 
-        let result = parser.parse(input: input, printTiming: true)
+        let result = parser.parse(input: input, printBuildInfo: true)
 
         // Should handle BUILD SUCCEEDED without timing gracefully
         XCTAssertEqual(result.status, "success")
-        XCTAssertNil(result.timing?.total)
+        XCTAssertNil(result.summary.buildTime)
+    }
+
+    // MARK: - Empty Fields Are Not Encoded
+
+    func testEmptyFieldsNotEncodedInJSON() {
+        let parser = OutputParser()
+        // Only phases, no timing
+        let input = """
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyApp')
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let jsonData = try! encoder.encode(result)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+
+        // build_info should be present with targets
+        XCTAssertTrue(jsonString.contains("\"build_info\""))
+        XCTAssertTrue(jsonString.contains("\"targets\""))
+        // Duration should NOT be present since no timing info
+        XCTAssertFalse(jsonString.contains("\"duration\""))
+        // build_time should NOT be present since no time info
+        XCTAssertFalse(jsonString.contains("\"build_time\""))
+    }
+
+    func testEmptyTargetsOmitsBuildInfo() {
+        let parser = OutputParser()
+        // No phases, no targets - just a simple build success
+        let input = """
+            ** BUILD SUCCEEDED ** [32.5s]
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let encoder = JSONEncoder()
+        let jsonData = try! encoder.encode(result)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+
+        // build_info should NOT be present when targets are empty
+        XCTAssertFalse(jsonString.contains("\"build_info\""))
+        // But build_time should still be in summary
+        XCTAssertTrue(jsonString.contains("\"build_time\":\"32.5s\""))
+    }
+
+    func testTargetWithoutPhasesDoesNotEncodePhasesField() {
+        let parser = OutputParser()
+        // Only timing, no phases
+        let input = """
+            Build target MyApp of project MyProject with configuration Debug (23.1s)
+            ** BUILD SUCCEEDED ** [45.2s]
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let encoder = JSONEncoder()
+        let jsonData = try! encoder.encode(result)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+
+        // build_info should be present
+        XCTAssertTrue(jsonString.contains("\"build_info\""))
+        XCTAssertTrue(jsonString.contains("\"duration\":\"23.1s\""))
+        // phases should NOT be present since no phases info
+        XCTAssertFalse(jsonString.contains("\"phases\""))
+    }
+
+    // MARK: - Duplicate Phase Prevention
+
+    func testDuplicatePhasesAreNotAdded() {
+        let parser = OutputParser()
+        let input = """
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyApp')
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyApp')
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyApp')
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        // Should only have 1 CompileSwiftSources, not 3
+        XCTAssertEqual(result.buildInfo?.targets[0].phases.count, 1)
+        XCTAssertEqual(result.buildInfo?.targets[0].phases[0], "CompileSwiftSources")
     }
 }

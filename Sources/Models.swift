@@ -8,17 +8,16 @@ struct BuildResult: Codable {
     let failedTests: [FailedTest]
     let linkerErrors: [LinkerError]
     let coverage: CodeCoverage?
-    let phases: [BuildPhase]?
-    let timing: BuildTiming?
+    let buildInfo: BuildInfo?
     let printWarnings: Bool
     let printCoverageDetails: Bool
-    let printPhases: Bool
-    let printTiming: Bool
+    let printBuildInfo: Bool
 
     enum CodingKeys: String, CodingKey {
-        case status, summary, errors, warnings, coverage, phases, timing
+        case status, summary, errors, warnings, coverage
         case failedTests = "failed_tests"
         case linkerErrors = "linker_errors"
+        case buildInfo = "build_info"
     }
 
     init(
@@ -29,12 +28,10 @@ struct BuildResult: Codable {
         failedTests: [FailedTest],
         linkerErrors: [LinkerError] = [],
         coverage: CodeCoverage?,
-        phases: [BuildPhase]? = nil,
-        timing: BuildTiming? = nil,
+        buildInfo: BuildInfo? = nil,
         printWarnings: Bool,
         printCoverageDetails: Bool = false,
-        printPhases: Bool = false,
-        printTiming: Bool = false
+        printBuildInfo: Bool = false
     ) {
         self.status = status
         self.summary = summary
@@ -43,12 +40,10 @@ struct BuildResult: Codable {
         self.failedTests = failedTests
         self.linkerErrors = linkerErrors
         self.coverage = coverage
-        self.phases = phases
-        self.timing = timing
+        self.buildInfo = buildInfo
         self.printWarnings = printWarnings
         self.printCoverageDetails = printCoverageDetails
-        self.printPhases = printPhases
-        self.printTiming = printTiming
+        self.printBuildInfo = printBuildInfo
     }
 
     init(from decoder: Decoder) throws {
@@ -60,12 +55,10 @@ struct BuildResult: Codable {
         failedTests = try container.decodeIfPresent([FailedTest].self, forKey: .failedTests) ?? []
         linkerErrors = try container.decodeIfPresent([LinkerError].self, forKey: .linkerErrors) ?? []
         coverage = try container.decodeIfPresent(CodeCoverage.self, forKey: .coverage)
-        phases = try container.decodeIfPresent([BuildPhase].self, forKey: .phases)
-        timing = try container.decodeIfPresent(BuildTiming.self, forKey: .timing)
+        buildInfo = try container.decodeIfPresent(BuildInfo.self, forKey: .buildInfo)
         printWarnings = false
         printCoverageDetails = false
-        printPhases = false
-        printTiming = false
+        printBuildInfo = false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -95,14 +88,9 @@ struct BuildResult: Codable {
             try container.encode(coverage, forKey: .coverage)
         }
 
-        // Only output phases section when printPhases flag is set
-        if printPhases, let phases = phases, !phases.isEmpty {
-            try container.encode(phases, forKey: .phases)
-        }
-
-        // Only output timing section when printTiming flag is set
-        if printTiming, let timing = timing, (timing.total != nil || !timing.targets.isEmpty) {
-            try container.encode(timing, forKey: .timing)
+        // Only output build_info section when printBuildInfo flag is set and there are targets
+        if printBuildInfo, let buildInfo = buildInfo, !buildInfo.targets.isEmpty {
+            try container.encode(buildInfo, forKey: .buildInfo)
         }
     }
 
@@ -391,57 +379,43 @@ struct LinkerError: Codable {
     }
 }
 
-// MARK: - Build Phases
+// MARK: - Build Info (Phases + Timing per target)
+// Note: Total build time is already in BuildSummary.buildTime, so not duplicated here
 
-struct BuildPhase: Codable {
-    let name: String
-    let target: String
-    let files: Int?
-    let duration: String?
+struct BuildInfo: Codable {
+    let targets: [TargetBuildInfo]
 
-    init(name: String, target: String, files: Int? = nil, duration: String? = nil) {
-        self.name = name
-        self.target = target
-        self.files = files
-        self.duration = duration
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(name, forKey: .name)
-        try container.encode(target, forKey: .target)
-        if let files = files {
-            try container.encode(files, forKey: .files)
-        }
-        if let duration = duration {
-            try container.encode(duration, forKey: .duration)
-        }
-    }
-}
-
-// MARK: - Build Timing
-
-struct BuildTiming: Codable {
-    let total: String?
-    let targets: [TargetTiming]
-
-    init(total: String? = nil, targets: [TargetTiming] = []) {
-        self.total = total
+    init(targets: [TargetBuildInfo] = []) {
         self.targets = targets
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        if let total = total {
-            try container.encode(total, forKey: .total)
-        }
         if !targets.isEmpty {
             try container.encode(targets, forKey: .targets)
         }
     }
 }
 
-struct TargetTiming: Codable {
+struct TargetBuildInfo: Codable {
     let name: String
-    let duration: String
+    let duration: String?
+    let phases: [String]
+
+    init(name: String, duration: String? = nil, phases: [String] = []) {
+        self.name = name
+        self.duration = duration
+        self.phases = phases
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        if let duration = duration {
+            try container.encode(duration, forKey: .duration)
+        }
+        if !phases.isEmpty {
+            try container.encode(phases, forKey: .phases)
+        }
+    }
 }

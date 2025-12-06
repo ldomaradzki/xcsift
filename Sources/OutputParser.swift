@@ -22,10 +22,10 @@ class OutputParser {
     private var pendingDuplicateSymbol: String?
     private var pendingConflictingFiles: [String] = []
 
-    // Build phases and timing
-    private var phases: [BuildPhase] = []
-    private var targetTimings: [TargetTiming] = []
-    private var totalBuildTime: String?
+    // Build info tracking - phases grouped by target
+    private var targetPhases: [String: [String]] = [:]  // target -> [phase names]
+    private var targetDurations: [String: String] = [:]  // target -> duration
+    private var targetOrder: [String] = []  // preserve target order
 
     // MARK: - Static Regex Patterns (compiled once)
 
@@ -325,8 +325,7 @@ class OutputParser {
         warningsAsErrors: Bool = false,
         coverage: CodeCoverage? = nil,
         printCoverageDetails: Bool = false,
-        printPhases: Bool = false,
-        printTiming: Bool = false
+        printBuildInfo: Bool = false
     ) -> BuildResult {
         resetState()
         let lines = input.split(separator: "\n", omittingEmptySubsequences: false)
@@ -374,26 +373,31 @@ class OutputParser {
             return nil
         }()
 
-        // Use totalBuildTime if available (from BUILD SUCCEEDED/FAILED), otherwise fall back to buildTime
-        let finalBuildTime = totalBuildTime ?? buildTime
-
         let summary = BuildSummary(
             errors: finalErrors.count,
             warnings: finalWarnings.count,
             failedTests: failedTests.count,
             linkerErrors: linkerErrors.count,
             passedTests: computedPassedTests,
-            buildTime: finalBuildTime,
+            buildTime: buildTime,
             coveragePercent: coverage?.lineCoverage
         )
 
-        // Build timing data
-        let timing: BuildTiming? =
-            printTiming
-            ? BuildTiming(
-                total: totalBuildTime,
-                targets: targetTimings
-            ) : nil
+        // Build info - phases and timing per target (total time is in summary.build_time)
+        let buildInfo: BuildInfo? =
+            printBuildInfo
+            ? {
+                // Build targets list with phases and durations
+                let allTargets = Set(targetPhases.keys).union(Set(targetDurations.keys))
+                let targets = allTargets.sorted().map { targetName in
+                    TargetBuildInfo(
+                        name: targetName,
+                        duration: targetDurations[targetName],
+                        phases: targetPhases[targetName] ?? []
+                    )
+                }
+                return BuildInfo(targets: targets)
+            }() : nil
 
         return BuildResult(
             status: status,
@@ -403,12 +407,10 @@ class OutputParser {
             failedTests: failedTests,
             linkerErrors: linkerErrors,
             coverage: coverage,
-            phases: printPhases ? (phases.isEmpty ? nil : phases) : nil,
-            timing: timing,
+            buildInfo: buildInfo,
             printWarnings: printWarnings,
             printCoverageDetails: printCoverageDetails,
-            printPhases: printPhases,
-            printTiming: printTiming
+            printBuildInfo: printBuildInfo
         )
     }
 
@@ -449,9 +451,9 @@ class OutputParser {
         pendingDuplicateSymbol = nil
         pendingConflictingFiles = []
         parallelTestsTotalCount = nil
-        phases = []
-        targetTimings = []
-        totalBuildTime = nil
+        targetPhases = [:]
+        targetDurations = [:]
+        targetOrder = []
     }
 
     private func parseLine(_ line: String) {
@@ -466,20 +468,20 @@ class OutputParser {
         }
 
         // Check for build phases (these have different keywords from errors/warnings)
-        if let phase = parseBuildPhase(line) {
-            phases.append(phase)
+        if let (phaseName, targetName) = parseBuildPhase(line) {
+            if targetPhases[targetName] == nil {
+                targetPhases[targetName] = []
+            }
+            // Only add if not already present (avoid duplicates)
+            if !targetPhases[targetName]!.contains(phaseName) {
+                targetPhases[targetName]!.append(phaseName)
+            }
             return
         }
 
         // Check for target timing
-        if let targetTiming = parseTargetTiming(line) {
-            targetTimings.append(targetTiming)
-            return
-        }
-
-        // Check for total build time from BUILD SUCCEEDED/FAILED
-        if let totalTime = parseTotalBuildTime(line) {
-            totalBuildTime = totalTime
+        if let (targetName, duration) = parseTargetTiming(line) {
+            targetDurations[targetName] = duration
             return
         }
 
@@ -488,6 +490,7 @@ class OutputParser {
             line.contains("error:") || line.contains("warning:") || line.contains("failed") || line.contains("passed")
             || line.contains("✘") || line.contains("✓") || line.contains("❌") || line.contains("Build succeeded")
             || line.contains("Build failed") || line.contains("Executed") || line.contains("] Testing ")
+            || line.contains("BUILD SUCCEEDED") || line.contains("BUILD FAILED") || line.contains("Build complete!")
 
         if !containsRelevant {
             return
@@ -950,6 +953,28 @@ class OutputParser {
     }
 
     private func parseBuildTime(_ line: String) -> String? {
+        // Pattern: ** BUILD SUCCEEDED ** [45.2s] or ** BUILD FAILED ** [15.3s]
+        // xcodebuild format with bracket timing - highest priority
+        if line.contains("** BUILD SUCCEEDED **") || line.contains("** BUILD FAILED **") {
+            // Extract time from square brackets
+            if let bracketStart = line.range(of: "[", options: .backwards),
+                let bracketEnd = line.range(of: "]", options: .backwards),
+                bracketStart.lowerBound < bracketEnd.lowerBound
+            {
+                return String(line[bracketStart.upperBound ..< bracketEnd.lowerBound])
+            }
+        }
+
+        // Pattern: Build complete! (12.34s) - SPM format
+        if line.hasPrefix("Build complete!") {
+            if let parenStart = line.range(of: "("),
+                let parenEnd = line.range(of: ")"),
+                parenStart.lowerBound < parenEnd.lowerBound
+            {
+                return String(line[parenStart.upperBound ..< parenEnd.lowerBound])
+            }
+        }
+
         // Pattern: Build succeeded in time
         if line.hasPrefix("Build succeeded in ") {
             return String(line.dropFirst(19))
@@ -1045,7 +1070,8 @@ class OutputParser {
 
     // MARK: - Build Phase Parsing
 
-    private func parseBuildPhase(_ line: String) -> BuildPhase? {
+    /// Returns (phaseName, targetName) tuple if line contains a build phase
+    private func parseBuildPhase(_ line: String) -> (String, String)? {
         // Extract target name from "(in target 'TargetName' from project 'ProjectName')"
         func extractTarget(from line: String) -> String? {
             if let inTargetRange = line.range(of: "(in target '") {
@@ -1057,92 +1083,59 @@ class OutputParser {
             return nil
         }
 
-        // Extract file count from "Compiling N swift files" pattern
-        func extractFileCount(from line: String) -> Int? {
-            if line.contains("Compiling ") && line.contains(" swift files") {
-                // Line format: "    Compiling 42 swift files"
-                let components = line.split(separator: " ")
-                for (index, component) in components.enumerated() {
-                    if component == "Compiling" && index + 1 < components.count {
-                        if let count = Int(components[index + 1]) {
-                            return count
-                        }
-                    }
-                }
-            }
-            return nil
-        }
-
         // Pattern: CompileSwiftSources normal arm64 (in target 'X' from project 'Y')
         if line.hasPrefix("CompileSwiftSources ") {
             if let target = extractTarget(from: line) {
-                // Check next line for file count (will be handled separately)
-                return BuildPhase(name: "CompileSwiftSources", target: target)
+                return ("CompileSwiftSources", target)
             }
         }
 
         // Pattern: SwiftDriver\ Compilation or SwiftDriver Compilation
         if line.contains("SwiftDriver") && line.contains("Compilation") {
             if let target = extractTarget(from: line) {
-                return BuildPhase(name: "SwiftCompilation", target: target)
+                return ("SwiftCompilation", target)
             }
         }
 
         // Pattern: CompileC /path/to/file.o /path/to/file.m normal arm64 (in target 'X' from project 'Y')
         if line.hasPrefix("CompileC ") {
             if let target = extractTarget(from: line) {
-                return BuildPhase(name: "CompileC", target: target)
+                return ("CompileC", target)
             }
         }
 
         // Pattern: Ld /path/to/binary normal (in target 'X' from project 'Y')
         if line.hasPrefix("Ld ") {
             if let target = extractTarget(from: line) {
-                return BuildPhase(name: "Link", target: target)
+                return ("Link", target)
             }
         }
 
         // Pattern: CopySwiftLibs /path (in target 'X' from project 'Y')
         if line.hasPrefix("CopySwiftLibs ") {
             if let target = extractTarget(from: line) {
-                return BuildPhase(name: "CopySwiftLibs", target: target)
+                return ("CopySwiftLibs", target)
             }
         }
 
         // Pattern: PhaseScriptExecution [name] /path (in target 'X' from project 'Y')
         if line.hasPrefix("PhaseScriptExecution ") {
             if let target = extractTarget(from: line) {
-                return BuildPhase(name: "PhaseScriptExecution", target: target)
+                return ("PhaseScriptExecution", target)
             }
         }
 
         // Pattern: LinkAssetCatalog /path (in target 'X' from project 'Y')
         if line.hasPrefix("LinkAssetCatalog ") {
             if let target = extractTarget(from: line) {
-                return BuildPhase(name: "LinkAssetCatalog", target: target)
+                return ("LinkAssetCatalog", target)
             }
         }
 
         // Pattern: ProcessInfoPlistFile (in target 'X' from project 'Y')
         if line.hasPrefix("ProcessInfoPlistFile ") {
             if let target = extractTarget(from: line) {
-                return BuildPhase(name: "ProcessInfoPlistFile", target: target)
-            }
-        }
-
-        // Update last phase with file count if this is a "Compiling N files" line
-        if !phases.isEmpty {
-            if let fileCount = extractFileCount(from: line) {
-                let lastPhase = phases[phases.count - 1]
-                if lastPhase.name == "CompileSwiftSources" && lastPhase.files == nil {
-                    // Update the last phase with file count
-                    phases[phases.count - 1] = BuildPhase(
-                        name: lastPhase.name,
-                        target: lastPhase.target,
-                        files: fileCount,
-                        duration: lastPhase.duration
-                    )
-                }
+                return ("ProcessInfoPlistFile", target)
             }
         }
 
@@ -1151,7 +1144,8 @@ class OutputParser {
 
     // MARK: - Target Timing Parsing
 
-    private func parseTargetTiming(_ line: String) -> TargetTiming? {
+    /// Returns (targetName, duration) tuple if line contains target timing
+    private func parseTargetTiming(_ line: String) -> (String, String)? {
         // Pattern: Build target MyApp of project MyProject with configuration Debug (23.1s)
         if line.hasPrefix("Build target ") && line.contains(" of project ") {
             // Extract target name
@@ -1165,7 +1159,7 @@ class OutputParser {
                     parenStart.lowerBound < parenEnd.lowerBound
                 {
                     let duration = String(line[parenStart.upperBound ..< parenEnd.lowerBound])
-                    return TargetTiming(name: targetName, duration: duration)
+                    return (targetName, duration)
                 }
             }
         }
@@ -1182,35 +1176,8 @@ class OutputParser {
                     parenStart.lowerBound < parenEnd.lowerBound
                 {
                     let duration = String(line[parenStart.upperBound ..< parenEnd.lowerBound])
-                    return TargetTiming(name: targetName, duration: duration)
+                    return (targetName, duration)
                 }
-            }
-        }
-
-        return nil
-    }
-
-    // MARK: - Total Build Time Parsing
-
-    private func parseTotalBuildTime(_ line: String) -> String? {
-        // Pattern: ** BUILD SUCCEEDED ** [45.2s]
-        if line.contains("** BUILD SUCCEEDED **") || line.contains("** BUILD FAILED **") {
-            // Extract time from square brackets
-            if let bracketStart = line.range(of: "[", options: .backwards),
-                let bracketEnd = line.range(of: "]", options: .backwards),
-                bracketStart.lowerBound < bracketEnd.lowerBound
-            {
-                return String(line[bracketStart.upperBound ..< bracketEnd.lowerBound])
-            }
-        }
-
-        // Pattern: Build complete! (12.34s) - SPM format
-        if line.hasPrefix("Build complete!") {
-            if let parenStart = line.range(of: "("),
-                let parenEnd = line.range(of: ")"),
-                parenStart.lowerBound < parenEnd.lowerBound
-            {
-                return String(line[parenStart.upperBound ..< parenEnd.lowerBound])
             }
         }
 

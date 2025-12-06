@@ -141,17 +141,9 @@ swift build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 2
 # Combine all TOON options
 xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-key-folding safe --toon-flatten-depth 5 -w -c
 
-# Build phases - show which build phases executed (CompileSwiftSources, Link, etc.)
-xcodebuild build 2>&1 | xcsift --phases
-swift build 2>&1 | xcsift --phases
-
-# Build timing - show per-target build timing breakdown
-xcodebuild build 2>&1 | xcsift --timing
-swift build 2>&1 | xcsift --timing
-
-# Combine phases and timing with other flags
-xcodebuild build 2>&1 | xcsift --phases --timing
-xcodebuild build 2>&1 | xcsift -f toon --phases --timing -w
+# Build info - show per-target phases and timing (xcodebuild only)
+xcodebuild build 2>&1 | xcsift --build-info
+xcodebuild build 2>&1 | xcsift -f toon --build-info -w
 ```
 
 ## Architecture
@@ -184,13 +176,13 @@ The codebase follows a simple two-component architecture:
 - **Test Failure Detection**: XCUnit assertion failures and general test failures
 - **Build Time Extraction**: Captures build duration from output
 - **File/Line Mapping**: Extracts precise source locations for navigation
-- **Build Phases Parsing**: Extracts build phases (CompileSwiftSources, Link, CopySwiftLibs, PhaseScriptExecution, etc.) with target names
-  - Enabled with `--phases` flag
+- **Build Info**: Unified per-target phases and timing
+  - Enabled with `--build-info` flag
+  - Groups phases by target with per-target duration
   - Supports xcodebuild phase detection from "(in target 'X' from project 'Y')" patterns
-- **Per-Target Timing**: Extracts build duration per target
-  - Enabled with `--timing` flag
   - Parses "Build target X (Ys)" and "** BUILD SUCCEEDED ** [Xs]" patterns
-  - Supports both xcodebuild and SPM timing formats
+  - Total build time always in `summary.build_time` (not duplicated in build_info)
+  - Supported phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
 - **Code Coverage with Auto-Conversion**: Automatically converts coverage files to JSON when `--coverage` flag is used
   - **Auto-detection**: Searches multiple default paths for both SPM and xcodebuild formats
   - **Target filtering**: Automatically extracts tested target name from xcodebuild output and filters coverage to that target only
@@ -349,29 +341,29 @@ The tool outputs structured data optimized for coding agents in two formats:
     - Supports both SPM (`swift test --enable-code-coverage`) and xcodebuild (`-enableCodeCoverage YES`) formats
     - Automatically detects format and parses accordingly
     - Warns to stderr if target was detected but no matching coverage data found
-  - **Build phases data** (with `--phases` flag): Includes build phase information
+  - **Build info** (with `--build-info` flag): Includes per-target phases and timing
     ```json
     {
-      "phases": [
-        {"name": "CompileSwiftSources", "target": "MyApp"},
-        {"name": "Link", "target": "MyApp"},
-        {"name": "CopySwiftLibs", "target": "MyApp"}
-      ]
-    }
-    ```
-    - Supported phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
-  - **Build timing data** (with `--timing` flag): Includes per-target timing breakdown
-    ```json
-    {
-      "timing": {
-        "total": "45.2s",
+      "build_info": {
         "targets": [
-          {"name": "MyFramework", "duration": "12.4s"},
-          {"name": "MyApp", "duration": "23.1s"}
+          {
+            "name": "MyFramework",
+            "duration": "12.4s",
+            "phases": ["CompileSwiftSources", "Link"]
+          },
+          {
+            "name": "MyApp",
+            "duration": "23.1s",
+            "phases": ["CompileSwiftSources", "Link", "CopySwiftLibs"]
+          }
         ]
       }
     }
     ```
+    - Groups phases by target with per-target timing
+    - Total build time is in `summary.build_time` (not duplicated in build_info)
+    - Supported phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
+    - Empty fields are omitted (targets without phases won't have `phases` field)
 
 ### TOON Format (with `--format toon` / `-f toon` flag)
 
