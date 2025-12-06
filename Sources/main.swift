@@ -121,7 +121,7 @@ struct XCSift: ParsableCommand {
     @Flag(name: .long, help: "Include detailed per-file coverage data (default: summary only)")
     var coverageDetails: Bool = false
 
-    @Flag(name: .long, help: "Include per-target build phases and timing (xcodebuild only)")
+    @Flag(name: .long, help: "Include per-target build phases and timing")
     var buildInfo: Bool = false
 
     @Option(

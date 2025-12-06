@@ -141,8 +141,9 @@ swift build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 2
 # Combine all TOON options
 xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-key-folding safe --toon-flatten-depth 5 -w -c
 
-# Build info - show per-target phases and timing (xcodebuild only)
+# Build info - show per-target phases and timing
 xcodebuild build 2>&1 | xcsift --build-info
+swift build 2>&1 | xcsift --build-info
 xcodebuild build 2>&1 | xcsift -f toon --build-info -w
 ```
 
@@ -180,9 +181,11 @@ The codebase follows a simple two-component architecture:
   - Enabled with `--build-info` flag
   - Groups phases by target with per-target duration
   - Supports xcodebuild phase detection from "(in target 'X' from project 'Y')" patterns
+  - Supports SPM phase detection from "[N/M] Compiling/Linking TARGET" patterns
   - Parses "Build target X (Ys)" and "** BUILD SUCCEEDED ** [Xs]" patterns
   - Total build time always in `summary.build_time` (not duplicated in build_info)
-  - Supported phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
+  - xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
+  - SPM phases: `Compiling`, `Linking`
 - **Code Coverage with Auto-Conversion**: Automatically converts coverage files to JSON when `--coverage` flag is used
   - **Auto-detection**: Searches multiple default paths for both SPM and xcodebuild formats
   - **Target filtering**: Automatically extracts tested target name from xcodebuild output and filters coverage to that target only
@@ -367,7 +370,8 @@ The tool outputs structured data optimized for coding agents in two formats:
     ```
     - Groups phases by target with per-target timing
     - Total build time is in `summary.build_time` (not duplicated in build_info)
-    - Supported phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
+    - xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
+    - SPM phases: `Compiling`, `Linking`
     - Empty fields are omitted (targets without phases won't have `phases` field)
 
 ### TOON Format (with `--format toon` / `-f toon` flag)

@@ -473,27 +473,13 @@ class OutputParser {
         if shouldParseBuildInfo {
             // Check for xcodebuild phases (these have different keywords from errors/warnings)
             if let (phaseName, targetName) = parseBuildPhase(line) {
-                if targetPhases[targetName] == nil {
-                    targetPhases[targetName] = []
-                    targetOrder.append(targetName)  // Track order of appearance
-                }
-                // Only add if not already present (avoid duplicates)
-                if !targetPhases[targetName]!.contains(phaseName) {
-                    targetPhases[targetName]!.append(phaseName)
-                }
+                addPhaseToTarget(phaseName, target: targetName)
                 return
             }
 
             // Check for SPM phases (format: [N/M] Compiling/Linking TARGET)
             if let (phaseName, targetName) = parseSPMPhase(line) {
-                if targetPhases[targetName] == nil {
-                    targetPhases[targetName] = []
-                    targetOrder.append(targetName)  // Track order of appearance
-                }
-                // Only add if not already present (avoid duplicates)
-                if !targetPhases[targetName]!.contains(phaseName) {
-                    targetPhases[targetName]!.append(phaseName)
-                }
+                addPhaseToTarget(phaseName, target: targetName)
                 return
             }
 
@@ -1093,6 +1079,17 @@ class OutputParser {
 
     // MARK: - Build Phase Parsing
 
+    /// Adds a phase to the target, tracking order of appearance and avoiding duplicates
+    private func addPhaseToTarget(_ phase: String, target: String) {
+        if targetPhases[target] == nil {
+            targetPhases[target] = []
+            targetOrder.append(target)
+        }
+        if !targetPhases[target]!.contains(phase) {
+            targetPhases[target]!.append(phase)
+        }
+    }
+
     /// Extract target name from "(in target 'TargetName' from project 'ProjectName')"
     private func extractTarget(from line: String) -> String? {
         if let inTargetRange = line.range(of: "(in target '") {
@@ -1104,62 +1101,31 @@ class OutputParser {
         return nil
     }
 
+    /// Phase prefix patterns mapped to their canonical phase names
+    private static let phasePatterns: [(prefix: String, phaseName: String)] = [
+        ("CompileSwiftSources ", "CompileSwiftSources"),
+        ("CompileC ", "CompileC"),
+        ("Ld ", "Link"),
+        ("CopySwiftLibs ", "CopySwiftLibs"),
+        ("PhaseScriptExecution ", "PhaseScriptExecution"),
+        ("LinkAssetCatalog ", "LinkAssetCatalog"),
+        ("ProcessInfoPlistFile ", "ProcessInfoPlistFile"),
+    ]
+
     /// Returns (phaseName, targetName) tuple if line contains a build phase
     private func parseBuildPhase(_ line: String) -> (String, String)? {
-        // Pattern: CompileSwiftSources normal arm64 (in target 'X' from project 'Y')
-        if line.hasPrefix("CompileSwiftSources ") {
-            if let target = extractTarget(from: line) {
-                return ("CompileSwiftSources", target)
+        // Check standard prefix-based patterns
+        for (prefix, phaseName) in Self.phasePatterns {
+            if line.hasPrefix(prefix), let target = extractTarget(from: line) {
+                return (phaseName, target)
             }
         }
 
-        // Pattern: SwiftDriver\ Compilation or SwiftDriver Compilation
-        if line.contains("SwiftDriver") && line.contains("Compilation") {
-            if let target = extractTarget(from: line) {
-                return ("SwiftCompilation", target)
-            }
-        }
-
-        // Pattern: CompileC /path/to/file.o /path/to/file.m normal arm64 (in target 'X' from project 'Y')
-        if line.hasPrefix("CompileC ") {
-            if let target = extractTarget(from: line) {
-                return ("CompileC", target)
-            }
-        }
-
-        // Pattern: Ld /path/to/binary normal (in target 'X' from project 'Y')
-        if line.hasPrefix("Ld ") {
-            if let target = extractTarget(from: line) {
-                return ("Link", target)
-            }
-        }
-
-        // Pattern: CopySwiftLibs /path (in target 'X' from project 'Y')
-        if line.hasPrefix("CopySwiftLibs ") {
-            if let target = extractTarget(from: line) {
-                return ("CopySwiftLibs", target)
-            }
-        }
-
-        // Pattern: PhaseScriptExecution [name] /path (in target 'X' from project 'Y')
-        if line.hasPrefix("PhaseScriptExecution ") {
-            if let target = extractTarget(from: line) {
-                return ("PhaseScriptExecution", target)
-            }
-        }
-
-        // Pattern: LinkAssetCatalog /path (in target 'X' from project 'Y')
-        if line.hasPrefix("LinkAssetCatalog ") {
-            if let target = extractTarget(from: line) {
-                return ("LinkAssetCatalog", target)
-            }
-        }
-
-        // Pattern: ProcessInfoPlistFile (in target 'X' from project 'Y')
-        if line.hasPrefix("ProcessInfoPlistFile ") {
-            if let target = extractTarget(from: line) {
-                return ("ProcessInfoPlistFile", target)
-            }
+        // Special case: SwiftDriver\ Compilation or SwiftDriver Compilation
+        if line.contains("SwiftDriver") && line.contains("Compilation"),
+            let target = extractTarget(from: line)
+        {
+            return ("SwiftCompilation", target)
         }
 
         return nil

@@ -94,7 +94,7 @@ final class BuildInfoTests: XCTestCase {
 
         XCTAssertNotNil(result.buildInfo)
         XCTAssertEqual(result.buildInfo?.targets.count, 2)
-        // Targets are sorted alphabetically
+        // Targets preserve order of appearance in build output
         let targetNames = result.buildInfo?.targets.map { $0.name } ?? []
         XCTAssertTrue(targetNames.contains("MyApp"))
         XCTAssertTrue(targetNames.contains("MyFramework"))

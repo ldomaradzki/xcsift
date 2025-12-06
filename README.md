@@ -149,8 +149,9 @@ xcodebuild test 2>&1 | xcsift -f toon -w -c --coverage-details
 xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe
 swift build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 3
 
-# Build info - show per-target phases and timing (xcodebuild only)
+# Build info - show per-target phases and timing
 xcodebuild build 2>&1 | xcsift --build-info
+swift build 2>&1 | xcsift --build-info
 xcodebuild build 2>&1 | xcsift -f toon --build-info -w
 
 # GitHub Actions format (auto-detected when GITHUB_ACTIONS=true)
@@ -308,7 +309,8 @@ xcodebuild build 2>&1 | xcsift -f github-actions
 - Groups phases by target with per-target timing
 - Total build time is always in `summary.build_time` (not duplicated in build_info)
 - Parses xcodebuild timing from "Build target X (Ys)" patterns
-- Supports: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
+- xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
+- SPM phases: `Compiling`, `Linking`
 - Empty fields are omitted (targets without phases won't have `phases` field)
 
 ### TOON Format
