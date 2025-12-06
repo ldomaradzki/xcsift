@@ -30,6 +30,8 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 - **Summary-only mode** - Default coverage output includes only percentage (token-efficient)
 - **Quiet mode** - Suppress output when build succeeds with no warnings or errors
 - **Werror mode** - Treat warnings as errors (build fails if warnings present)
+- **Build phases parsing** - Track which build phases executed (CompileSwiftSources, Link, etc.)
+- **Per-target timing** - See build time breakdown per target
 
 ## Installation
 
@@ -147,6 +149,18 @@ xcodebuild test 2>&1 | xcsift -f toon -w -c --coverage-details
 # TOON key folding - collapse nested objects to dotted paths
 xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe
 swift build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 3
+
+# Build phases - show which build phases executed
+xcodebuild build 2>&1 | xcsift --phases
+swift build 2>&1 | xcsift --phases
+
+# Build timing - show per-target timing breakdown
+xcodebuild build 2>&1 | xcsift --timing
+swift build 2>&1 | xcsift --timing
+
+# Combine phases and timing
+xcodebuild build 2>&1 | xcsift --phases --timing
+xcodebuild build 2>&1 | xcsift -f toon --phases --timing -w
 
 # GitHub Actions format (auto-detected when GITHUB_ACTIONS=true)
 # Creates workflow annotations visible in PR and Actions UI
@@ -280,6 +294,33 @@ xcodebuild build 2>&1 | xcsift -f github-actions
 - **Details mode** (with `--coverage-details`): Includes full `files` array as shown in the example above
 - **Target filtering** (xcodebuild only): Automatically extracts tested target from stdout and shows coverage for that target only
 - xcsift automatically converts `.profraw` files (SPM) or `.xcresult` bundles (xcodebuild) to JSON format without requiring manual llvm-cov or xccov commands
+
+**Note on phases:** The `phases` array is only included when using the `--phases` flag:
+```json
+{
+  "phases": [
+    {"name": "CompileSwiftSources", "target": "MyApp"},
+    {"name": "Link", "target": "MyApp"},
+    {"name": "CopySwiftLibs", "target": "MyApp"}
+  ]
+}
+```
+Supported phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
+
+**Note on timing:** The `timing` section is only included when using the `--timing` flag:
+```json
+{
+  "timing": {
+    "total": "45.2s",
+    "targets": [
+      {"name": "MyFramework", "duration": "12.4s"},
+      {"name": "MyApp", "duration": "23.1s"}
+    ]
+  }
+}
+```
+- Parses xcodebuild timing from "Build target X (Ys)" patterns
+- Parses total build time from "** BUILD SUCCEEDED ** [Xs]" or SPM's "Build complete! (Xs)"
 
 ### TOON Format
 
