@@ -380,4 +380,129 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.errors[0].line, 15)
         XCTAssertEqual(result.errors[0].message, "use of undeclared identifier 'unknown'")
     }
+
+    // MARK: - Swift Test Parallel Tests
+
+    func testSwiftTestParallelAllPassed() {
+        let parser = OutputParser()
+        let input = """
+            Building for debugging...
+            Build complete! (5.00s)
+            [1/20] Testing ModuleA.TestClassA/testMethod1
+            [2/20] Testing ModuleA.TestClassA/testMethod2
+            [3/20] Testing ModuleA.TestClassA/testMethod3
+            [4/20] Testing ModuleA.TestClassB/testMethod1
+            [5/20] Testing ModuleA.TestClassB/testMethod2
+            [6/20] Testing ModuleB.TestClassC/testMethod1
+            [7/20] Testing ModuleB.TestClassC/testMethod2
+            [8/20] Testing ModuleB.TestClassC/testMethod3
+            [9/20] Testing ModuleB.TestClassD/testMethod1
+            [10/20] Testing ModuleB.TestClassD/testMethod2
+            [11/20] Testing ModuleC.TestClassE/testMethod1
+            [12/20] Testing ModuleC.TestClassE/testMethod2
+            [13/20] Testing ModuleC.TestClassE/testMethod3
+            [14/20] Testing ModuleC.TestClassE/testMethod4
+            [15/20] Testing ModuleC.TestClassF/testMethod1
+            [16/20] Testing ModuleC.TestClassF/testMethod2
+            [17/20] Testing ModuleD.TestClassG/testMethod1
+            [18/20] Testing ModuleD.TestClassG/testMethod2
+            [19/20] Testing ModuleD.TestClassG/testMethod3
+            [20/20] Testing ModuleD.TestClassH/testMethod1
+            ◇ Test run started.
+            ↳ Testing Library Version: 6.0.3
+            ◇ Suite "TestClassG" started.
+            ✔ Test "testMethod1" passed after 0.005 seconds.
+            ✔ Test "testMethod2" passed after 0.004 seconds.
+            ✔ Test "testMethod3" passed after 0.003 seconds.
+            ✔ Suite "TestClassG" passed after 0.010 seconds.
+            ✔ Test run with 4 tests passed after 0.015 seconds.
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.passedTests, 20)
+        XCTAssertEqual(result.summary.failedTests, 0)
+    }
+
+    func testSwiftTestParallelWithFailure() {
+        let parser = OutputParser()
+        let input = """
+            Building for debugging...
+            Build complete! (5.00s)
+            [1/10] Testing ModuleA.TestClassA/testMethod1
+            [2/10] Testing ModuleA.TestClassA/testMethod2
+            [3/10] Testing ModuleA.TestClassA/testMethod3
+            [4/10] Testing ModuleA.TestClassB/testMethod1
+            [5/10] Testing ModuleA.TestClassB/testMethod2
+            [6/10] Testing ModuleB.TestClassC/testMethod1
+            [7/10] Testing ModuleB.TestClassC/testMethod2
+            [8/10] Testing ModuleB.TestClassC/testMethod3
+            [9/10] Testing ModuleB.TestClassD/testMethod1
+            [10/10] Testing ModuleB.TestClassD/testMethod2
+            ◇ Test run started.
+            ↳ Testing Library Version: 6.0.3
+            ◇ Suite "TestClassD" started.
+            ✔ Test "testMethod1" passed after 0.005 seconds.
+            ✘ Test "testMethod2" failed after 0.010 seconds.
+            ✘ Test run with 1 test failed, 1 test passed after 0.020 seconds.
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.passedTests, 9)
+        XCTAssertEqual(result.summary.buildTime, "0.020")
+    }
+
+    func testSwiftTestParallelLargeCount() {
+        let parser = OutputParser()
+        // Simulate a large test run with 1306 tests
+        var input = "Building for debugging...\nBuild complete! (5.00s)\n"
+        for i in 1 ... 1306 {
+            input += "[\(i)/1306] Testing Module.TestClass/testMethod\(i)\n"
+        }
+        input += "◇ Test run started.\n"
+        input += "✔ Test run with 82 tests passed after 0.170 seconds.\n"
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.passedTests, 1306)
+        XCTAssertEqual(result.summary.failedTests, 0)
+    }
+
+    func testSwiftTestParallelPrioritizesSchedulingCount() {
+        let parser = OutputParser()
+        // When both [N/TOTAL] and "Test run with X tests passed" are present,
+        // the [N/TOTAL] count should take priority
+        let input = """
+            [1/100] Testing Module.TestClass/testMethod1
+            [100/100] Testing Module.TestClass/testMethod100
+            ◇ Test run started.
+            ✔ Test run with 5 tests passed after 0.015 seconds.
+            """
+
+        let result = parser.parse(input: input)
+
+        // Should use 100 from [N/TOTAL], not 5 from summary
+        XCTAssertEqual(result.summary.passedTests, 100)
+    }
+
+    func testSwiftTestingFailureSummaryParsing() {
+        let parser = OutputParser()
+        let input = """
+            ◇ Test run started.
+            ✘ Test "testMethod" failed after 0.010 seconds.
+            ✘ Test run with 3 tests failed, 7 tests passed after 0.050 seconds.
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        // Without [N/TOTAL] lines, should use summary: 3 failed + 7 passed = 10 total
+        // passed = 10 - 3 = 7
+        XCTAssertEqual(result.summary.passedTests, 7)
+        XCTAssertEqual(result.summary.buildTime, "0.050")
+    }
 }
