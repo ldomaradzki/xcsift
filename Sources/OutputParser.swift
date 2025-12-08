@@ -6,6 +6,7 @@ class OutputParser {
     private var warnings: [BuildWarning] = []
     private var failedTests: [FailedTest] = []
     private var linkerErrors: [LinkerError] = []
+    private var executables: [Executable] = []
     private var buildTime: String?
     private var seenTestNames: Set<String> = []
     private var executedTestsCount: Int?
@@ -335,7 +336,8 @@ class OutputParser {
         coverage: CodeCoverage? = nil,
         printCoverageDetails: Bool = false,
         slowThreshold: Double? = nil,
-        printBuildInfo: Bool = false
+        printBuildInfo: Bool = false,
+        printExecutables: Bool = false
     ) -> BuildResult {
         resetState()
         shouldParseBuildInfo = printBuildInfo
@@ -402,7 +404,8 @@ class OutputParser {
             buildTime: buildTime,
             coveragePercent: coverage?.lineCoverage,
             slowTests: slowTests.isEmpty ? nil : slowTests.count,
-            flakyTests: flakyTests.isEmpty ? nil : flakyTests.count
+            flakyTests: flakyTests.isEmpty ? nil : flakyTests.count,
+            executables: printExecutables && !executables.isEmpty ? executables.count : nil
         )
 
         // Build info - phases, timing, and dependencies per target (total time is in summary.build_time)
@@ -436,9 +439,11 @@ class OutputParser {
             slowTests: slowTests,
             flakyTests: flakyTests,
             buildInfo: buildInfo,
+            executables: executables,
             printWarnings: printWarnings,
             printCoverageDetails: printCoverageDetails,
-            printBuildInfo: printBuildInfo
+            printBuildInfo: printBuildInfo,
+            printExecutables: printExecutables
         )
     }
 
@@ -514,6 +519,7 @@ class OutputParser {
         warnings = []
         failedTests = []
         linkerErrors = []
+        executables = []
         buildTime = nil
         seenTestNames = []
         executedTestsCount = nil
@@ -582,6 +588,7 @@ class OutputParser {
             || line.contains("✘") || line.contains("✓") || line.contains("❌") || line.contains("Build succeeded")
             || line.contains("Build failed") || line.contains("Executed") || line.contains("] Testing ")
             || line.contains("BUILD SUCCEEDED") || line.contains("BUILD FAILED") || line.contains("Build complete!")
+            || line.contains("RegisterWithLaunchServices")
 
         if !containsRelevant {
             return
@@ -595,6 +602,12 @@ class OutputParser {
                     parallelTestsTotalCount = total
                 }
             }
+            return
+        }
+
+        // Parse executable registration
+        if let executable = parseExecutable(line) {
+            executables.append(executable)
             return
         }
 
@@ -1413,5 +1426,35 @@ class OutputParser {
         }
 
         return nil
+    }
+
+    // MARK: - Executable Parsing
+
+    private func parseExecutable(_ line: String) -> Executable? {
+        // Pattern: RegisterWithLaunchServices /path/to/Executable.app (in target 'TargetName' from project 'ProjectName')
+        guard line.hasPrefix("RegisterWithLaunchServices ") else {
+            return nil
+        }
+
+        // Find the path (between "RegisterWithLaunchServices " and " (in target")
+        let afterPrefix = line.dropFirst("RegisterWithLaunchServices ".count)
+        guard let targetRange = afterPrefix.range(of: " (in target '") else {
+            return nil
+        }
+
+        let path = String(afterPrefix[..<targetRange.lowerBound])
+
+        // Extract the name from the path (last component, e.g., "ClaudeSettings.app")
+        let name = (path as NSString).lastPathComponent
+
+        // Extract the target name
+        let afterTarget = afterPrefix[targetRange.upperBound...]
+        guard let targetEnd = afterTarget.range(of: "' from project") else {
+            return nil
+        }
+
+        let target = String(afterTarget[..<targetEnd.lowerBound])
+
+        return Executable(path: path, name: name, target: target)
     }
 }
