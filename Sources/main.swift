@@ -7,7 +7,7 @@ import Foundation
 #elseif canImport(Musl)
     import Musl
 #endif
-import TOONEncoder
+import ToonFormat
 
 // MARK: - Stderr Helper
 
@@ -38,18 +38,6 @@ enum TOONDelimiterType: String, ExpressibleByArgument {
     }
 }
 
-enum TOONLengthMarkerType: String, ExpressibleByArgument {
-    case none
-    case hash
-
-    var toonLengthMarker: TOONEncoder.LengthMarker {
-        switch self {
-        case .none: return .none
-        case .hash: return .hash
-        }
-    }
-}
-
 enum TOONKeyFoldingType: String, ExpressibleByArgument {
     case disabled
     case safe
@@ -76,7 +64,7 @@ struct XCSift: ParsableCommand {
         commandName: "xcsift",
         abstract: "A Swift tool to parse and format xcodebuild output for coding agents",
         usage:
-            "xcodebuild [options] 2>&1 | xcsift [--format|-f json|toon|github-actions] [--toon-delimiter comma|tab|pipe] [--toon-length-marker none|hash] [--warnings|-w] [--Werror|-W] [--quiet|-q] [--coverage|-c] [--version|-v] [--help|-h]",
+            "xcodebuild [options] 2>&1 | xcsift [--format|-f json|toon|github-actions] [--toon-delimiter comma|tab|pipe] [--warnings|-w] [--Werror|-W] [--quiet|-q] [--coverage|-c] [--version|-v] [--help|-h]",
         discussion: """
             xcsift parses xcodebuild/SPM output and formats it as JSON, TOON, or GitHub Actions.
 
@@ -103,7 +91,6 @@ struct XCSift: ParsableCommand {
 
             Configuration options:
               --toon-delimiter [comma|tab|pipe]  # Default: comma
-              --toon-length-marker [none|hash]   # Default: none
               --toon-key-folding [disabled|safe] # Default: disabled
               --toon-flatten-depth N             # Default: unlimited
             """,
@@ -147,9 +134,6 @@ struct XCSift: ParsableCommand {
 
     @Option(name: .long, help: "TOON delimiter (comma, tab, or pipe). Default: comma")
     var toonDelimiter: TOONDelimiterType = .comma
-
-    @Option(name: .long, help: "TOON length marker (none or hash). Default: none")
-    var toonLengthMarker: TOONLengthMarkerType = .none
 
     @Option(
         name: .long,
@@ -269,7 +253,6 @@ struct XCSift: ParsableCommand {
         let encoder = TOONEncoder()
         encoder.indent = 2
         encoder.delimiter = toonDelimiter.toonDelimiter
-        encoder.lengthMarker = toonLengthMarker.toonLengthMarker
         encoder.keyFolding = toonKeyFolding.toonKeyFolding
         if let depth = toonFlattenDepth {
             encoder.flattenDepth = depth

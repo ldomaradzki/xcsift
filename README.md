@@ -328,7 +328,7 @@ linker_errors[1]{symbol,architecture,referenced_from,message}:
 
 ### TOON Configuration
 
-TOON format can be customized with delimiter and length marker options for different use cases:
+TOON format can be customized with delimiter options for different use cases:
 
 **Delimiter Options** (`--toon-delimiter [comma|tab|pipe]`):
 - `comma` (default): CSV-style format, most compact
@@ -350,28 +350,6 @@ TOON format can be customized with delimiter and length marker options for diffe
   # Output: errors[1]{file|line|message}:
   #   main.swift|15|"use of undeclared identifier"
   ```
-
-**Length Marker Options** (`--toon-length-marker [none|hash]`):
-- `none` (default): Standard array notation `[3]{...}`
-  ```bash
-  xcodebuild build 2>&1 | xcsift -f toon
-  # Output: errors[1]{file,line,message}:
-  ```
-
-- `hash`: Ruby/Perl-style length prefix `[#3]{...}`
-  ```bash
-  xcodebuild build 2>&1 | xcsift -f toon --toon-length-marker hash
-  # Output: errors[#1]{file,line,message}:
-  ```
-
-**Combined Configuration:**
-```bash
-# TSV format with hash markers for data analysis workflows
-xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter tab --toon-length-marker hash -w -c
-
-# Pipe-delimited with hash markers for complex data
-swift test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash --coverage-details
-```
 
 ### TOON Key Folding
 
@@ -401,10 +379,10 @@ Key folding collapses nested single-key objects into dotted paths for more compa
   swift build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 2
   ```
 
-**Combined Key Folding Configuration:**
+**Combined TOON Configuration:**
 ```bash
 # All TOON options together
-xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-length-marker hash --toon-key-folding safe --toon-flatten-depth 5 -w -c
+xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-key-folding safe --toon-flatten-depth 5 -w -c
 ```
 
 ### GitHub Actions Format (Auto-Appended on CI)

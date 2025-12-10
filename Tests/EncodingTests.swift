@@ -1,5 +1,5 @@
 import XCTest
-import TOONEncoder
+import ToonFormat
 @testable import xcsift
 
 /// Tests for JSON/TOON encoding and optional fields handling
