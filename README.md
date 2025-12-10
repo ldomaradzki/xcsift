@@ -21,6 +21,7 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 - **TOON format support** - Token-Oriented Object Notation optimized for LLM consumption
 - **GitHub Actions integration** - Auto-detected workflow commands with inline PR annotations
 - **Structured error reporting** - Clear categorization of errors, warnings, and test failures
+- **Linker error parsing** - Captures undefined symbols, missing frameworks/libraries, architecture mismatches, and duplicate symbols with conflicting file paths
 - **File/line number extraction** - Easy navigation to problematic code locations
 - **Build status summary** - Quick overview of build results
 - **Automatic code coverage conversion** - Converts .profraw (SPM) and .xcresult (xcodebuild) to JSON automatically
@@ -159,13 +160,16 @@ xcodebuild build 2>&1 | xcsift -f github-actions
 
 ### JSON Format
 
+#### Test failures with coverage
+
 ```json
 {
   "status": "failed",
   "summary": {
-    "errors": 2,
+    "errors": 1,
     "warnings": 1,
     "failed_tests": 2,
+    "linker_errors": 0,
     "passed_tests": 28,
     "build_time": "3.2",
     "coverage_percent": 85.5
@@ -205,7 +209,63 @@ xcodebuild build 2>&1 | xcsift -f github-actions
 }
 ```
 
+#### Linker errors - undefined symbols
+
+```json
+{
+  "status": "failed",
+  "summary": {
+    "errors": 0,
+    "warnings": 0,
+    "failed_tests": 0,
+    "linker_errors": 1
+  },
+  "linker_errors": [
+    {
+      "symbol": "_OBJC_CLASS_$_MissingClass",
+      "architecture": "arm64",
+      "referenced_from": "ViewController.o",
+      "message": "",
+      "conflicting_files": []
+    }
+  ]
+}
+```
+
+#### Linker errors - duplicate symbols
+
+```json
+{
+  "status": "failed",
+  "summary": {
+    "errors": 0,
+    "warnings": 0,
+    "failed_tests": 0,
+    "linker_errors": 1
+  },
+  "linker_errors": [
+    {
+      "symbol": "_globalConfiguration",
+      "architecture": "arm64",
+      "referenced_from": "",
+      "message": "",
+      "conflicting_files": [
+        "/path/to/ConfigA.o",
+        "/path/to/ConfigB.o"
+      ]
+    }
+  ]
+}
+```
+
 **Note on warnings:** By default, only the warning count appears in `summary.warnings`. The detailed `warnings` array (shown above) is only included when using the `--warnings` flag. This reduces token usage for coding agents that don't need to process every warning.
+
+**Note on linker errors:** The `linker_errors` array is automatically included when linker errors are detected. Supported error types:
+- Undefined symbols (missing classes, functions, variables) - uses `referenced_from` field
+- Missing frameworks (`ld: framework not found`)
+- Missing libraries (`ld: library not found for -l`)
+- Architecture mismatches (`building for iOS Simulator, but linking in dylib built for iOS`)
+- Duplicate symbols - uses `conflicting_files` array to show which object files contain the duplicate
 
 **Note on coverage:** The `coverage` section is only included when using the `--coverage-details` flag:
 - **Summary-only mode** (default): Only includes coverage percentage in summary for maximum token efficiency
@@ -224,21 +284,34 @@ xcodebuild build 2>&1 | xcsift -f github-actions
 
 With the `--format toon` / `-f toon` flag, xcsift outputs in **TOON (Token-Oriented Object Notation)** format, which provides **30-60% token reduction** compared to JSON. This format is specifically optimized for LLM consumption and can significantly reduce API costs.
 
+#### Compiler errors and warnings
+
 ```toon
 status: failed
 summary:
   errors: 1
   warnings: 3
   failed_tests: 0
-  passed_tests: null
-  build_time: null
-  coverage_percent: null
+  linker_errors: 0
 errors[1]{file,line,message}:
   main.swift,15,"use of undeclared identifier \"unknown\""
 warnings[3]{file,line,message}:
   Parser.swift,20,"immutable value \"result\" was never used"
   Parser.swift,25,"variable \"foo\" was never mutated"
   Model.swift,30,"initialization of immutable value \"bar\" was never used"
+```
+
+#### Linker errors
+
+```toon
+status: failed
+summary:
+  errors: 0
+  warnings: 0
+  failed_tests: 0
+  linker_errors: 1
+linker_errors[1]{symbol,architecture,referenced_from,message}:
+  "_OBJC_CLASS_$_MissingClass","arm64","ViewController.o",""
 ```
 
 **TOON Benefits:**
@@ -413,6 +486,7 @@ jobs:
 | **Machine readable** | Yes | No | Limited |
 | **GitHub Actions** | Yes (auto-detected) | Yes | No |
 | **Error extraction** | Structured | Visual | Visual |
+| **Linker errors** | Yes (structured) | No | No |
 | **Code coverage** | Auto-converts | No | No |
 | **Build time** | Fast | Fast | Slower |
 

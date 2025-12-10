@@ -179,6 +179,7 @@ The codebase follows a simple two-component architecture:
 
 ### Key Features
 - **Error/Warning Parsing**: Multiple regex patterns handle various Xcode error formats
+- **Linker Error Parsing**: Captures undefined symbols, missing frameworks/libraries, architecture mismatches, and duplicate symbols (with structured conflicting file paths)
 - **Test Failure Detection**: XCUnit assertion failures and general test failures
 - **Build Time Extraction**: Captures build duration from output
 - **File/Line Mapping**: Extracts precise source locations for navigation
@@ -198,9 +199,36 @@ The codebase follows a simple two-component architecture:
 
 ## Testing
 
-Tests are in `Tests/OutputParserTests.swift` using XCTest framework. Test cases cover:
+Tests are in `Tests/*.swift` using XCTest framework.
+
+### Test Fixtures
+
+Real-world output samples are stored in `Tests/Fixtures/` for integration tests:
+- **build.txt** (~2.7MB) - Large successful xcodebuild output for performance testing
+- **swift-testing-output.txt** (~11KB) - Swift Testing output with 23 passed tests
+- **linker-error-output.txt** - Real linker error output with undefined symbols
+
+To add new fixtures:
+1. Create the file in `Tests/Fixtures/`
+2. Add to `Package.swift` resources: `.copy("Fixtures/your-file.txt")`
+3. Load in tests via `Bundle.module.url(forResource: "your-file", withExtension: "txt")`
+
+### Test Coverage
+
+Test cases cover:
 - Error parsing from various Xcode formats
 - Warning detection
+- **Linker error parsing** (14 tests):
+  - Undefined symbol errors
+  - Multiple undefined symbols
+  - Architecture mismatch errors
+  - Framework/library not found
+  - Duplicate symbols with structured conflicting_files parsing
+  - Duplicate symbols with double quotes
+  - Duplicate symbols JSON encoding
+  - Mixed compiler and linker errors
+  - Swift mangled symbols
+  - Real-world linker error output (fixture-based test)
 - Failed test extraction
 - Multi-error scenarios
 - Build time parsing
@@ -213,9 +241,10 @@ Tests are in `Tests/OutputParserTests.swift` using XCTest framework. Test cases 
 - Target extraction from xcodebuild output
 - Coverage target filtering
 - Summary-only vs details mode for coverage output
-- **TOON format encoding** (22 tests):
+- **TOON format encoding** (24 tests):
   - Basic TOON encoding
   - TOON with errors, warnings, and failed tests
+  - TOON with linker errors
   - TOON with code coverage
   - Token efficiency verification (30-60% reduction)
   - Summary-only vs details mode in TOON format
@@ -258,10 +287,13 @@ The tool outputs structured data optimized for coding agents in two formats:
 
 ### JSON Format (default)
 
-- **JSON**: Structured format with `status`, `summary`, `errors`, `warnings` (optional), `failed_tests`, `coverage` (optional)
-  - **Summary always includes warning count**: `{"summary": {"warnings": N, ...}}`
+- **JSON**: Structured format with `status`, `summary`, `errors`, `warnings` (optional), `failed_tests`, `linker_errors` (optional), `coverage` (optional)
+  - **Summary always includes warning and linker error counts**: `{"summary": {"warnings": N, "linker_errors": N, ...}}`
   - **Summary includes coverage percentage** (when `--coverage` flag is used): `{"summary": {"coverage_percent": X.X, ...}}`
   - **Detailed warnings list** (with `--warnings` flag): `{"warnings": [{"file": "...", "line": N, "message": "..."}]}`
+  - **Linker errors**: Two types are supported:
+    - **Undefined symbols**: `{"linker_errors": [{"symbol": "_MissingClass", "architecture": "arm64", "referenced_from": "ViewController.o", "message": "", "conflicting_files": []}]}`
+    - **Duplicate symbols**: `{"linker_errors": [{"symbol": "_duplicateVar", "architecture": "arm64", "referenced_from": "", "message": "", "conflicting_files": ["/path/to/FileA.o", "/path/to/FileB.o"]}]}`
   - **Default behavior** (without flag): Only shows warning count in summary, omits detailed warnings array to reduce token usage
   - **Quiet mode** (with `--quiet` or `-q` flag): Produces no output when build succeeds with zero warnings and zero errors
   - **Coverage data** (with `--coverage` flag):
