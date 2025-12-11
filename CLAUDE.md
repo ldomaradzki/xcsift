@@ -158,7 +158,7 @@ xcodebuild test 2>&1 | xcsift --slow-threshold 1.0 --coverage
 
 ## Architecture
 
-The codebase follows a simple two-component architecture:
+The codebase follows a modular architecture:
 
 ### Core Components
 
@@ -171,7 +171,16 @@ The codebase follows a simple two-component architecture:
    - Defines data structures: `BuildResult`, `BuildSummary`, `BuildError`, `BuildWarning`, `FailedTest`, `SlowTest`, `CodeCoverage`, `FileCoverage`
    - Pattern matching for various Xcode/SPM output formats
    - Extracts file paths, line numbers, and messages from build output
-   - Parses code coverage data from SPM coverage JSON files
+
+3. **CoverageParser.swift** - Code coverage parsing
+   - `CoverageParser` struct with dependency injection for testability
+   - Auto-detects and converts `.profraw` (SPM) and `.xcresult` (xcodebuild) formats
+   - Searches DerivedData for latest xcresult bundles
+   - Static API preserved for backward compatibility
+
+4. **FileSystemProtocol.swift** & **ShellRunnerProtocol.swift** - Dependency injection
+   - Protocols for file system and shell command abstraction
+   - Enable mocking in tests to avoid slow I/O operations
 
 ### Data Flow
 1. Stdin input → `readStandardInput()`

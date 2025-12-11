@@ -1,15 +1,24 @@
 import Foundation
 
-enum CoverageParser {
+struct CoverageParser {
+    let fileSystem: FileSystemProtocol
+    let shellRunner: ShellRunnerProtocol
+
+    init(
+        fileSystem: FileSystemProtocol = FileManager.default,
+        shellRunner: ShellRunnerProtocol = DefaultShellRunner()
+    ) {
+        self.fileSystem = fileSystem
+        self.shellRunner = shellRunner
+    }
 
     // MARK: - Main Entry Point
 
-    static func parseCoverageFromPath(_ path: String, targetFilter: String? = nil) -> CodeCoverage? {
-        let fileManager = FileManager.default
+    func parseCoverageFromPath(_ path: String, targetFilter: String? = nil) -> CodeCoverage? {
         let coveragePath: String
 
         // If explicit path provided and exists, use it
-        if !path.isEmpty && fileManager.fileExists(atPath: path) {
+        if !path.isEmpty && fileSystem.fileExists(atPath: path) {
             coveragePath = path
         } else {
             // Auto-detect: try xcodebuild first (DerivedData), then SPM paths
@@ -29,7 +38,7 @@ enum CoverageParser {
 
             var foundPath: String?
             for defaultPath in defaultPaths {
-                if fileManager.fileExists(atPath: defaultPath) {
+                if fileSystem.fileExists(atPath: defaultPath) {
                     foundPath = defaultPath
                     break
                 }
@@ -41,15 +50,15 @@ enum CoverageParser {
             coveragePath = found
         }
 
-        guard fileManager.fileExists(atPath: coveragePath) else {
+        guard fileSystem.fileExists(atPath: coveragePath) else {
             return nil
         }
 
         var isDirectory: ObjCBool = false
-        _ = fileManager.fileExists(atPath: coveragePath, isDirectory: &isDirectory)
+        _ = fileSystem.fileExists(atPath: coveragePath, isDirectory: &isDirectory)
 
         if isDirectory.boolValue {
-            guard let files = try? fileManager.contentsOfDirectory(atPath: coveragePath) else {
+            guard let files = try? fileSystem.contentsOfDirectory(atPath: coveragePath) else {
                 return nil
             }
 
@@ -86,9 +95,8 @@ enum CoverageParser {
     // MARK: - Auto-Detection Helpers
 
     /// Finds all .profraw files in a directory (recursively)
-    private static func findProfrawFiles(in directory: String) -> [String] {
-        let fileManager = FileManager.default
-        guard let enumerator = fileManager.enumerator(atPath: directory) else {
+    private func findProfrawFiles(in directory: String) -> [String] {
+        guard let enumerator = fileSystem.enumerator(atPath: directory) else {
             return []
         }
 
@@ -103,9 +111,8 @@ enum CoverageParser {
     }
 
     /// Finds .xcresult bundles (created by xcodebuild)
-    private static func findXCResultBundles(in directory: String) -> [String] {
-        let fileManager = FileManager.default
-        guard let enumerator = fileManager.enumerator(atPath: directory) else {
+    private func findXCResultBundles(in directory: String) -> [String] {
+        guard let enumerator = fileSystem.enumerator(atPath: directory) else {
             return []
         }
 
@@ -120,12 +127,13 @@ enum CoverageParser {
     }
 
     /// Finds the most recent .xcresult bundle in Xcode DerivedData using shell find
-    private static func findLatestXCResultInDerivedData(projectHint: String? = nil) -> String? {
-        let fileManager = FileManager.default
-        let homeDir = fileManager.homeDirectoryForCurrentUser.path
-        let derivedDataPath = (homeDir as NSString).appendingPathComponent("Library/Developer/Xcode/DerivedData")
+    private func findLatestXCResultInDerivedData(projectHint: String? = nil) -> String? {
+        let homeDir = fileSystem.homeDirectoryForCurrentUser.path
+        let derivedDataPath = (homeDir as NSString).appendingPathComponent(
+            "Library/Developer/Xcode/DerivedData"
+        )
 
-        guard fileManager.fileExists(atPath: derivedDataPath) else {
+        guard fileSystem.fileExists(atPath: derivedDataPath) else {
             return nil
         }
 
@@ -133,10 +141,10 @@ enum CoverageParser {
         let searchPaths: [String]
         if let hint = projectHint {
             // Find project directories matching the hint (e.g., "MyProject-abcdef123")
-            let projectDirs = (try? fileManager.contentsOfDirectory(atPath: derivedDataPath))?
+            let projectDirs = (try? fileSystem.contentsOfDirectory(atPath: derivedDataPath))?
                 .filter { $0.hasPrefix("\(hint)-") || $0.hasPrefix("\(hint)Tests-") }
                 .map { (derivedDataPath as NSString).appendingPathComponent($0) }
-                .filter { fileManager.fileExists(atPath: $0) }
+                .filter { fileSystem.fileExists(atPath: $0) }
 
             guard let dirs = projectDirs, !dirs.isEmpty else {
                 // Project hint provided but no matching directory found
@@ -149,7 +157,7 @@ enum CoverageParser {
         }
 
         let findArgs = ["find"] + searchPaths + ["-name", "*.xcresult", "-type", "d", "-mtime", "-7"]
-        guard let output = runShellCommand("/usr/bin/env", args: findArgs) else {
+        guard let output = shellRunner.run("/usr/bin/env", args: findArgs) else {
             return nil
         }
 
@@ -162,7 +170,7 @@ enum CoverageParser {
         var newestDate: Date?
 
         for path in paths {
-            if let attrs = try? fileManager.attributesOfItem(atPath: path),
+            if let attrs = try? fileSystem.attributesOfItem(atPath: path),
                 let modDate = attrs[.modificationDate] as? Date
             {
                 if newestDate == nil || modDate > newestDate! {
@@ -176,12 +184,11 @@ enum CoverageParser {
     }
 
     /// Finds the test binary (.xctest bundle) in .build directory
-    private static func findTestBinary() -> String? {
-        let fileManager = FileManager.default
+    private func findTestBinary() -> String? {
         let buildDir = ".build"
 
-        guard fileManager.fileExists(atPath: buildDir),
-            let enumerator = fileManager.enumerator(atPath: buildDir)
+        guard fileSystem.fileExists(atPath: buildDir),
+            let enumerator = fileSystem.enumerator(atPath: buildDir)
         else {
             return nil
         }
@@ -191,7 +198,8 @@ enum CoverageParser {
                 let xctestPath = (buildDir as NSString).appendingPathComponent(file)
                 let macosPath = (xctestPath as NSString).appendingPathComponent("Contents/MacOS")
 
-                guard let macosContents = try? fileManager.contentsOfDirectory(atPath: macosPath) else {
+                guard let macosContents = try? fileSystem.contentsOfDirectory(atPath: macosPath)
+                else {
                     continue
                 }
 
@@ -199,7 +207,7 @@ enum CoverageParser {
                     let itemPath = (macosPath as NSString).appendingPathComponent(item)
                     var isDirectory: ObjCBool = false
 
-                    if fileManager.fileExists(atPath: itemPath, isDirectory: &isDirectory),
+                    if fileSystem.fileExists(atPath: itemPath, isDirectory: &isDirectory),
                         !isDirectory.boolValue,
                         !item.hasSuffix(".dSYM")
                     {
@@ -214,7 +222,7 @@ enum CoverageParser {
     // MARK: - Conversion Helpers
 
     /// Converts .profraw files to JSON coverage data
-    private static func convertProfrawToJSON(profrawFiles: [String]) -> CodeCoverage? {
+    private func convertProfrawToJSON(profrawFiles: [String]) -> CodeCoverage? {
         guard !profrawFiles.isEmpty else {
             return nil
         }
@@ -228,12 +236,14 @@ enum CoverageParser {
         let jsonPath = (tempDir as NSString).appendingPathComponent("xcsift-coverage.json")
 
         let mergeArgs = ["llvm-profdata", "merge", "-sparse"] + profrawFiles + ["-o", profdataPath]
-        guard runShellCommand("xcrun", args: mergeArgs) != nil else {
+        guard shellRunner.run("xcrun", args: mergeArgs) != nil else {
             return nil
         }
 
-        let exportArgs = ["llvm-cov", "export", testBinary, "-instr-profile=\(profdataPath)", "-format=text"]
-        guard let jsonOutput = runShellCommand("xcrun", args: exportArgs) else {
+        let exportArgs = [
+            "llvm-cov", "export", testBinary, "-instr-profile=\(profdataPath)", "-format=text",
+        ]
+        guard let jsonOutput = shellRunner.run("xcrun", args: exportArgs) else {
             try? FileManager.default.removeItem(atPath: profdataPath)
             return nil
         }
@@ -256,9 +266,11 @@ enum CoverageParser {
     }
 
     /// Converts .xcresult bundle to JSON coverage data
-    private static func convertXCResultToJSON(xcresultPath: String, targetFilter: String? = nil) -> CodeCoverage? {
+    private func convertXCResultToJSON(xcresultPath: String, targetFilter: String? = nil)
+        -> CodeCoverage?
+    {
         let args = ["xccov", "view", "--report", "--json", xcresultPath]
-        guard let jsonOutput = runShellCommand("xcrun", args: args) else {
+        guard let jsonOutput = shellRunner.run("xcrun", args: args) else {
             return nil
         }
 
@@ -268,12 +280,12 @@ enum CoverageParser {
             return nil
         }
 
-        return parseXcodebuildFormat(json: json, targetFilter: targetFilter)
+        return Self.parseXcodebuildFormat(json: json, targetFilter: targetFilter)
     }
 
     // MARK: - JSON Parsing
 
-    private static func parseCoverageJSON(at path: String, targetFilter: String? = nil) -> CodeCoverage? {
+    private func parseCoverageJSON(at path: String, targetFilter: String? = nil) -> CodeCoverage? {
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
             return nil
         }
@@ -282,18 +294,20 @@ enum CoverageParser {
             return nil
         }
 
-        if let coverage = parseXcodebuildFormat(json: json, targetFilter: targetFilter) {
+        if let coverage = Self.parseXcodebuildFormat(json: json, targetFilter: targetFilter) {
             return coverage
         }
 
-        if let coverage = parseSPMFormat(json: json) {
+        if let coverage = Self.parseSPMFormat(json: json) {
             return coverage
         }
 
         return nil
     }
 
-    private static func parseXcodebuildFormat(json: [String: Any], targetFilter: String? = nil) -> CodeCoverage? {
+    private static func parseXcodebuildFormat(json: [String: Any], targetFilter: String? = nil)
+        -> CodeCoverage?
+    {
         guard let targets = json["targets"] as? [[String: Any]] else {
             return nil
         }
@@ -360,7 +374,8 @@ enum CoverageParser {
             return nil
         }
 
-        let overallCoverage = totalExecutable > 0 ? (Double(totalCovered) / Double(totalExecutable)) * 100.0 : 0.0
+        let overallCoverage =
+            totalExecutable > 0 ? (Double(totalCovered) / Double(totalExecutable)) * 100.0 : 0.0
 
         return CodeCoverage(lineCoverage: overallCoverage, files: fileCoverages)
     }
@@ -408,37 +423,17 @@ enum CoverageParser {
             return nil
         }
 
-        let overallCoverage = totalExecutable > 0 ? (Double(totalCovered) / Double(totalExecutable)) * 100.0 : 0.0
+        let overallCoverage =
+            totalExecutable > 0 ? (Double(totalCovered) / Double(totalExecutable)) * 100.0 : 0.0
 
         return CodeCoverage(lineCoverage: overallCoverage, files: fileCoverages)
     }
+}
 
-    // MARK: - Shell Command Helper
+// MARK: - Static API for backward compatibility
 
-    /// Runs a shell command and returns the output
-    private static func runShellCommand(_ command: String, args: [String]) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = [command] + args
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-
-        do {
-            try process.run()
-
-            // Read data BEFORE waiting for exit to avoid pipe deadlock
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-
-            guard process.terminationStatus == 0 else {
-                return nil
-            }
-
-            return String(data: data, encoding: .utf8)
-        } catch {
-            return nil
-        }
+extension CoverageParser {
+    static func parseCoverageFromPath(_ path: String, targetFilter: String? = nil) -> CodeCoverage? {
+        CoverageParser().parseCoverageFromPath(path, targetFilter: targetFilter)
     }
 }
