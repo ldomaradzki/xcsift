@@ -154,6 +154,11 @@ xcodebuild test 2>&1 | xcsift --slow-threshold 1.0 --coverage
 
 # Note: Flaky test detection is automatic (no flag needed)
 # A test is marked as flaky if it both passes AND fails in the same run (retry scenarios)
+
+# Build info - show per-target phases and timing
+xcodebuild build 2>&1 | xcsift --build-info
+swift build 2>&1 | xcsift --build-info
+xcodebuild build 2>&1 | xcsift -f toon --build-info -w
 ```
 
 ## Architecture
@@ -168,9 +173,10 @@ The codebase follows a modular architecture:
 
 2. **OutputParser.swift** - Core parsing logic
    - `OutputParser` class with regex-based line parsing
-   - Defines data structures: `BuildResult`, `BuildSummary`, `BuildError`, `BuildWarning`, `FailedTest`, `SlowTest`, `CodeCoverage`, `FileCoverage`
+   - Defines data structures: `BuildResult`, `BuildSummary`, `BuildError`, `BuildWarning`, `FailedTest`, `SlowTest`, `CodeCoverage`, `FileCoverage`, `BuildInfo`, `TargetBuildInfo`
    - Pattern matching for various Xcode/SPM output formats
    - Extracts file paths, line numbers, and messages from build output
+   - Parses build phases and per-target timing information
 
 3. **CoverageParser.swift** - Code coverage parsing
    - `CoverageParser` struct with dependency injection for testability
@@ -194,6 +200,15 @@ The codebase follows a modular architecture:
 - **Test Failure Detection**: XCUnit assertion failures and general test failures
 - **Build Time Extraction**: Captures build duration from output
 - **File/Line Mapping**: Extracts precise source locations for navigation
+- **Build Info**: Unified per-target phases and timing
+  - Enabled with `--build-info` flag
+  - Groups phases by target with per-target duration
+  - Supports xcodebuild phase detection from "(in target 'X' from project 'Y')" patterns
+  - Supports SPM phase detection from "[N/M] Compiling/Linking TARGET" patterns
+  - Parses "Build target X (Ys)" and "** BUILD SUCCEEDED ** [Xs]" patterns
+  - Total build time always in `summary.build_time` (not duplicated in build_info)
+  - xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
+  - SPM phases: `Compiling`, `Linking`
 - **Code Coverage with Auto-Conversion**: Automatically converts coverage files to JSON when `--coverage` flag is used
   - **Auto-detection**: Searches multiple default paths for both SPM and xcodebuild formats
   - **Target filtering**: Automatically extracts tested target name from xcodebuild output and filters coverage to that target only
@@ -278,6 +293,26 @@ Test cases cover:
     - Key folding with build results
     - Key folding combined with flatten depth
     - Combined TOON configuration
+- **Build phases and timing** (29 tests):
+  - CompileSwiftSources phase parsing
+  - SwiftDriver Compilation phase parsing
+  - CompileC (Clang) phase parsing
+  - Link phase parsing
+  - CopySwiftLibs phase parsing
+  - PhaseScriptExecution phase parsing
+  - Multiple phases capture
+  - Phases omitted by default
+  - Single and multiple target timing
+  - SPM timing format ("Build complete!")
+  - xcodebuild timing formats (SUCCEEDED/FAILED with brackets)
+  - Target completed format
+  - Timing omitted by default
+  - JSON encoding with phases and timing
+  - SPM Compiling/Linking phase parsing
+  - SPM multiple targets
+  - SPM plugin compilation skipped
+  - Target order preservation
+  - TOON encoding with build_info
 
 Run individual tests:
 ```bash
@@ -309,7 +344,7 @@ The tool outputs structured data optimized for coding agents in two formats:
 
 ### JSON Format (default)
 
-- **JSON**: Structured format with `status`, `summary`, `errors`, `warnings` (optional), `failed_tests`, `linker_errors` (optional), `coverage` (optional)
+- **JSON**: Structured format with `status`, `summary`, `errors`, `warnings` (optional), `failed_tests`, `linker_errors` (optional), `coverage` (optional), `phases` (optional), `timing` (optional)
   - **Summary always includes warning and linker error counts**: `{"summary": {"warnings": N, "linker_errors": N, ...}}`
   - **Summary includes coverage percentage** (when `--coverage` flag is used): `{"summary": {"coverage_percent": X.X, ...}}`
   - **Detailed warnings list** (with `--warnings` flag): `{"warnings": [{"file": "...", "line": N, "message": "..."}]}`
@@ -348,6 +383,30 @@ The tool outputs structured data optimized for coding agents in two formats:
     - Supports both SPM (`swift test --enable-code-coverage`) and xcodebuild (`-enableCodeCoverage YES`) formats
     - Automatically detects format and parses accordingly
     - Warns to stderr if target was detected but no matching coverage data found
+  - **Build info** (with `--build-info` flag): Includes per-target phases and timing
+    ```json
+    {
+      "build_info": {
+        "targets": [
+          {
+            "name": "MyFramework",
+            "duration": "12.4s",
+            "phases": ["CompileSwiftSources", "Link"]
+          },
+          {
+            "name": "MyApp",
+            "duration": "23.1s",
+            "phases": ["CompileSwiftSources", "Link", "CopySwiftLibs"]
+          }
+        ]
+      }
+    }
+    ```
+    - Groups phases by target with per-target timing
+    - Total build time is in `summary.build_time` (not duplicated in build_info)
+    - xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
+    - SPM phases: `Compiling`, `Linking`
+    - Empty fields are omitted (targets without phases won't have `phases` field)
 
 ### TOON Format (with `--format toon` / `-f toon` flag)
 

@@ -26,6 +26,12 @@ class OutputParser {
     private var passedTestDurations: [String: Double] = [:]
     private var failedTestDurations: [String: Double] = [:]
 
+    // Build info tracking - phases grouped by target
+    private var targetPhases: [String: [String]] = [:]  // target -> [phase names]
+    private var targetDurations: [String: String] = [:]  // target -> duration
+    private var targetOrder: [String] = []  // Tracks order of target appearance
+    private var shouldParseBuildInfo: Bool = false  // Performance: skip phase parsing when not needed
+
     // MARK: - Static Regex Patterns (compiled once)
 
     // Error patterns
@@ -324,9 +330,11 @@ class OutputParser {
         warningsAsErrors: Bool = false,
         coverage: CodeCoverage? = nil,
         printCoverageDetails: Bool = false,
-        slowThreshold: Double? = nil
+        slowThreshold: Double? = nil,
+        printBuildInfo: Bool = false
     ) -> BuildResult {
         resetState()
+        shouldParseBuildInfo = printBuildInfo
         let lines = input.split(separator: "\n", omittingEmptySubsequences: false)
 
         for line in lines {
@@ -393,6 +401,21 @@ class OutputParser {
             flakyTests: flakyTests.isEmpty ? nil : flakyTests.count
         )
 
+        // Build info - phases and timing per target (total time is in summary.build_time)
+        let buildInfo: BuildInfo? =
+            printBuildInfo
+            ? {
+                // Build targets list with phases and durations, preserving order of appearance
+                let targets = targetOrder.map { targetName in
+                    TargetBuildInfo(
+                        name: targetName,
+                        duration: targetDurations[targetName],
+                        phases: targetPhases[targetName] ?? []
+                    )
+                }
+                return BuildInfo(targets: targets)
+            }() : nil
+
         return BuildResult(
             status: status,
             summary: summary,
@@ -403,8 +426,10 @@ class OutputParser {
             coverage: coverage,
             slowTests: slowTests,
             flakyTests: flakyTests,
+            buildInfo: buildInfo,
             printWarnings: printWarnings,
-            printCoverageDetails: printCoverageDetails
+            printCoverageDetails: printCoverageDetails,
+            printBuildInfo: printBuildInfo
         )
     }
 
@@ -476,6 +501,10 @@ class OutputParser {
         parallelTestsTotalCount = nil
         passedTestDurations = [:]
         failedTestDurations = [:]
+        targetPhases = [:]
+        targetDurations = [:]
+        targetOrder = []
+        shouldParseBuildInfo = false
     }
 
     private func parseLine(_ line: String) {
@@ -489,11 +518,37 @@ class OutputParser {
             return
         }
 
+        // Check for build phases only if build info is requested (performance optimization)
+        if shouldParseBuildInfo {
+            // Check for xcodebuild phases (these have different keywords from errors/warnings)
+            if let (phaseName, targetName) = parseBuildPhase(line) {
+                addPhaseToTarget(phaseName, target: targetName)
+                return
+            }
+
+            // Check for SPM phases (format: [N/M] Compiling/Linking TARGET)
+            if let (phaseName, targetName) = parseSPMPhase(line) {
+                addPhaseToTarget(phaseName, target: targetName)
+                return
+            }
+
+            // Check for target timing
+            if let (targetName, duration) = parseTargetTiming(line) {
+                // Track order if this is the first time we see this target
+                if targetPhases[targetName] == nil && !targetOrder.contains(targetName) {
+                    targetOrder.append(targetName)
+                }
+                targetDurations[targetName] = duration
+                return
+            }
+        }
+
         // Fast path checks before expensive regex
         let containsRelevant =
             line.contains("error:") || line.contains("warning:") || line.contains("failed") || line.contains("passed")
             || line.contains("✘") || line.contains("✓") || line.contains("❌") || line.contains("Build succeeded")
             || line.contains("Build failed") || line.contains("Executed") || line.contains("] Testing ")
+            || line.contains("BUILD SUCCEEDED") || line.contains("BUILD FAILED") || line.contains("Build complete!")
 
         if !containsRelevant {
             return
@@ -1019,6 +1074,28 @@ class OutputParser {
     }
 
     private func parseBuildTime(_ line: String) -> String? {
+        // Pattern: ** BUILD SUCCEEDED ** [45.2s] or ** BUILD FAILED ** [15.3s]
+        // xcodebuild format with bracket timing - highest priority
+        if line.contains("** BUILD SUCCEEDED **") || line.contains("** BUILD FAILED **") {
+            // Extract time from square brackets
+            if let bracketStart = line.range(of: "[", options: .backwards),
+                let bracketEnd = line.range(of: "]", options: .backwards),
+                bracketStart.lowerBound < bracketEnd.lowerBound
+            {
+                return String(line[bracketStart.upperBound ..< bracketEnd.lowerBound])
+            }
+        }
+
+        // Pattern: Build complete! (12.34s) - SPM format
+        if line.hasPrefix("Build complete!") {
+            if let parenStart = line.range(of: "("),
+                let parenEnd = line.range(of: ")"),
+                parenStart.lowerBound < parenEnd.lowerBound
+            {
+                return String(line[parenStart.upperBound ..< parenEnd.lowerBound])
+            }
+        }
+
         // Pattern: Build succeeded in time
         if line.hasPrefix("Build succeeded in ") {
             return String(line.dropFirst(19))
@@ -1107,6 +1184,143 @@ class OutputParser {
             }
             // Without " seconds" suffix
             return String(afterPassed).trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        }
+
+        return nil
+    }
+
+    // MARK: - Build Phase Parsing
+
+    /// Adds a phase to the target, tracking order of appearance and avoiding duplicates
+    private func addPhaseToTarget(_ phase: String, target: String) {
+        if targetPhases[target] == nil {
+            targetPhases[target] = []
+            targetOrder.append(target)
+        }
+        if !targetPhases[target]!.contains(phase) {
+            targetPhases[target]!.append(phase)
+        }
+    }
+
+    /// Extract target name from "(in target 'TargetName' from project 'ProjectName')"
+    private func extractTarget(from line: String) -> String? {
+        if let inTargetRange = line.range(of: "(in target '") {
+            let afterTarget = line[inTargetRange.upperBound...]
+            if let endQuote = afterTarget.range(of: "'") {
+                return String(afterTarget[..<endQuote.lowerBound])
+            }
+        }
+        return nil
+    }
+
+    /// Phase prefix patterns mapped to their canonical phase names
+    private static let phasePatterns: [(prefix: String, phaseName: String)] = [
+        ("CompileSwiftSources ", "CompileSwiftSources"),
+        ("CompileC ", "CompileC"),
+        ("Ld ", "Link"),
+        ("CopySwiftLibs ", "CopySwiftLibs"),
+        ("PhaseScriptExecution ", "PhaseScriptExecution"),
+        ("LinkAssetCatalog ", "LinkAssetCatalog"),
+        ("ProcessInfoPlistFile ", "ProcessInfoPlistFile"),
+    ]
+
+    /// Returns (phaseName, targetName) tuple if line contains a build phase
+    private func parseBuildPhase(_ line: String) -> (String, String)? {
+        // Check standard prefix-based patterns
+        for (prefix, phaseName) in Self.phasePatterns {
+            if line.hasPrefix(prefix), let target = extractTarget(from: line) {
+                return (phaseName, target)
+            }
+        }
+
+        // Special case: SwiftDriver\ Compilation or SwiftDriver Compilation
+        if line.contains("SwiftDriver") && line.contains("Compilation"),
+            let target = extractTarget(from: line)
+        {
+            return ("SwiftCompilation", target)
+        }
+
+        return nil
+    }
+
+    // MARK: - SPM Phase Parsing
+
+    /// Returns (phaseName, targetName) tuple if line contains SPM build phase
+    /// Format: [N/M] Compiling TARGET or [N/M] Linking TARGET
+    private func parseSPMPhase(_ line: String) -> (String, String)? {
+        // Pattern: [1/5] Compiling xcsift main.swift
+        // or [1/5] Compiling plugin GenerateManual
+        if line.contains("] Compiling ") {
+            // Find the start of target name (after "] Compiling ")
+            if let compilingRange = line.range(of: "] Compiling ") {
+                let afterCompiling = line[compilingRange.upperBound...]
+                // Target name is the first word after "Compiling"
+                // For SPM: "[1/5] Compiling xcsift main.swift" -> target is "xcsift"
+                // For plugins: "[1/1] Compiling plugin GenerateManual" -> target is "plugin" (skip)
+                let parts = afterCompiling.split(separator: " ", maxSplits: 1)
+                if let targetName = parts.first {
+                    let target = String(targetName)
+                    // Skip plugin compilation (not a real target)
+                    if target == "plugin" {
+                        return nil
+                    }
+                    return ("Compiling", target)
+                }
+            }
+        }
+
+        // Pattern: [3/5] Linking xcsift
+        if line.contains("] Linking ") {
+            if let linkingRange = line.range(of: "] Linking ") {
+                let afterLinking = line[linkingRange.upperBound...]
+                // Target name is everything after "Linking" (may have path)
+                let targetName = afterLinking.trimmingCharacters(in: .whitespaces)
+                if !targetName.isEmpty {
+                    return ("Linking", targetName)
+                }
+            }
+        }
+
+        return nil
+    }
+
+    // MARK: - Target Timing Parsing
+
+    /// Returns (targetName, duration) tuple if line contains target timing
+    private func parseTargetTiming(_ line: String) -> (String, String)? {
+        // Pattern: Build target MyApp of project MyProject with configuration Debug (23.1s)
+        if line.hasPrefix("Build target ") && line.contains(" of project ") {
+            // Extract target name
+            let afterBuildTarget = line.dropFirst("Build target ".count)
+            if let ofProjectRange = afterBuildTarget.range(of: " of project ") {
+                let targetName = String(afterBuildTarget[..<ofProjectRange.lowerBound])
+
+                // Extract duration from parentheses at the end
+                if let parenStart = line.range(of: "(", options: .backwards),
+                    let parenEnd = line.range(of: ")", options: .backwards),
+                    parenStart.lowerBound < parenEnd.lowerBound
+                {
+                    let duration = String(line[parenStart.upperBound ..< parenEnd.lowerBound])
+                    return (targetName, duration)
+                }
+            }
+        }
+
+        // Pattern: Build target 'MyApp' completed. (12.3s)
+        if line.hasPrefix("Build target '") && line.contains("' completed") {
+            let afterPrefix = line.dropFirst("Build target '".count)
+            if let endQuote = afterPrefix.range(of: "'") {
+                let targetName = String(afterPrefix[..<endQuote.lowerBound])
+
+                // Extract duration from parentheses at the end
+                if let parenStart = line.range(of: "(", options: .backwards),
+                    let parenEnd = line.range(of: ")", options: .backwards),
+                    parenStart.lowerBound < parenEnd.lowerBound
+                {
+                    let duration = String(line[parenStart.upperBound ..< parenEnd.lowerBound])
+                    return (targetName, duration)
+                }
+            }
         }
 
         return nil

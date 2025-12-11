@@ -30,6 +30,7 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 - **Summary-only mode** - Default coverage output includes only percentage (token-efficient)
 - **Quiet mode** - Suppress output when build succeeds with no warnings or errors
 - **Werror mode** - Treat warnings as errors (build fails if warnings present)
+- **Build info** - Per-target phases and timing (CompileSwiftSources, Link, etc. with per-target duration)
 
 ## Installation
 
@@ -147,6 +148,11 @@ xcodebuild test 2>&1 | xcsift -f toon -w -c --coverage-details
 # TOON key folding - collapse nested objects to dotted paths
 xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe
 swift build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 3
+
+# Build info - show per-target phases and timing
+xcodebuild build 2>&1 | xcsift --build-info
+swift build 2>&1 | xcsift --build-info
+xcodebuild build 2>&1 | xcsift -f toon --build-info -w
 
 # GitHub Actions format (auto-detected when GITHUB_ACTIONS=true)
 # Creates workflow annotations visible in PR and Actions UI
@@ -280,6 +286,32 @@ xcodebuild build 2>&1 | xcsift -f github-actions
 - **Details mode** (with `--coverage-details`): Includes full `files` array as shown in the example above
 - **Target filtering** (xcodebuild only): Automatically extracts tested target from stdout and shows coverage for that target only
 - xcsift automatically converts `.profraw` files (SPM) or `.xcresult` bundles (xcodebuild) to JSON format without requiring manual llvm-cov or xccov commands
+
+**Note on build info:** The `build_info` section is only included when using the `--build-info` flag:
+```json
+{
+  "build_info": {
+    "targets": [
+      {
+        "name": "MyFramework",
+        "duration": "12.4s",
+        "phases": ["CompileSwiftSources", "Link"]
+      },
+      {
+        "name": "MyApp",
+        "duration": "23.1s",
+        "phases": ["CompileSwiftSources", "Link", "CopySwiftLibs"]
+      }
+    ]
+  }
+}
+```
+- Groups phases by target with per-target timing
+- Total build time is always in `summary.build_time` (not duplicated in build_info)
+- Parses xcodebuild timing from "Build target X (Ys)" patterns
+- xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
+- SPM phases: `Compiling`, `Linking`
+- Empty fields are omitted (targets without phases won't have `phases` field)
 
 ### TOON Format
 
