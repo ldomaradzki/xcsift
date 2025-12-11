@@ -418,7 +418,11 @@ class OutputParser {
                         dependsOn: targetDependencies[targetName] ?? []
                     )
                 }
-                return BuildInfo(targets: targets)
+
+                // Compute top 5 slowest targets (sorted by duration descending)
+                let slowestTargets = computeSlowestTargets(targets: targets, limit: 5)
+
+                return BuildInfo(targets: targets, slowestTargets: slowestTargets)
             }() : nil
 
         return BuildResult(
@@ -465,6 +469,23 @@ class OutputParser {
         let passedNames = Set(passedTestDurations.keys)
         let failedNames = Set(failedTests.map { normalizeTestName($0.test) })
         return Array(passedNames.intersection(failedNames)).sorted()
+    }
+
+    /// Computes the top N slowest targets sorted by duration (descending)
+    private func computeSlowestTargets(targets: [TargetBuildInfo], limit: Int) -> [String] {
+        // Parse duration string "12.4s" to Double for sorting
+        func parseDuration(_ duration: String?) -> Double {
+            guard let d = duration, d.hasSuffix("s") else { return 0 }
+            return Double(d.dropLast()) ?? 0
+        }
+
+        // Filter targets with duration, sort by duration descending, take top N
+        let sorted =
+            targets
+            .filter { $0.duration != nil }
+            .sorted { parseDuration($0.duration) > parseDuration($1.duration) }
+
+        return Array(sorted.prefix(limit).map { $0.name })
     }
 
     func extractTestedTarget(from input: String) -> String? {

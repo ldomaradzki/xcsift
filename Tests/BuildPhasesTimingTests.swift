@@ -721,4 +721,156 @@ final class BuildInfoTests: XCTestCase {
         XCTAssertTrue(jsonString.contains("depends_on"))
         XCTAssertTrue(jsonString.contains("MyFramework"))
     }
+
+    // MARK: - Slowest Targets Tests
+
+    func testSlowestTargetsSortedByDuration() throws {
+        let parser = OutputParser()
+        let input = """
+            Build target Fast of project MyProject with configuration Debug (5.0s)
+            Build target Medium of project MyProject with configuration Debug (15.0s)
+            Build target Slow of project MyProject with configuration Debug (30.0s)
+            ** BUILD SUCCEEDED ** [50.0s]
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let buildInfo = try XCTUnwrap(result.buildInfo)
+        XCTAssertEqual(buildInfo.slowestTargets.count, 3)
+        // Should be sorted by duration descending (slowest first)
+        XCTAssertEqual(buildInfo.slowestTargets[0], "Slow")
+        XCTAssertEqual(buildInfo.slowestTargets[1], "Medium")
+        XCTAssertEqual(buildInfo.slowestTargets[2], "Fast")
+    }
+
+    func testSlowestTargetsLimitedToTop5() throws {
+        let parser = OutputParser()
+        let input = """
+            Build target Target1 of project P with configuration Debug (1.0s)
+            Build target Target2 of project P with configuration Debug (2.0s)
+            Build target Target3 of project P with configuration Debug (3.0s)
+            Build target Target4 of project P with configuration Debug (4.0s)
+            Build target Target5 of project P with configuration Debug (5.0s)
+            Build target Target6 of project P with configuration Debug (6.0s)
+            Build target Target7 of project P with configuration Debug (7.0s)
+            ** BUILD SUCCEEDED ** [28.0s]
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let buildInfo = try XCTUnwrap(result.buildInfo)
+        // Should be limited to top 5
+        XCTAssertEqual(buildInfo.slowestTargets.count, 5)
+        // Slowest 5 should be: Target7, Target6, Target5, Target4, Target3
+        XCTAssertEqual(buildInfo.slowestTargets[0], "Target7")
+        XCTAssertEqual(buildInfo.slowestTargets[1], "Target6")
+        XCTAssertEqual(buildInfo.slowestTargets[2], "Target5")
+        XCTAssertEqual(buildInfo.slowestTargets[3], "Target4")
+        XCTAssertEqual(buildInfo.slowestTargets[4], "Target3")
+    }
+
+    func testSlowestTargetsOmitsTargetsWithoutDuration() throws {
+        let parser = OutputParser()
+        let input = """
+            CompileSwiftSources normal arm64 (in target 'NoDuration' from project 'P')
+            Build target WithDuration of project P with configuration Debug (10.0s)
+            ** BUILD SUCCEEDED ** [10.0s]
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let buildInfo = try XCTUnwrap(result.buildInfo)
+        // Both targets should be in targets list
+        XCTAssertEqual(buildInfo.targets.count, 2)
+        // But only one has duration, so slowest_targets should only contain that one
+        XCTAssertEqual(buildInfo.slowestTargets.count, 1)
+        XCTAssertEqual(buildInfo.slowestTargets[0], "WithDuration")
+    }
+
+    func testSlowestTargetsEmptyWhenNoDurations() throws {
+        let parser = OutputParser()
+        let input = """
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'P')
+            Ld /path/to/binary normal (in target 'MyApp' from project 'P')
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let buildInfo = try XCTUnwrap(result.buildInfo)
+        XCTAssertEqual(buildInfo.targets.count, 1)
+        // No durations, so slowest_targets should be empty
+        XCTAssertEqual(buildInfo.slowestTargets.count, 0)
+    }
+
+    func testSlowestTargetsNotEncodedWhenEmpty() {
+        let parser = OutputParser()
+        let input = """
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'P')
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let encoder = JSONEncoder()
+        let jsonData = try! encoder.encode(result)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+
+        // slowest_targets should NOT be in JSON when empty
+        XCTAssertFalse(jsonString.contains("slowest_targets"))
+    }
+
+    func testSlowestTargetsEncodedWhenNotEmpty() {
+        let parser = OutputParser()
+        let input = """
+            Build target MyApp of project P with configuration Debug (10.0s)
+            ** BUILD SUCCEEDED ** [10.0s]
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let encoder = JSONEncoder()
+        let jsonData = try! encoder.encode(result)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+
+        // slowest_targets should be in JSON
+        XCTAssertTrue(jsonString.contains("slowest_targets"))
+        XCTAssertTrue(jsonString.contains("MyApp"))
+    }
+
+    func testSlowestTargetsInTOONFormat() throws {
+        let parser = OutputParser()
+        let input = """
+            Build target Slow of project P with configuration Debug (30.0s)
+            Build target Fast of project P with configuration Debug (5.0s)
+            ** BUILD SUCCEEDED ** [35.0s]
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)!
+
+        XCTAssertTrue(toonString.contains("slowest_targets"))
+        XCTAssertTrue(toonString.contains("Slow"))
+    }
+
+    func testSlowestTargetsWithSPMOutput() throws {
+        let parser = OutputParser()
+        let input = """
+            [1/3] Compiling FastPackage file1.swift
+            [2/3] Compiling SlowPackage file2.swift
+            [3/3] Linking SlowPackage
+            Build complete! (5.2s)
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let buildInfo = try XCTUnwrap(result.buildInfo)
+        // SPM targets should be parsed
+        XCTAssertEqual(buildInfo.targets.count, 2)
+        // SPM doesn't report per-target timing, only total build time
+        // So slowest_targets should be empty (no per-target durations)
+        XCTAssertEqual(buildInfo.slowestTargets.count, 0)
+    }
 }

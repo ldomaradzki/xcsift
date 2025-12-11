@@ -110,6 +110,7 @@ xcodebuild build 2>&1 | xcsift -f toon --build-info -w
 
 When enabled, output includes:
 - `build_info.targets[]` — array of targets with build information
+- `build_info.slowest_targets[]` — top 5 targets sorted by duration (descending)
 - Each target contains:
   - `name` — target name
   - `duration` — build duration (e.g., "12.4s")

@@ -30,7 +30,7 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 - **Summary-only mode** - Default coverage output includes only percentage (token-efficient)
 - **Quiet mode** - Suppress output when build succeeds with no warnings or errors
 - **Werror mode** - Treat warnings as errors (build fails if warnings present)
-- **Build info** - Per-target phases and timing (CompileSwiftSources, Link, etc. with per-target duration)
+- **Build info** - Per-target phases, timing, and slowest targets (top 5 by duration)
 
 ## Installation
 
@@ -302,16 +302,18 @@ xcodebuild build 2>&1 | xcsift -f github-actions
         "duration": "23.1s",
         "phases": ["CompileSwiftSources", "Link", "CopySwiftLibs"]
       }
-    ]
+    ],
+    "slowest_targets": ["MyApp", "MyFramework"]
   }
 }
 ```
 - Groups phases by target with per-target timing
+- **Slowest targets**: Top 5 targets sorted by duration (descending)
 - Total build time is always in `summary.build_time` (not duplicated in build_info)
 - Parses xcodebuild timing from "Build target X (Ys)" patterns
 - xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
 - SPM phases: `Compiling`, `Linking`
-- Empty fields are omitted (targets without phases won't have `phases` field)
+- Empty fields are omitted (targets without phases won't have `phases` field, no `slowest_targets` when empty)
 
 ### TOON Format
 

@@ -204,6 +204,7 @@ The codebase follows a modular architecture:
   - Enabled with `--build-info` flag
   - Groups phases by target with per-target duration
   - Parses target dependency graph from xcodebuild output
+  - **Slowest Targets**: Top 5 targets sorted by duration (descending) in `slowest_targets` array
   - Supports xcodebuild phase detection from "(in target 'X' from project 'Y')" patterns
   - Supports SPM phase detection from "[N/M] Compiling/Linking TARGET" patterns
   - Parses "Build target X (Ys)" and "** BUILD SUCCEEDED ** [Xs]" patterns
@@ -297,7 +298,7 @@ Test cases cover:
     - Key folding with build results
     - Key folding combined with flatten depth
     - Combined TOON configuration
-- **Build phases, timing, and dependencies** (38 tests):
+- **Build phases, timing, and dependencies** (45 tests):
   - CompileSwiftSources phase parsing
   - SwiftDriver Compilation phase parsing
   - CompileC (Clang) phase parsing
@@ -322,6 +323,13 @@ Test cases cover:
   - Dependency graph deduplication
   - Dependencies combined with phases
   - depends_on field encoding (omitted when empty)
+  - **Slowest targets** (7 tests):
+    - Sorted by duration descending
+    - Limited to top 5
+    - Omits targets without duration
+    - Empty when no durations
+    - Encoding (omitted when empty, encoded when not)
+    - TOON format support
 
 Run individual tests:
 ```bash
@@ -392,7 +400,7 @@ The tool outputs structured data optimized for coding agents in two formats:
     - Supports both SPM (`swift test --enable-code-coverage`) and xcodebuild (`-enableCodeCoverage YES`) formats
     - Automatically detects format and parses accordingly
     - Warns to stderr if target was detected but no matching coverage data found
-  - **Build info** (with `--build-info` flag): Includes per-target phases, timing, and dependencies
+  - **Build info** (with `--build-info` flag): Includes per-target phases, timing, dependencies, and slowest targets
     ```json
     {
       "build_info": {
@@ -408,16 +416,18 @@ The tool outputs structured data optimized for coding agents in two formats:
             "phases": ["CompileSwiftSources", "Link", "CopySwiftLibs"],
             "depends_on": ["MyFramework"]
           }
-        ]
+        ],
+        "slowest_targets": ["MyApp", "MyFramework"]
       }
     }
     ```
     - Groups phases by target with per-target timing
     - Parses target dependencies from xcodebuild "Target dependency graph" output
+    - **Slowest targets**: Top 5 targets sorted by duration (descending)
     - Total build time is in `summary.build_time` (not duplicated in build_info)
     - xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
     - SPM phases: `Compiling`, `Linking`
-    - Empty fields are omitted (targets without phases won't have `phases` field, targets without dependencies won't have `depends_on` field)
+    - Empty fields are omitted (targets without phases won't have `phases` field, targets without dependencies won't have `depends_on` field, no `slowest_targets` when empty)
 
 ### TOON Format (with `--format toon` / `-f toon` flag)
 
