@@ -62,6 +62,7 @@ The default format outputs structured JSON with build status, summary, and detai
 - `slow_tests[]` — Included when `--slow-threshold` is set; each entry has `test` name and `duration` in seconds
 - `flaky_tests[]` — Automatically included when flaky tests detected
 - `coverage{}` — Only with `--coverage --coverage-details`
+- `build_info{}` — Only with `--build-info`
 
 ### Linker Errors
 
@@ -129,6 +130,38 @@ Two types of linker errors are captured:
 }
 ```
 
+### Build Info
+
+**Build Info** (with `--build-info`):
+```json
+{
+  "build_info": {
+    "targets": [
+      {
+        "name": "MyFramework",
+        "duration": "12.4s",
+        "phases": ["CompileSwiftSources", "Link"]
+      },
+      {
+        "name": "MyApp",
+        "duration": "23.1s",
+        "phases": ["CompileSwiftSources", "Link", "CopySwiftLibs"],
+        "depends_on": ["MyFramework"]
+      }
+    ]
+  }
+}
+```
+
+- Groups phases by target with per-target timing
+- Parses target dependencies from xcodebuild output
+- Total build time remains in `summary.build_time`
+- Empty fields are omitted (targets without phases or dependencies)
+
+Supported phases:
+- **xcodebuild**: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
+- **SPM**: `Compiling`, `Linking`
+
 ## TOON Format
 
 TOON (Token-Oriented Object Notation) provides 30-60% token reduction compared to JSON, ideal for LLM consumption.
@@ -170,6 +203,22 @@ Same build output (1 error, 3 warnings):
 | `--toon-delimiter` | `comma`, `tab`, `pipe` | Table delimiter |
 | `--toon-key-folding` | `disabled`, `safe` | Collapse nested objects |
 | `--toon-flatten-depth` | Integer | Limit folding depth |
+
+### Build Info in TOON
+
+With `--build-info`, TOON outputs build information in compact format:
+
+```toon
+status: success
+summary:
+  errors: 0
+  warnings: 0
+  build_time: "15.3"
+build_info:
+  targets[2]{name,duration,phases,depends_on}:
+    "MyFramework","12.4s",["CompileSwiftSources","Link"],[]
+    "MyApp","23.1s",["CompileSwiftSources","Link","CopySwiftLibs"],["MyFramework"]
+```
 
 ## GitHub Actions Format
 

@@ -85,6 +85,10 @@ struct XCSift: ParsableCommand {
               swift test 2>&1 | xcsift --slow-threshold 1.0
               xcodebuild test 2>&1 | xcsift --slow-threshold 0.5
 
+            Build info (per-target phases, timing, dependencies):
+              xcodebuild build 2>&1 | xcsift --build-info
+              swift build 2>&1 | xcsift --build-info
+
             TOON format (30-60% fewer tokens for LLMs):
               xcodebuild build 2>&1 | xcsift -f toon
               swift test 2>&1 | xcsift -f toon -w -c
@@ -98,6 +102,7 @@ struct XCSift: ParsableCommand {
               --toon-key-folding [disabled|safe] # Default: disabled
               --toon-flatten-depth N             # Default: unlimited
               --slow-threshold N                 # Slow test threshold in seconds
+              --build-info                       # Per-target phases and timing
             """,
         helpNames: [.short, .long]
     )

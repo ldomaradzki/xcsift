@@ -93,6 +93,33 @@ When detected, output includes:
 - `summary.flaky_tests` — count of flaky tests
 - `flaky_tests[]` — array of flaky test names
 
+## Build Info Options
+
+### `--build-info`
+
+Include per-target build phases, timing, and dependencies in output.
+
+```bash
+# Basic build info
+xcodebuild build 2>&1 | xcsift --build-info
+swift build 2>&1 | xcsift --build-info
+
+# Combine with other flags
+xcodebuild build 2>&1 | xcsift -f toon --build-info -w
+```
+
+When enabled, output includes:
+- `build_info.targets[]` — array of targets with build information
+- Each target contains:
+  - `name` — target name
+  - `duration` — build duration (e.g., "12.4s")
+  - `phases[]` — build phases (CompileSwiftSources, Link, etc.)
+  - `depends_on[]` — target dependencies (omitted when empty)
+
+Supported phases:
+- **xcodebuild**: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
+- **SPM**: `Compiling`, `Linking`
+
 ## Coverage Options
 
 ### `--coverage`, `-c`

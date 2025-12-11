@@ -510,6 +510,8 @@ class OutputParser {
         targetDurations = [:]
         targetOrder = []
         shouldParseBuildInfo = false
+        targetDependencies = [:]
+        currentDependencyTarget = nil
     }
 
     private func parseLine(_ line: String) {
