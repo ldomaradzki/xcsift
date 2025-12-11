@@ -22,7 +22,7 @@ swift test
 ### Formatting
 **IMPORTANT:** Always run before committing changes:
 ```bash
-swift format --recursive --in-place Sources Tests
+swift format --recursive --in-place .
 ```
 
 ### Installation
@@ -408,3 +408,27 @@ When running on GitHub Actions (`GITHUB_ACTIONS=true`), xcsift automatically app
 - name: Annotations only (no JSON/TOON)
   run: xcodebuild build 2>&1 | xcsift -f github-actions
 ```
+
+## Documentation Maintenance
+
+**IMPORTANT:** When modifying public API, CLI flags, or features, you MUST update the corresponding DocC documentation in `Sources/xcsift.docc/`.
+
+Documentation files to update:
+- `xcsift.md` - Main overview and Topics structure
+- `GettingStarted.md` - Installation and basic usage
+- `Usage.md` - CLI flags and options reference
+- `OutputFormats.md` - JSON/TOON/GitHub Actions format details
+- `CodeCoverage.md` - Coverage feature documentation
+
+### Previewing Documentation Locally
+
+**For Claude:** You cannot run the preview server (it's interactive/long-running). Ask the user to run it manually.
+
+**For user:** Run in a separate terminal:
+```bash
+swift package --disable-sandbox preview-documentation --target xcsift
+```
+Opens at: http://localhost:8080/documentation/xcsift
+
+**Note:** The `docs/` folder contains pre-generated documentation for GitHub Pages with `--hosting-base-path xcsift`. Do NOT use a simple HTTP server (like `python3 -m http.server`) to serve `docs/` directly — it won't handle the `/xcsift/` base path routing.
+

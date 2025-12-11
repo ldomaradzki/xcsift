@@ -1,0 +1,43 @@
+name: Deploy DocC
+
+on:
+  push:
+    branches: ["master"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build DocC
+        run: |
+          swift package --allow-writing-to-directory docs \
+              generate-documentation --target xcsift \
+              --disable-indexing \
+              --transform-for-static-hosting \
+              --hosting-base-path xcsift \
+              --output-path docs
+          echo '<script>window.location.href += "/documentation/xcsift"</script>' > docs/index.html
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: 'docs'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
