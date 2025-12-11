@@ -5,6 +5,7 @@
 [![Swift-versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fldomaradzki%2Fxcsift%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/ldomaradzki/xcsift)
 [![CI](https://github.com/ldomaradzki/xcsift/actions/workflows/ci.yml/badge.svg)](https://github.com/ldomaradzki/xcsift/actions/workflows/ci.yml)
 [![Release](https://github.com/ldomaradzki/xcsift/actions/workflows/release.yml/badge.svg)](https://github.com/ldomaradzki/xcsift/actions/workflows/release.yml)
+[![Docs](https://github.com/ldomaradzki/xcsift/actions/workflows/deploy-docc.yml/badge.svg)](https://ldomaradzki.github.io/xcsift/documentation/xcsift)
 [![License](https://img.shields.io/github/license/ldomaradzki/xcsift.svg)](LICENSE.md)
 
 ![Example](.github/images/example.png)
@@ -475,17 +476,52 @@ jobs:
 
 ## Development
 
+### Building
+
+```bash
+swift build
+swift build -c release
+```
+
 ### Running Tests
 
 ```bash
 swift test
 ```
 
-### Building
+### Formatting
+
+**Required before committing:**
 
 ```bash
-swift build
+swift format --recursive --in-place .
 ```
+
+### Documentation
+
+Generate DocC documentation locally:
+
+```bash
+# Build static documentation
+swift package --allow-writing-to-directory docs \
+    generate-documentation --target xcsift \
+    --disable-indexing \
+    --transform-for-static-hosting \
+    --hosting-base-path xcsift \
+    --output-path docs
+
+# Preview documentation (opens in browser at http://localhost:8080)
+swift package --disable-sandbox preview-documentation --target xcsift
+```
+
+Documentation source files are in `Sources/xcsift.docc/`:
+- `xcsift.md` — Main overview
+- `GettingStarted.md` — Installation guide
+- `Usage.md` — CLI reference
+- `OutputFormats.md` — Format details
+- `CodeCoverage.md` — Coverage feature
+
+**Production URL:** [ldomaradzki.github.io/xcsift](https://ldomaradzki.github.io/xcsift/documentation/xcsift)
 
 ## License
 
