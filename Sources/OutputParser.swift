@@ -7,6 +7,7 @@ class OutputParser {
     private var failedTests: [FailedTest] = []
     private var linkerErrors: [LinkerError] = []
     private var executables: [Executable] = []
+    private var seenExecutablePaths: Set<String> = []
     private var buildTime: String?
     private var seenTestNames: Set<String> = []
     private var executedTestsCount: Int?
@@ -605,9 +606,11 @@ class OutputParser {
             return
         }
 
-        // Parse executable registration
+        // Parse executable registration (deduplicate by path)
         if let executable = parseExecutable(line) {
-            executables.append(executable)
+            if seenExecutablePaths.insert(executable.path).inserted {
+                executables.append(executable)
+            }
             return
         }
 

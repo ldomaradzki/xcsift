@@ -775,4 +775,20 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.executables.count, 0)
         XCTAssertNil(result.summary.executables)
     }
+
+    func testExecutableDeduplicationByPath() {
+        let parser = OutputParser()
+        // Same app registered multiple times (can happen in incremental builds)
+        let input = """
+            RegisterWithLaunchServices /Users/dev/DerivedData/MyApp/Build/Products/Debug/MyApp.app (in target 'MyApp' from project 'MyApp')
+            RegisterWithLaunchServices /Users/dev/DerivedData/MyApp/Build/Products/Debug/MyApp.app (in target 'MyApp' from project 'MyApp')
+            RegisterWithLaunchServices /Users/dev/DerivedData/MyApp/Build/Products/Debug/MyApp.app (in target 'MyApp' from project 'MyApp')
+            """
+
+        let result = parser.parse(input: input, printExecutables: true)
+
+        XCTAssertEqual(result.executables.count, 1, "Duplicate executables should be deduplicated by path")
+        XCTAssertEqual(result.executables[0].name, "MyApp.app")
+        XCTAssertEqual(result.summary.executables, 1)
+    }
 }

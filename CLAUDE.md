@@ -299,11 +299,13 @@ Test cases cover:
   - Executables not included when flag is false
   - Executables included in JSON when flag is true
   - No executables in output
-- **TOON format encoding** (24 tests):
+  - Executable deduplication by path
+- **TOON format encoding** (25 tests):
   - Basic TOON encoding
   - TOON with errors, warnings, and failed tests
   - TOON with linker errors
   - TOON with code coverage
+  - TOON with executables
   - Token efficiency verification (30-60% reduction)
   - Summary-only vs details mode in TOON format
   - **TOON key folding features** (7 tests):

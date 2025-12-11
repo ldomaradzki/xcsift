@@ -635,6 +635,32 @@ final class TOONFormatTests: XCTestCase {
         XCTAssertTrue(toonString!.contains("linker_errors[1]:"))
     }
 
+    // MARK: - Executable TOON Tests
+
+    func testTOONEncoderWithExecutables() throws {
+        let parser = OutputParser()
+        let input = """
+            Building for debugging...
+            RegisterWithLaunchServices /Users/dev/DerivedData/MyApp-abc/Build/Products/Debug/MyApp.app (in target 'MyApp' from project 'MyApp')
+            RegisterWithLaunchServices /Users/dev/DerivedData/MyApp-abc/Build/Products/Debug/HelperTool.app (in target 'HelperTool' from project 'MyApp')
+            Build complete!
+            """
+        let result = parser.parse(input: input, printExecutables: true)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("status: success"))
+        XCTAssertTrue(toonString!.contains("executables: 2"))
+        XCTAssertTrue(toonString!.contains("executables[2]{path,name,target}"))
+        XCTAssertTrue(toonString!.contains("MyApp.app"))
+        XCTAssertTrue(toonString!.contains("HelperTool.app"))
+    }
+
     // MARK: - Helper Methods
 
     private func measureJSONSize(_ result: BuildResult) throws -> Int {
