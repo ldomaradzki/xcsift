@@ -1,4 +1,4 @@
-import TOONEncoder
+import ToonFormat
 import XCTest
 
 @testable import xcsift
