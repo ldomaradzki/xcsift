@@ -10,8 +10,10 @@ struct BuildResult: Codable {
     let coverage: CodeCoverage?
     let slowTests: [SlowTest]
     let flakyTests: [String]
+    let buildInfo: BuildInfo?
     let printWarnings: Bool
     let printCoverageDetails: Bool
+    let printBuildInfo: Bool
 
     enum CodingKeys: String, CodingKey {
         case status, summary, errors, warnings, coverage
@@ -19,6 +21,7 @@ struct BuildResult: Codable {
         case linkerErrors = "linker_errors"
         case slowTests = "slow_tests"
         case flakyTests = "flaky_tests"
+        case buildInfo = "build_info"
     }
 
     init(
@@ -31,8 +34,10 @@ struct BuildResult: Codable {
         coverage: CodeCoverage?,
         slowTests: [SlowTest] = [],
         flakyTests: [String] = [],
+        buildInfo: BuildInfo? = nil,
         printWarnings: Bool,
-        printCoverageDetails: Bool = false
+        printCoverageDetails: Bool = false,
+        printBuildInfo: Bool = false
     ) {
         self.status = status
         self.summary = summary
@@ -43,8 +48,10 @@ struct BuildResult: Codable {
         self.coverage = coverage
         self.slowTests = slowTests
         self.flakyTests = flakyTests
+        self.buildInfo = buildInfo
         self.printWarnings = printWarnings
         self.printCoverageDetails = printCoverageDetails
+        self.printBuildInfo = printBuildInfo
     }
 
     init(from decoder: Decoder) throws {
@@ -58,8 +65,10 @@ struct BuildResult: Codable {
         coverage = try container.decodeIfPresent(CodeCoverage.self, forKey: .coverage)
         slowTests = try container.decodeIfPresent([SlowTest].self, forKey: .slowTests) ?? []
         flakyTests = try container.decodeIfPresent([String].self, forKey: .flakyTests) ?? []
+        buildInfo = try container.decodeIfPresent(BuildInfo.self, forKey: .buildInfo)
         printWarnings = false
         printCoverageDetails = false
+        printBuildInfo = false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -95,6 +104,11 @@ struct BuildResult: Codable {
 
         if !flakyTests.isEmpty {
             try container.encode(flakyTests, forKey: .flakyTests)
+        }
+
+        // Only output build_info section when printBuildInfo flag is set and there are targets
+        if printBuildInfo, let buildInfo = buildInfo, !buildInfo.targets.isEmpty {
+            try container.encode(buildInfo, forKey: .buildInfo)
         }
     }
 
@@ -418,4 +432,55 @@ struct LinkerError: Codable {
 struct SlowTest: Codable {
     let test: String
     let duration: Double
+}
+
+// MARK: - Build Info (Phases + Timing per target)
+// Note: Total build time is already in BuildSummary.buildTime, so not duplicated here
+
+struct BuildInfo: Codable {
+    let targets: [TargetBuildInfo]
+
+    init(targets: [TargetBuildInfo] = []) {
+        self.targets = targets
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if !targets.isEmpty {
+            try container.encode(targets, forKey: .targets)
+        }
+    }
+}
+
+struct TargetBuildInfo: Codable {
+    let name: String
+    let duration: String?
+    let phases: [String]
+    let dependsOn: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case name, duration, phases
+        case dependsOn = "depends_on"
+    }
+
+    init(name: String, duration: String? = nil, phases: [String] = [], dependsOn: [String] = []) {
+        self.name = name
+        self.duration = duration
+        self.phases = phases
+        self.dependsOn = dependsOn
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        if let duration = duration {
+            try container.encode(duration, forKey: .duration)
+        }
+        if !phases.isEmpty {
+            try container.encode(phases, forKey: .phases)
+        }
+        if !dependsOn.isEmpty {
+            try container.encode(dependsOn, forKey: .dependsOn)
+        }
+    }
 }
