@@ -140,6 +140,20 @@ swift build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 2
 
 # Combine all TOON options
 xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-key-folding safe --toon-flatten-depth 5 -w -c
+
+# Slow/flaky test detection
+# Detects tests that exceed a duration threshold and tests that both pass and fail in the same run
+
+# Set slow threshold to 1.0 seconds (tests taking longer are marked as slow)
+swift test 2>&1 | xcsift --slow-threshold 1.0
+xcodebuild test 2>&1 | xcsift --slow-threshold 0.5
+
+# Combine with other flags
+swift test 2>&1 | xcsift -f toon --slow-threshold 2.0 -w
+xcodebuild test 2>&1 | xcsift --slow-threshold 1.0 --coverage
+
+# Note: Flaky test detection is automatic (no flag needed)
+# A test is marked as flaky if it both passes AND fails in the same run (retry scenarios)
 ```
 
 ## Architecture
@@ -154,7 +168,7 @@ The codebase follows a simple two-component architecture:
 
 2. **OutputParser.swift** - Core parsing logic
    - `OutputParser` class with regex-based line parsing
-   - Defines data structures: `BuildResult`, `BuildSummary`, `BuildError`, `BuildWarning`, `FailedTest`, `CodeCoverage`, `FileCoverage`
+   - Defines data structures: `BuildResult`, `BuildSummary`, `BuildError`, `BuildWarning`, `FailedTest`, `SlowTest`, `CodeCoverage`, `FileCoverage`
    - Pattern matching for various Xcode/SPM output formats
    - Extracts file paths, line numbers, and messages from build output
    - Parses code coverage data from SPM coverage JSON files
@@ -184,6 +198,17 @@ The codebase follows a simple two-component architecture:
     - SPM: `swift test --enable-code-coverage 2>&1 | xcsift --coverage`
     - xcodebuild: `xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift --coverage`
   - Supports both formats seamlessly
+- **Slow Test Detection**: Identifies tests exceeding a configurable duration threshold
+  - Enabled with `--slow-threshold <seconds>` flag
+  - Parses test duration from both XCTest and Swift Testing output formats
+  - Reports slow tests in both summary (count) and detailed list with `test` name and `duration` in seconds
+- **Flaky Test Detection**: Automatically detects tests that both pass and fail in the same run
+  - No flag required - detection is automatic
+  - Useful for identifying unstable tests in retry scenarios
+  - Reports in both summary (count) and detailed list
+- **Test Duration Tracking**: Captures execution time for each test
+  - Duration included in `FailedTest` struct for failed tests
+  - Tracked internally for passed tests (used for slow/flaky detection)
 
 ## Testing
 

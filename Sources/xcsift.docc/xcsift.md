@@ -10,6 +10,7 @@ xcsift transforms verbose Xcode build output into concise, structured formats th
 
 - **Multiple output formats** — JSON (default), TOON (30-60% fewer tokens), or GitHub Actions
 - **Structured error reporting** — Clear categorization of errors, warnings, linker errors, and test failures
+- **Test analysis** — Duration tracking, slow test detection (`--slow-threshold`), automatic flaky test detection
 - **Automatic code coverage** — Converts `.profraw` (SPM) and `.xcresult` (xcodebuild) automatically
 - **GitHub Actions integration** — Auto-detected workflow annotations with inline PR comments
 - **Token efficiency** — TOON format reduces API costs for LLM-based tools
@@ -25,6 +26,9 @@ xcodebuild build 2>&1 | xcsift --format toon
 
 # Include code coverage
 swift test --enable-code-coverage 2>&1 | xcsift --coverage
+
+# Detect slow tests (>1s threshold)
+swift test 2>&1 | xcsift --slow-threshold 1.0
 ```
 
 ## Topics

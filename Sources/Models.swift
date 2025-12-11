@@ -8,6 +8,8 @@ struct BuildResult: Codable {
     let failedTests: [FailedTest]
     let linkerErrors: [LinkerError]
     let coverage: CodeCoverage?
+    let slowTests: [SlowTest]
+    let flakyTests: [String]
     let printWarnings: Bool
     let printCoverageDetails: Bool
 
@@ -15,6 +17,8 @@ struct BuildResult: Codable {
         case status, summary, errors, warnings, coverage
         case failedTests = "failed_tests"
         case linkerErrors = "linker_errors"
+        case slowTests = "slow_tests"
+        case flakyTests = "flaky_tests"
     }
 
     init(
@@ -25,6 +29,8 @@ struct BuildResult: Codable {
         failedTests: [FailedTest],
         linkerErrors: [LinkerError] = [],
         coverage: CodeCoverage?,
+        slowTests: [SlowTest] = [],
+        flakyTests: [String] = [],
         printWarnings: Bool,
         printCoverageDetails: Bool = false
     ) {
@@ -35,6 +41,8 @@ struct BuildResult: Codable {
         self.failedTests = failedTests
         self.linkerErrors = linkerErrors
         self.coverage = coverage
+        self.slowTests = slowTests
+        self.flakyTests = flakyTests
         self.printWarnings = printWarnings
         self.printCoverageDetails = printCoverageDetails
     }
@@ -48,6 +56,8 @@ struct BuildResult: Codable {
         failedTests = try container.decodeIfPresent([FailedTest].self, forKey: .failedTests) ?? []
         linkerErrors = try container.decodeIfPresent([LinkerError].self, forKey: .linkerErrors) ?? []
         coverage = try container.decodeIfPresent(CodeCoverage.self, forKey: .coverage)
+        slowTests = try container.decodeIfPresent([SlowTest].self, forKey: .slowTests) ?? []
+        flakyTests = try container.decodeIfPresent([String].self, forKey: .flakyTests) ?? []
         printWarnings = false
         printCoverageDetails = false
     }
@@ -77,6 +87,14 @@ struct BuildResult: Codable {
         // In summary-only mode, coverage_percent in summary is sufficient
         if let coverage = coverage, printCoverageDetails {
             try container.encode(coverage, forKey: .coverage)
+        }
+
+        if !slowTests.isEmpty {
+            try container.encode(slowTests, forKey: .slowTests)
+        }
+
+        if !flakyTests.isEmpty {
+            try container.encode(flakyTests, forKey: .flakyTests)
         }
     }
 
@@ -210,6 +228,8 @@ struct BuildSummary: Codable {
     let passedTests: Int?
     let buildTime: String?
     let coveragePercent: Double?
+    let slowTests: Int?
+    let flakyTests: Int?
 
     enum CodingKeys: String, CodingKey {
         case errors
@@ -219,6 +239,8 @@ struct BuildSummary: Codable {
         case passedTests = "passed_tests"
         case buildTime = "build_time"
         case coveragePercent = "coverage_percent"
+        case slowTests = "slow_tests"
+        case flakyTests = "flaky_tests"
     }
 
     init(
@@ -228,7 +250,9 @@ struct BuildSummary: Codable {
         linkerErrors: Int = 0,
         passedTests: Int?,
         buildTime: String?,
-        coveragePercent: Double?
+        coveragePercent: Double?,
+        slowTests: Int? = nil,
+        flakyTests: Int? = nil
     ) {
         self.errors = errors
         self.warnings = warnings
@@ -237,6 +261,8 @@ struct BuildSummary: Codable {
         self.passedTests = passedTests
         self.buildTime = buildTime
         self.coveragePercent = coveragePercent
+        self.slowTests = slowTests
+        self.flakyTests = flakyTests
     }
 
     func encode(to encoder: Encoder) throws {
@@ -255,6 +281,12 @@ struct BuildSummary: Codable {
         }
         if let coveragePercent = coveragePercent {
             try container.encode(coveragePercent, forKey: .coveragePercent)
+        }
+        if let slowTests = slowTests, slowTests > 0 {
+            try container.encode(slowTests, forKey: .slowTests)
+        }
+        if let flakyTests = flakyTests, flakyTests > 0 {
+            try container.encode(flakyTests, forKey: .flakyTests)
         }
     }
 }
@@ -290,12 +322,22 @@ struct FailedTest: Codable {
     let message: String
     let file: String?
     let line: Int?
+    let duration: Double?
 
     // Internal only - used for GitHub Actions format, not encoded to JSON/TOON
     var column: Int? = nil
 
     enum CodingKeys: String, CodingKey {
-        case test, message, file, line
+        case test, message, file, line, duration
+    }
+
+    init(test: String, message: String, file: String?, line: Int?, duration: Double? = nil) {
+        self.test = test
+        self.message = message
+        self.file = file
+        self.line = line
+        self.duration = duration
+        self.column = nil
     }
 }
 
@@ -363,4 +405,9 @@ struct LinkerError: Codable {
         self.message = ""
         self.conflictingFiles = conflictingFiles
     }
+}
+
+struct SlowTest: Codable {
+    let test: String
+    let duration: Double
 }
