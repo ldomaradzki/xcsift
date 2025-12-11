@@ -12,6 +12,7 @@ class OutputParser {
     private var summaryFailedTestsCount: Int?
     private var passedTestsCount: Int = 0
     private var seenPassedTestNames: Set<String> = []
+    private var parallelTestsTotalCount: Int?
 
     // Linker error parsing state
     private var currentLinkerArchitecture: String?
@@ -302,6 +303,17 @@ class OutputParser {
         ".xctest'"
     }
 
+    // Parallel test scheduling pattern: [N/TOTAL] Testing Module.Class/method
+    nonisolated(unsafe) private static let parallelTestSchedulingRegex = Regex {
+        "["
+        Capture(OneOrMore(.digit))
+        "/"
+        Capture(OneOrMore(.digit))
+        "] Testing "
+        Capture(OneOrMore(.any, .reluctant))
+        Anchor.endOfSubject
+    }
+
     func parse(
         input: String,
         printWarnings: Bool = false,
@@ -339,9 +351,16 @@ class OutputParser {
 
         let summaryFailedCount = summaryFailedTestsCount ?? failedTests.count
         let computedPassedTests: Int? = {
+            // Priority 1: Use parallel test total count if available
+            // This is the authoritative count from [N/TOTAL] Testing lines
+            if let parallelTotal = parallelTestsTotalCount {
+                return max(parallelTotal - summaryFailedCount, 0)
+            }
+            // Priority 2: Use executed tests count from summary line
             if let executed = executedTestsCount {
                 return max(executed - summaryFailedCount, 0)
             }
+            // Priority 3: Use counted passed tests
             if passedTestsCount > 0 {
                 return passedTestsCount
             }
@@ -407,6 +426,7 @@ class OutputParser {
         pendingLinkerSymbol = nil
         pendingDuplicateSymbol = nil
         pendingConflictingFiles = []
+        parallelTestsTotalCount = nil
     }
 
     private func parseLine(_ line: String) {
@@ -424,9 +444,20 @@ class OutputParser {
         let containsRelevant =
             line.contains("error:") || line.contains("warning:") || line.contains("failed") || line.contains("passed")
             || line.contains("✘") || line.contains("✓") || line.contains("❌") || line.contains("Build succeeded")
-            || line.contains("Build failed") || line.contains("Executed")
+            || line.contains("Build failed") || line.contains("Executed") || line.contains("] Testing ")
 
         if !containsRelevant {
+            return
+        }
+
+        // Parse parallel test scheduling lines: [N/TOTAL] Testing Module.Class/method
+        if line.contains("] Testing "), let match = line.firstMatch(of: Self.parallelTestSchedulingRegex) {
+            if let _ = Int(match.1), let total = Int(match.2) {
+                // Only set on first match (total should be consistent across all lines)
+                if parallelTestsTotalCount == nil {
+                    parallelTestsTotalCount = total
+                }
+            }
             return
         }
 
@@ -912,6 +943,36 @@ class OutputParser {
                     return String(afterIn[..<secondsRange.lowerBound])
                 }
             }
+        }
+
+        // Pattern: ✘ Test run with N test(s) failed, N test(s) passed after X seconds.
+        // Swift Testing failure summary format (check this BEFORE the passed-only pattern)
+        if let testRunRange = line.range(of: "Test run with "),
+            let failedRange = line.range(of: " failed, ", range: testRunRange.upperBound ..< line.endIndex),
+            let passedRange = line.range(of: " passed after ", range: failedRange.upperBound ..< line.endIndex)
+        {
+            // Extract failed count
+            let beforeFailed = line[testRunRange.upperBound ..< failedRange.lowerBound]
+            let failedCountStr = beforeFailed.split(separator: " ").first
+            if let failedCountStr = failedCountStr, let failedCount = Int(failedCountStr) {
+                summaryFailedTestsCount = failedCount
+            }
+
+            // Extract passed count (for executedTestsCount calculation)
+            let beforePassed = line[failedRange.upperBound ..< passedRange.lowerBound]
+            let passedCountStr = beforePassed.split(separator: " ").first
+            if let passedCountStr = passedCountStr, let passedCount = Int(passedCountStr),
+                let failedCount = summaryFailedTestsCount
+            {
+                executedTestsCount = passedCount + failedCount
+            }
+
+            // Extract time
+            let afterPassed = line[passedRange.upperBound...]
+            if let secondsRange = afterPassed.range(of: " seconds", options: .backwards) {
+                return String(afterPassed[..<secondsRange.lowerBound])
+            }
+            return String(afterPassed).trimmingCharacters(in: CharacterSet(charactersIn: "."))
         }
 
         // Pattern: Test run with N tests in N suites passed after X seconds.
