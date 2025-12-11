@@ -50,13 +50,17 @@ The default format outputs structured JSON with build status, summary, and detai
 | `summary.passed_tests` | Count of passed tests (if available) |
 | `summary.build_time` | Build duration in seconds |
 | `summary.coverage_percent` | Line coverage percentage (with `--coverage`) |
+| `summary.slow_tests` | Count of slow tests (with `--slow-threshold`) |
+| `summary.flaky_tests` | Count of flaky tests (auto-detected) |
 
 ### Optional Arrays
 
 - `errors[]` — Always included when errors exist
 - `warnings[]` — Only with `--warnings` flag
 - `linker_errors[]` — Included when linker errors detected
-- `failed_tests[]` — Included when test failures detected
+- `failed_tests[]` — Included when test failures detected (includes `duration` field)
+- `slow_tests[]` — Included when `--slow-threshold` is set; each entry has `test` name and `duration` in seconds
+- `flaky_tests[]` — Automatically included when flaky tests detected
 - `coverage{}` — Only with `--coverage --coverage-details`
 
 ### Linker Errors
@@ -82,6 +86,46 @@ Two types of linker errors are captured:
   "referenced_from": "",
   "message": "",
   "conflicting_files": ["/path/to/ConfigA.o", "/path/to/ConfigB.o"]
+}
+```
+
+### Test Analysis
+
+**Failed Tests with Duration:**
+```json
+{
+  "failed_tests": [
+    {
+      "test": "MyTests.testLogin",
+      "message": "XCTAssertEqual failed",
+      "file": "MyTests.swift",
+      "line": 42,
+      "duration": 1.234
+    }
+  ]
+}
+```
+
+**Slow Tests** (with `--slow-threshold 1.0`):
+```json
+{
+  "summary": {
+    "slow_tests": 2
+  },
+  "slow_tests": [
+    { "test": "testHeavyOperation", "duration": 2.345 },
+    { "test": "testNetworkCall", "duration": 5.678 }
+  ]
+}
+```
+
+**Flaky Tests** (auto-detected):
+```json
+{
+  "summary": {
+    "flaky_tests": 1
+  },
+  "flaky_tests": ["testRaceCondition"]
 }
 ```
 

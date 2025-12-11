@@ -189,4 +189,75 @@ final class GitHubActionsFormatTests: XCTestCase {
         // Summary should show warnings
         XCTAssertTrue(annotations.contains("2 warnings"))
     }
+
+    // MARK: - Slow/Flaky Test Annotations
+
+    /// Verifies that slow tests appear in GitHub Actions summary.
+    func testSlowTestsInSummary() throws {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testFast' passed (0.1 seconds).
+            Test Case 'SampleTests.testSlow' passed (5.0 seconds).
+            Test Case 'SampleTests.testVerySlow' passed (10.0 seconds).
+            """
+        let result = parser.parse(input: input, slowThreshold: 1.0)
+
+        let annotations = result.formatGitHubActions()
+
+        // Summary should include slow tests count
+        XCTAssertTrue(annotations.contains("2 slow tests"))
+        XCTAssertTrue(annotations.contains("::notice ::Build succeeded"))
+    }
+
+    /// Verifies that flaky tests appear in GitHub Actions summary.
+    func testFlakyTestsInSummary() throws {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testFlaky' passed (0.1 seconds).
+            Test Case 'SampleTests.testFlaky' failed (0.2 seconds).
+            """
+        let result = parser.parse(input: input)
+
+        let annotations = result.formatGitHubActions()
+
+        // Summary should include flaky tests count
+        XCTAssertTrue(annotations.contains("1 flaky test"))
+        XCTAssertTrue(annotations.contains("::notice ::Build failed"))
+    }
+
+    /// Verifies that both slow and flaky tests appear in summary.
+    func testSlowAndFlakyTestsInSummary() throws {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testFast' passed (0.1 seconds).
+            Test Case 'SampleTests.testSlow' passed (5.0 seconds).
+            Test Case 'SampleTests.testFlakyAndSlow' passed (3.0 seconds).
+            Test Case 'SampleTests.testFlakyAndSlow' failed (2.5 seconds).
+            """
+        let result = parser.parse(input: input, slowThreshold: 1.0)
+
+        let annotations = result.formatGitHubActions()
+
+        // Summary should include both counts
+        XCTAssertTrue(annotations.contains("2 slow tests"))
+        XCTAssertTrue(annotations.contains("1 flaky test"))
+        XCTAssertTrue(annotations.contains("::notice ::Build failed"))
+    }
+
+    /// Verifies that summary doesn't include slow/flaky when counts are zero.
+    func testNoSlowFlakyInSummaryWhenEmpty() throws {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testA' passed (0.1 seconds).
+            Test Case 'SampleTests.testB' passed (0.2 seconds).
+            """
+        let result = parser.parse(input: input)
+
+        let annotations = result.formatGitHubActions()
+
+        // Summary should NOT include slow/flaky when counts are zero
+        XCTAssertFalse(annotations.contains("slow"))
+        XCTAssertFalse(annotations.contains("flaky"))
+        XCTAssertTrue(annotations.contains("::notice ::Build succeeded"))
+    }
 }

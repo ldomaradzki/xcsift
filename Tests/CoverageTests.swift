@@ -84,8 +84,13 @@ final class CoverageTests: XCTestCase {
     }
 
     func testParseCoverageFromNonExistentPath() {
-        let coverage = CoverageParser.parseCoverageFromPath("/nonexistent/path")
-        _ = coverage
+        // Use mocks to avoid slow DerivedData search
+        let mockFS = MockFileSystem()
+        let mockShell = MockShellRunner()
+        let parser = CoverageParser(fileSystem: mockFS, shellRunner: mockShell)
+
+        let coverage = parser.parseCoverageFromPath("/nonexistent/path")
+        XCTAssertNil(coverage)
     }
 
     func testCoverageJSONEncoding() {
@@ -251,8 +256,13 @@ final class CoverageTests: XCTestCase {
     }
 
     func testParseEmptyPathTriggersAutoDetection() {
-        let coverage = CoverageParser.parseCoverageFromPath("")
-        _ = coverage
+        // Use mocks to avoid slow DerivedData search
+        let mockFS = MockFileSystem()
+        let mockShell = MockShellRunner()
+        let parser = CoverageParser(fileSystem: mockFS, shellRunner: mockShell)
+
+        let coverage = parser.parseCoverageFromPath("")
+        XCTAssertNil(coverage)
     }
 
     func testParseExplicitPathThatExists() throws {
@@ -289,17 +299,20 @@ final class CoverageTests: XCTestCase {
     }
 
     func testParseXCResultPathDirectly() throws {
-        let tempDir = FileManager.default.temporaryDirectory
-        let xcresultPath = tempDir.appendingPathComponent("test.xcresult")
+        // Use mocks to avoid slow xcrun xccov and DerivedData search
+        let mockFS = MockFileSystem()
+        let mockShell = MockShellRunner()
 
-        try FileManager.default.createDirectory(at: xcresultPath, withIntermediateDirectories: true)
+        // Simulate an existing .xcresult path
+        let xcresultPath = "/tmp/test.xcresult"
+        mockFS.existingPaths.insert(xcresultPath)
+        mockFS.directoryFlags.insert(xcresultPath)
 
-        defer {
-            try? FileManager.default.removeItem(at: xcresultPath)
-        }
+        let parser = CoverageParser(fileSystem: mockFS, shellRunner: mockShell)
+        let coverage = parser.parseCoverageFromPath(xcresultPath)
 
-        let coverage = CoverageParser.parseCoverageFromPath(xcresultPath.path)
-        _ = coverage
+        // xcrun xccov returns nil since MockShellRunner returns nil by default
+        XCTAssertNil(coverage)
     }
 
     func testMultipleFilesInCoverageCalculation() throws {

@@ -64,7 +64,7 @@ struct XCSift: ParsableCommand {
         commandName: "xcsift",
         abstract: "A Swift tool to parse and format xcodebuild output for coding agents",
         usage:
-            "xcodebuild [options] 2>&1 | xcsift [--format|-f json|toon|github-actions] [--toon-delimiter comma|tab|pipe] [--warnings|-w] [--Werror|-W] [--quiet|-q] [--coverage|-c] [--version|-v] [--help|-h]",
+            "xcodebuild [options] 2>&1 | xcsift [--format|-f json|toon|github-actions] [--toon-delimiter comma|tab|pipe] [--warnings|-w] [--Werror|-W] [--quiet|-q] [--coverage|-c] [--slow-threshold N] [--version|-v] [--help|-h]",
         discussion: """
             xcsift parses xcodebuild/SPM output and formats it as JSON, TOON, or GitHub Actions.
 
@@ -81,6 +81,10 @@ struct XCSift: ParsableCommand {
               xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift --coverage
               xcsift -c --coverage-path .build/debug/codecov
 
+            Slow/flaky test detection:
+              swift test 2>&1 | xcsift --slow-threshold 1.0
+              xcodebuild test 2>&1 | xcsift --slow-threshold 0.5
+
             TOON format (30-60% fewer tokens for LLMs):
               xcodebuild build 2>&1 | xcsift -f toon
               swift test 2>&1 | xcsift -f toon -w -c
@@ -93,6 +97,7 @@ struct XCSift: ParsableCommand {
               --toon-delimiter [comma|tab|pipe]  # Default: comma
               --toon-key-folding [disabled|safe] # Default: disabled
               --toon-flatten-depth N             # Default: unlimited
+              --slow-threshold N                 # Slow test threshold in seconds
             """,
         helpNames: [.short, .long]
     )
@@ -145,6 +150,12 @@ struct XCSift: ParsableCommand {
     @Option(name: .long, help: "TOON flatten depth limit for key folding. Default: unlimited")
     var toonFlattenDepth: Int?
 
+    @Option(
+        name: .long,
+        help: "Threshold in seconds for slow test detection (e.g., 1.0). Tests exceeding this are marked as slow."
+    )
+    var slowThreshold: Double?
+
     func run() throws {
         if version {
             print(getVersion())
@@ -186,7 +197,8 @@ struct XCSift: ParsableCommand {
             printWarnings: warnings,
             warningsAsErrors: warningsAsErrors,
             coverage: coverageData,
-            printCoverageDetails: coverageDetails
+            printCoverageDetails: coverageDetails,
+            slowThreshold: slowThreshold
         )
         outputResult(result, quiet: quiet)
     }

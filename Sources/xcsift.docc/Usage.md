@@ -64,6 +64,35 @@ xcodebuild build 2>&1 | xcsift --quiet
 swift build 2>&1 | xcsift -q
 ```
 
+## Test Analysis Options
+
+### `--slow-threshold`
+
+Set threshold in seconds for slow test detection. Tests exceeding this duration are flagged.
+
+```bash
+# Flag tests slower than 1 second
+swift test 2>&1 | xcsift --slow-threshold 1.0
+
+# Flag tests slower than 500ms
+xcodebuild test 2>&1 | xcsift --slow-threshold 0.5
+
+# Combine with TOON format
+swift test 2>&1 | xcsift -f toon --slow-threshold 2.0
+```
+
+When enabled, output includes:
+- `summary.slow_tests` — count of slow tests
+- `slow_tests[]` — array of slow test objects with `test` name and `duration` in seconds
+
+### Flaky Test Detection
+
+Flaky tests are automatically detected when a test both passes AND fails in the same run (common in retry scenarios). No flag needed — detection is automatic.
+
+When detected, output includes:
+- `summary.flaky_tests` — count of flaky tests
+- `flaky_tests[]` — array of flaky test names
+
 ## Coverage Options
 
 ### `--coverage`, `-c`
@@ -130,6 +159,12 @@ swift test --enable-code-coverage 2>&1 | xcsift -f toon -c --coverage-details
 
 # All TOON options
 xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-key-folding safe -w -c
+
+# Slow test detection with coverage
+swift test --enable-code-coverage 2>&1 | xcsift --slow-threshold 1.0 --coverage
+
+# Full test analysis
+xcodebuild test 2>&1 | xcsift -f toon --slow-threshold 0.5 -w -c
 ```
 
 ## Exit Codes

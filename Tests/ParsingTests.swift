@@ -505,4 +505,179 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.passedTests, 7)
         XCTAssertEqual(result.summary.buildTime, "0.050")
     }
+
+    // MARK: - Test Duration Parsing
+
+    func testParseDurationFromXCTestPassed() {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testExample' passed (0.123 seconds).
+            Test Case 'SampleTests.testSlowTest' passed (2.567 seconds).
+            """
+
+        let result = parser.parse(input: input, slowThreshold: 1.0)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.passedTests, 2)
+        XCTAssertEqual(result.slowTests.count, 1)
+        XCTAssertTrue(result.slowTests.contains { $0.test == "SampleTests.testSlowTest" })
+        XCTAssertFalse(result.slowTests.contains { $0.test == "SampleTests.testExample" })
+        XCTAssertEqual(result.slowTests[0].duration, 2.567)
+    }
+
+    func testParseDurationFromXCTestFailed() {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testSlowFailing' failed (3.456 seconds).
+            """
+
+        let result = parser.parse(input: input, slowThreshold: 1.0)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.failedTests.count, 1)
+        XCTAssertEqual(result.failedTests[0].duration, 3.456)
+        XCTAssertEqual(result.slowTests.count, 1)
+        XCTAssertTrue(result.slowTests.contains { $0.test == "SampleTests.testSlowFailing" })
+        XCTAssertEqual(result.slowTests[0].duration, 3.456)
+    }
+
+    func testParseDurationFromSwiftTestingPassed() {
+        let parser = OutputParser()
+        let input = """
+            ✓ Test "testQuickOperation" passed after 0.022 seconds.
+            ✓ Test "testSlowNetworkCall" passed after 5.123 seconds.
+            """
+
+        let result = parser.parse(input: input, slowThreshold: 1.0)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.passedTests, 2)
+        XCTAssertEqual(result.slowTests.count, 1)
+        XCTAssertTrue(result.slowTests.contains { $0.test == "testSlowNetworkCall" })
+        XCTAssertEqual(result.slowTests[0].duration, 5.123)
+    }
+
+    func testParseDurationFromSwiftTestingFailed() {
+        let parser = OutputParser()
+        let input = """
+            ✘ Test "testSlowFailure" failed after 2.345 seconds with 1 issue.
+            """
+
+        let result = parser.parse(input: input, slowThreshold: 1.0)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.failedTests.count, 1)
+        XCTAssertEqual(result.failedTests[0].duration, 2.345)
+        XCTAssertEqual(result.slowTests.count, 1)
+    }
+
+    func testSlowThresholdNotSet() {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testSlowTest' passed (10.0 seconds).
+            """
+
+        // No slowThreshold set - should not detect slow tests
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertTrue(result.slowTests.isEmpty)
+        XCTAssertNil(result.summary.slowTests)
+    }
+
+    func testSlowThresholdCustomValue() {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testFast' passed (0.4 seconds).
+            Test Case 'SampleTests.testMedium' passed (0.6 seconds).
+            Test Case 'SampleTests.testSlow' passed (1.2 seconds).
+            """
+
+        let result = parser.parse(input: input, slowThreshold: 0.5)
+
+        XCTAssertEqual(result.slowTests.count, 2)
+        XCTAssertTrue(result.slowTests.contains { $0.test == "SampleTests.testMedium" })
+        XCTAssertTrue(result.slowTests.contains { $0.test == "SampleTests.testSlow" })
+        XCTAssertFalse(result.slowTests.contains { $0.test == "SampleTests.testFast" })
+    }
+
+    // MARK: - Flaky Test Detection
+
+    func testFlakyTestDetection() {
+        let parser = OutputParser()
+        // Simulate a test that both passed and failed in the same run (flaky)
+        let input = """
+            Test Case 'SampleTests.testFlakyTest' passed (0.1 seconds).
+            Test Case 'SampleTests.testFlakyTest' failed (0.2 seconds).
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.flakyTests.count, 1)
+        XCTAssertTrue(result.flakyTests.contains("SampleTests.testFlakyTest"))
+        XCTAssertEqual(result.summary.flakyTests, 1)
+    }
+
+    func testNoFlakyTestsWhenAllPass() {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testA' passed (0.1 seconds).
+            Test Case 'SampleTests.testB' passed (0.2 seconds).
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertTrue(result.flakyTests.isEmpty)
+        XCTAssertNil(result.summary.flakyTests)
+    }
+
+    func testNoFlakyTestsWhenDifferentTestsFail() {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testA' passed (0.1 seconds).
+            Test Case 'SampleTests.testB' failed (0.2 seconds).
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertTrue(result.flakyTests.isEmpty)
+        XCTAssertNil(result.summary.flakyTests)
+    }
+
+    func testDurationInFailedTestStruct() {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testWithDuration' failed (1.234 seconds).
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.failedTests.count, 1)
+        XCTAssertEqual(result.failedTests[0].test, "SampleTests.testWithDuration")
+        XCTAssertEqual(result.failedTests[0].duration, 1.234)
+    }
+
+    func testSlowAndFlakyTestsCombined() {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testFast' passed (0.1 seconds).
+            Test Case 'SampleTests.testSlow' passed (5.0 seconds).
+            Test Case 'SampleTests.testFlakyAndSlow' passed (3.0 seconds).
+            Test Case 'SampleTests.testFlakyAndSlow' failed (2.5 seconds).
+            """
+
+        let result = parser.parse(input: input, slowThreshold: 1.0)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.slowTests.count, 2)
+        XCTAssertTrue(result.slowTests.contains { $0.test == "SampleTests.testSlow" })
+        XCTAssertTrue(result.slowTests.contains { $0.test == "SampleTests.testFlakyAndSlow" })
+        XCTAssertEqual(result.flakyTests.count, 1)
+        XCTAssertTrue(result.flakyTests.contains("SampleTests.testFlakyAndSlow"))
+        XCTAssertEqual(result.summary.slowTests, 2)
+        XCTAssertEqual(result.summary.flakyTests, 1)
+    }
 }

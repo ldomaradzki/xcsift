@@ -22,6 +22,10 @@ class OutputParser {
     private var pendingDuplicateSymbol: String?
     private var pendingConflictingFiles: [String] = []
 
+    // Test duration tracking for slow/flaky detection
+    private var passedTestDurations: [String: Double] = [:]
+    private var failedTestDurations: [String: Double] = [:]
+
     // MARK: - Static Regex Patterns (compiled once)
 
     // Error patterns
@@ -319,7 +323,8 @@ class OutputParser {
         printWarnings: Bool = false,
         warningsAsErrors: Bool = false,
         coverage: CodeCoverage? = nil,
-        printCoverageDetails: Bool = false
+        printCoverageDetails: Bool = false,
+        slowThreshold: Double? = nil
     ) -> BuildResult {
         resetState()
         let lines = input.split(separator: "\n", omittingEmptySubsequences: false)
@@ -367,6 +372,15 @@ class OutputParser {
             return nil
         }()
 
+        // Detect slow tests (if threshold is set)
+        let slowTests: [SlowTest] = {
+            guard let threshold = slowThreshold else { return [] }
+            return detectSlowTests(threshold: threshold)
+        }()
+
+        // Detect flaky tests (tests that both passed and failed in the same run)
+        let flakyTests = detectFlakyTests()
+
         let summary = BuildSummary(
             errors: finalErrors.count,
             warnings: finalWarnings.count,
@@ -374,7 +388,9 @@ class OutputParser {
             linkerErrors: linkerErrors.count,
             passedTests: computedPassedTests,
             buildTime: buildTime,
-            coveragePercent: coverage?.lineCoverage
+            coveragePercent: coverage?.lineCoverage,
+            slowTests: slowTests.isEmpty ? nil : slowTests.count,
+            flakyTests: flakyTests.isEmpty ? nil : flakyTests.count
         )
 
         return BuildResult(
@@ -385,9 +401,40 @@ class OutputParser {
             failedTests: failedTests,
             linkerErrors: linkerErrors,
             coverage: coverage,
+            slowTests: slowTests,
+            flakyTests: flakyTests,
             printWarnings: printWarnings,
             printCoverageDetails: printCoverageDetails
         )
+    }
+
+    // MARK: - Slow/Flaky Test Detection
+
+    /// Detects tests that exceeded the slow threshold
+    private func detectSlowTests(threshold: Double) -> [SlowTest] {
+        var slow: [SlowTest] = []
+        var seenNames: Set<String> = []
+
+        for (name, duration) in passedTestDurations where duration > threshold {
+            slow.append(SlowTest(test: name, duration: duration))
+            seenNames.insert(name)
+        }
+
+        for (name, duration) in failedTestDurations where duration > threshold {
+            if !seenNames.contains(name) {
+                slow.append(SlowTest(test: name, duration: duration))
+            }
+        }
+
+        // Sort by duration descending (slowest first)
+        return slow.sorted { $0.duration > $1.duration }
+    }
+
+    /// Detects flaky tests - tests that both passed and failed in the same run
+    private func detectFlakyTests() -> [String] {
+        let passedNames = Set(passedTestDurations.keys)
+        let failedNames = Set(failedTests.map { normalizeTestName($0.test) })
+        return Array(passedNames.intersection(failedNames)).sorted()
     }
 
     func extractTestedTarget(from input: String) -> String? {
@@ -427,6 +474,8 @@ class OutputParser {
         pendingDuplicateSymbol = nil
         pendingConflictingFiles = []
         parallelTestsTotalCount = nil
+        passedTestDurations = [:]
+        failedTestDurations = [:]
     }
 
     private func parseLine(_ line: String) {
@@ -469,12 +518,26 @@ class OutputParser {
                 failedTests.append(failedTest)
                 seenTestNames.insert(normalizedTestName)
             } else {
-                // If we've seen this test before, check if the new one has more info (file/line)
+                // If we've seen this test before, check if the new one has more info (file/line or duration)
                 if let index = failedTests.firstIndex(where: { normalizeTestName($0.test) == normalizedTestName }) {
                     let existing = failedTests[index]
-                    // Update if new test has file info and existing doesn't
-                    if failedTest.file != nil && existing.file == nil {
-                        failedTests[index] = failedTest
+
+                    // Merge: prefer new file/line if available, otherwise keep existing
+                    let mergedFile = failedTest.file ?? existing.file
+                    let mergedLine = failedTest.line ?? existing.line
+                    let mergedMessage = failedTest.file != nil ? failedTest.message : existing.message
+                    let mergedDuration = failedTest.duration ?? existing.duration
+
+                    // Update if we have new info
+                    if mergedFile != existing.file || mergedLine != existing.line || mergedDuration != existing.duration
+                    {
+                        failedTests[index] = FailedTest(
+                            test: existing.test,
+                            message: mergedMessage,
+                            file: mergedFile,
+                            line: mergedLine,
+                            duration: mergedDuration
+                        )
                     }
                 }
             }
@@ -672,12 +735,17 @@ class OutputParser {
         return false
     }
 
-    private func recordPassedTest(named testName: String) {
+    private func recordPassedTest(named testName: String, duration: Double? = nil) {
         let normalizedTestName = normalizeTestName(testName)
         guard seenPassedTestNames.insert(normalizedTestName).inserted else {
             return
         }
         passedTestsCount += 1
+
+        // Track duration for slow test detection
+        if let dur = duration {
+            passedTestDurations[normalizedTestName] = dur
+        }
     }
 
     private func parseError(_ line: String) -> BuildError? {
@@ -787,19 +855,39 @@ class OutputParser {
     }
 
     private func parsePassedTest(_ line: String) -> Bool {
-        // Pattern: Test Case 'TestName' passed (time)
+        // Pattern: Test Case 'TestName' passed (0.123 seconds).
         if line.hasPrefix("Test Case '"), let endQuote = line.range(of: "' passed (") {
             let startIndex = line.index(line.startIndex, offsetBy: 11)  // "Test Case '".count
             let testName = String(line[startIndex ..< endQuote.lowerBound])
-            recordPassedTest(named: testName)
+
+            // Extract duration from "(X.XXX seconds)"
+            var duration: Double? = nil
+            let afterPassed = line[endQuote.upperBound...]
+            if let parenEnd = afterPassed.range(of: " seconds") {
+                let durationStr = String(afterPassed[..<parenEnd.lowerBound])
+                duration = Double(durationStr)
+            }
+
+            recordPassedTest(named: testName, duration: duration)
             return true
         }
 
-        // Pattern: ✓ Test "name" passed
+        // Pattern: ✓ Test "name" passed after 0.123 seconds.
         if line.hasPrefix("✓ Test \""), let endQuote = line.range(of: "\" passed") {
             let startIndex = line.index(line.startIndex, offsetBy: 8)  // "✓ Test \"".count
             let testName = String(line[startIndex ..< endQuote.lowerBound])
-            recordPassedTest(named: testName)
+
+            // Extract duration from "passed after X.XXX seconds"
+            var duration: Double? = nil
+            if let afterRange = line.range(of: " after ", range: endQuote.upperBound ..< line.endIndex) {
+                let afterStr = line[afterRange.upperBound...]
+                if let secondsRange = afterStr.range(of: " seconds") {
+                    let durationStr = String(afterStr[..<secondsRange.lowerBound])
+                    duration = Double(durationStr)
+                }
+            }
+
+            recordPassedTest(named: testName, duration: duration)
             return true
         }
 
@@ -847,18 +935,27 @@ class OutputParser {
             )
         }
 
-        // Pattern: Test Case 'TestName' failed (time)
+        // Pattern: Test Case 'TestName' failed (0.123 seconds).
         if line.hasPrefix("Test Case '"), let endQuote = line.range(of: "' failed (") {
             let startIndex = line.index(line.startIndex, offsetBy: 11)
             let test = String(line[startIndex ..< endQuote.lowerBound])
-            // Extract time from parentheses
-            if let parenStart = line.range(of: "(", range: endQuote.upperBound ..< line.endIndex),
-                let parenEnd = line.range(of: ")", range: parenStart.upperBound ..< line.endIndex)
-            {
-                let message = String(line[parenStart.upperBound ..< parenEnd.lowerBound])
-                return FailedTest(test: test, message: message, file: nil, line: nil)
+
+            // Extract duration from "(X.XXX seconds)"
+            var duration: Double? = nil
+            let afterFailed = line[endQuote.upperBound...]
+            if let secondsRange = afterFailed.range(of: " seconds") {
+                let durationStr = String(afterFailed[..<secondsRange.lowerBound])
+                duration = Double(durationStr)
             }
-            return FailedTest(test: test, message: "failed", file: nil, line: nil)
+
+            // Track duration for slow test detection
+            let normalizedTest = normalizeTestName(test)
+            if let dur = duration {
+                failedTestDurations[normalizedTest] = dur
+            }
+
+            let message = duration.map { String(format: "%.3f seconds", $0) } ?? "failed"
+            return FailedTest(test: test, message: message, file: nil, line: nil, duration: duration)
         }
 
         // Pattern: ✘ Test "name" recorded an issue at file:line:column: message
@@ -876,11 +973,26 @@ class OutputParser {
             }
         }
 
-        // Pattern: ✘ Test "name" failed after time with N issues.
+        // Pattern: ✘ Test "name" failed after 0.123 seconds with N issues.
         if line.hasPrefix("✘ Test \""), let failedAfter = line.range(of: "\" failed after ") {
             let startIndex = line.index(line.startIndex, offsetBy: 8)
             let test = String(line[startIndex ..< failedAfter.lowerBound])
-            return FailedTest(test: test, message: "Test failed", file: nil, line: nil)
+
+            // Extract duration from "failed after X.XXX seconds"
+            var duration: Double? = nil
+            let afterStr = line[failedAfter.upperBound...]
+            if let secondsRange = afterStr.range(of: " seconds") {
+                let durationStr = String(afterStr[..<secondsRange.lowerBound])
+                duration = Double(durationStr)
+            }
+
+            // Track duration for slow test detection
+            let normalizedTest = normalizeTestName(test)
+            if let dur = duration {
+                failedTestDurations[normalizedTest] = dur
+            }
+
+            return FailedTest(test: test, message: "Test failed", file: nil, line: nil, duration: duration)
         }
 
         // Pattern: ❌ testname (message)
