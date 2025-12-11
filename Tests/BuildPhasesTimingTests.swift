@@ -553,4 +553,172 @@ final class BuildInfoTests: XCTestCase {
         XCTAssertTrue(toonString.contains("CompileSwiftSources"))
         XCTAssertTrue(toonString.contains("Link"))
     }
+
+    // MARK: - Dependency Graph Parsing Tests
+
+    func testParseDependencyGraphSingleTarget() {
+        let parser = OutputParser()
+        let input = """
+            note: Target dependency graph (1 targets)
+                Target 'MyApp' in project 'MyProject'
+                    ➜ Explicit dependency on target 'MyFramework' in project 'MyProject'
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertEqual(result.buildInfo?.targets[0].name, "MyApp")
+        XCTAssertEqual(result.buildInfo?.targets[0].dependsOn, ["MyFramework"])
+    }
+
+    func testParseDependencyGraphNoDependencies() {
+        let parser = OutputParser()
+        let input = """
+            note: Target dependency graph (1 targets)
+                Target 'MyLibrary' in project 'MyProject' (no dependencies)
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertEqual(result.buildInfo?.targets[0].name, "MyLibrary")
+        XCTAssertEqual(result.buildInfo?.targets[0].dependsOn, [])
+    }
+
+    func testParseDependencyGraphMultipleDependencies() {
+        let parser = OutputParser()
+        let input = """
+            note: Target dependency graph (3 targets)
+                Target 'MyApp' in project 'MyProject'
+                    ➜ Explicit dependency on target 'MyFramework' in project 'MyProject'
+                    ➜ Explicit dependency on target 'MyCore' in project 'MyProject'
+                Target 'MyFramework' in project 'MyProject'
+                    ➜ Explicit dependency on target 'MyCore' in project 'MyProject'
+                Target 'MyCore' in project 'MyProject' (no dependencies)
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 3)
+
+        let myApp = result.buildInfo?.targets.first { $0.name == "MyApp" }
+        XCTAssertNotNil(myApp)
+        XCTAssertEqual(myApp?.dependsOn, ["MyFramework", "MyCore"])
+
+        let myFramework = result.buildInfo?.targets.first { $0.name == "MyFramework" }
+        XCTAssertNotNil(myFramework)
+        XCTAssertEqual(myFramework?.dependsOn, ["MyCore"])
+
+        let myCore = result.buildInfo?.targets.first { $0.name == "MyCore" }
+        XCTAssertNotNil(myCore)
+        XCTAssertEqual(myCore?.dependsOn, [])
+    }
+
+    func testDependencyGraphPreservesTargetOrder() {
+        let parser = OutputParser()
+        let input = """
+            note: Target dependency graph (3 targets)
+                Target 'App' in project 'MyProject'
+                    ➜ Explicit dependency on target 'Framework' in project 'MyProject'
+                Target 'Framework' in project 'MyProject'
+                    ➜ Explicit dependency on target 'Core' in project 'MyProject'
+                Target 'Core' in project 'MyProject' (no dependencies)
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 3)
+        // Order should be preserved from dependency graph
+        XCTAssertEqual(result.buildInfo?.targets[0].name, "App")
+        XCTAssertEqual(result.buildInfo?.targets[1].name, "Framework")
+        XCTAssertEqual(result.buildInfo?.targets[2].name, "Core")
+    }
+
+    func testDependencyGraphDoesNotDuplicateTargets() {
+        let parser = OutputParser()
+        // xcodebuild outputs same target multiple times for different platforms
+        let input = """
+            note: Target dependency graph (2 targets)
+                Target 'MyLib' in project 'MyProject' (no dependencies)
+                Target 'MyLib' in project 'MyProject' (no dependencies)
+                Target 'MyLib' in project 'MyProject' (no dependencies)
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 1)
+        XCTAssertEqual(result.buildInfo?.targets[0].name, "MyLib")
+    }
+
+    func testDependencyGraphCombinedWithPhases() {
+        let parser = OutputParser()
+        let input = """
+            note: Target dependency graph (2 targets)
+                Target 'MyApp' in project 'MyProject'
+                    ➜ Explicit dependency on target 'MyLib' in project 'MyProject'
+                Target 'MyLib' in project 'MyProject' (no dependencies)
+            CompileSwiftSources normal arm64 (in target 'MyLib' from project 'MyProject')
+            Ld /path/to/MyLib.framework normal (in target 'MyLib' from project 'MyProject')
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyProject')
+            Ld /path/to/MyApp.app normal (in target 'MyApp' from project 'MyProject')
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        XCTAssertNotNil(result.buildInfo)
+        XCTAssertEqual(result.buildInfo?.targets.count, 2)
+
+        let myApp = result.buildInfo?.targets.first { $0.name == "MyApp" }
+        XCTAssertNotNil(myApp)
+        XCTAssertEqual(myApp?.dependsOn, ["MyLib"])
+        XCTAssertTrue(myApp?.phases.contains("CompileSwiftSources") ?? false)
+        XCTAssertTrue(myApp?.phases.contains("Link") ?? false)
+
+        let myLib = result.buildInfo?.targets.first { $0.name == "MyLib" }
+        XCTAssertNotNil(myLib)
+        XCTAssertEqual(myLib?.dependsOn, [])
+        XCTAssertTrue(myLib?.phases.contains("CompileSwiftSources") ?? false)
+        XCTAssertTrue(myLib?.phases.contains("Link") ?? false)
+    }
+
+    func testDependsOnNotEncodedWhenEmpty() {
+        let parser = OutputParser()
+        let input = """
+            CompileSwiftSources normal arm64 (in target 'MyApp' from project 'MyProject')
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let jsonData = try! encoder.encode(result)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+
+        // depends_on should NOT be present when empty
+        XCTAssertFalse(jsonString.contains("depends_on"))
+    }
+
+    func testDependsOnEncodedWhenNotEmpty() {
+        let parser = OutputParser()
+        let input = """
+            note: Target dependency graph (1 targets)
+                Target 'MyApp' in project 'MyProject'
+                    ➜ Explicit dependency on target 'MyFramework' in project 'MyProject'
+            """
+
+        let result = parser.parse(input: input, printBuildInfo: true)
+
+        let encoder = JSONEncoder()
+        let jsonData = try! encoder.encode(result)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+
+        // depends_on should be present
+        XCTAssertTrue(jsonString.contains("depends_on"))
+        XCTAssertTrue(jsonString.contains("MyFramework"))
+    }
 }

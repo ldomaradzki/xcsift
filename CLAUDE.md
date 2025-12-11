@@ -200,15 +200,19 @@ The codebase follows a modular architecture:
 - **Test Failure Detection**: XCUnit assertion failures and general test failures
 - **Build Time Extraction**: Captures build duration from output
 - **File/Line Mapping**: Extracts precise source locations for navigation
-- **Build Info**: Unified per-target phases and timing
+- **Build Info**: Unified per-target phases, timing, and dependencies
   - Enabled with `--build-info` flag
   - Groups phases by target with per-target duration
+  - Parses target dependency graph from xcodebuild output
   - Supports xcodebuild phase detection from "(in target 'X' from project 'Y')" patterns
   - Supports SPM phase detection from "[N/M] Compiling/Linking TARGET" patterns
   - Parses "Build target X (Ys)" and "** BUILD SUCCEEDED ** [Xs]" patterns
   - Total build time always in `summary.build_time` (not duplicated in build_info)
   - xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
   - SPM phases: `Compiling`, `Linking`
+  - **Dependency Graph**: Extracts target dependencies from xcodebuild "Target dependency graph" output
+    - Parses "Target 'X' in project 'Y'" and "➜ Explicit dependency on target 'Z'" patterns
+    - Outputs `depends_on` array for each target (omitted when empty)
 - **Code Coverage with Auto-Conversion**: Automatically converts coverage files to JSON when `--coverage` flag is used
   - **Auto-detection**: Searches multiple default paths for both SPM and xcodebuild formats
   - **Target filtering**: Automatically extracts tested target name from xcodebuild output and filters coverage to that target only
@@ -293,7 +297,7 @@ Test cases cover:
     - Key folding with build results
     - Key folding combined with flatten depth
     - Combined TOON configuration
-- **Build phases and timing** (29 tests):
+- **Build phases, timing, and dependencies** (38 tests):
   - CompileSwiftSources phase parsing
   - SwiftDriver Compilation phase parsing
   - CompileC (Clang) phase parsing
@@ -313,6 +317,11 @@ Test cases cover:
   - SPM plugin compilation skipped
   - Target order preservation
   - TOON encoding with build_info
+  - Dependency graph parsing (single target, multiple dependencies, no dependencies)
+  - Dependency graph order preservation
+  - Dependency graph deduplication
+  - Dependencies combined with phases
+  - depends_on field encoding (omitted when empty)
 
 Run individual tests:
 ```bash
@@ -383,7 +392,7 @@ The tool outputs structured data optimized for coding agents in two formats:
     - Supports both SPM (`swift test --enable-code-coverage`) and xcodebuild (`-enableCodeCoverage YES`) formats
     - Automatically detects format and parses accordingly
     - Warns to stderr if target was detected but no matching coverage data found
-  - **Build info** (with `--build-info` flag): Includes per-target phases and timing
+  - **Build info** (with `--build-info` flag): Includes per-target phases, timing, and dependencies
     ```json
     {
       "build_info": {
@@ -396,17 +405,19 @@ The tool outputs structured data optimized for coding agents in two formats:
           {
             "name": "MyApp",
             "duration": "23.1s",
-            "phases": ["CompileSwiftSources", "Link", "CopySwiftLibs"]
+            "phases": ["CompileSwiftSources", "Link", "CopySwiftLibs"],
+            "depends_on": ["MyFramework"]
           }
         ]
       }
     }
     ```
     - Groups phases by target with per-target timing
+    - Parses target dependencies from xcodebuild "Target dependency graph" output
     - Total build time is in `summary.build_time` (not duplicated in build_info)
     - xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
     - SPM phases: `Compiling`, `Linking`
-    - Empty fields are omitted (targets without phases won't have `phases` field)
+    - Empty fields are omitted (targets without phases won't have `phases` field, targets without dependencies won't have `depends_on` field)
 
 ### TOON Format (with `--format toon` / `-f toon` flag)
 

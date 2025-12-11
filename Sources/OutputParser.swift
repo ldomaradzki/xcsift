@@ -32,6 +32,10 @@ class OutputParser {
     private var targetOrder: [String] = []  // Tracks order of target appearance
     private var shouldParseBuildInfo: Bool = false  // Performance: skip phase parsing when not needed
 
+    // Dependency graph tracking
+    private var targetDependencies: [String: [String]] = [:]  // target -> [dependencies]
+    private var currentDependencyTarget: String?  // For multi-line dependency parsing
+
     // MARK: - Static Regex Patterns (compiled once)
 
     // Error patterns
@@ -401,16 +405,17 @@ class OutputParser {
             flakyTests: flakyTests.isEmpty ? nil : flakyTests.count
         )
 
-        // Build info - phases and timing per target (total time is in summary.build_time)
+        // Build info - phases, timing, and dependencies per target (total time is in summary.build_time)
         let buildInfo: BuildInfo? =
             printBuildInfo
             ? {
-                // Build targets list with phases and durations, preserving order of appearance
+                // Build targets list with phases, durations, and dependencies, preserving order of appearance
                 let targets = targetOrder.map { targetName in
                     TargetBuildInfo(
                         name: targetName,
                         duration: targetDurations[targetName],
-                        phases: targetPhases[targetName] ?? []
+                        phases: targetPhases[targetName] ?? [],
+                        dependsOn: targetDependencies[targetName] ?? []
                     )
                 }
                 return BuildInfo(targets: targets)
@@ -520,6 +525,11 @@ class OutputParser {
 
         // Check for build phases only if build info is requested (performance optimization)
         if shouldParseBuildInfo {
+            // Check for dependency graph (xcodebuild outputs this early in build)
+            if parseDependencyGraph(line) {
+                return
+            }
+
             // Check for xcodebuild phases (these have different keywords from errors/warnings)
             if let (phaseName, targetName) = parseBuildPhase(line) {
                 addPhaseToTarget(phaseName, target: targetName)
@@ -1195,7 +1205,10 @@ class OutputParser {
     private func addPhaseToTarget(_ phase: String, target: String) {
         if targetPhases[target] == nil {
             targetPhases[target] = []
-            targetOrder.append(target)
+            // Only add to order if not already present (may have been added by dependency parsing)
+            if !targetOrder.contains(target) {
+                targetOrder.append(target)
+            }
         }
         if !targetPhases[target]!.contains(phase) {
             targetPhases[target]!.append(phase)
@@ -1282,6 +1295,59 @@ class OutputParser {
         }
 
         return nil
+    }
+
+    // MARK: - Dependency Graph Parsing
+
+    /// Parses dependency graph lines from xcodebuild output
+    /// Format:
+    ///     Target 'SimpleMeditation' in project 'SimpleMeditation'
+    ///         ➜ Explicit dependency on target 'PostHog' in project 'PostHog'
+    ///     Target 'phlibwebp' in project 'PostHog' (no dependencies)
+    private func parseDependencyGraph(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+        // Pattern: "Target 'TargetName' in project 'ProjectName'"
+        if trimmed.hasPrefix("Target '") && trimmed.contains("' in project '") {
+            // Extract target name
+            let afterTarget = trimmed.dropFirst("Target '".count)
+            if let endQuote = afterTarget.range(of: "'") {
+                let targetName = String(afterTarget[..<endQuote.lowerBound])
+                currentDependencyTarget = targetName
+
+                // Track target order (only add if not already present)
+                if !targetOrder.contains(targetName) {
+                    targetOrder.append(targetName)
+                }
+
+                // Check for "(no dependencies)" suffix
+                if trimmed.hasSuffix("(no dependencies)") {
+                    targetDependencies[targetName] = []
+                }
+                return true
+            }
+        }
+
+        // Pattern: "➜ Explicit dependency on target 'DependencyName' in project 'ProjectName'"
+        if trimmed.contains("dependency on target '"), let currentTarget = currentDependencyTarget {
+            if let startQuote = trimmed.range(of: "dependency on target '") {
+                let afterStartQuote = trimmed[startQuote.upperBound...]
+                if let endQuote = afterStartQuote.range(of: "'") {
+                    let dependencyName = String(afterStartQuote[..<endQuote.lowerBound])
+
+                    // Add dependency to current target
+                    if targetDependencies[currentTarget] == nil {
+                        targetDependencies[currentTarget] = []
+                    }
+                    if !targetDependencies[currentTarget]!.contains(dependencyName) {
+                        targetDependencies[currentTarget]!.append(dependencyName)
+                    }
+                    return true
+                }
+            }
+        }
+
+        return false
     }
 
     // MARK: - Target Timing Parsing

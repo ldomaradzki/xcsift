@@ -456,11 +456,18 @@ struct TargetBuildInfo: Codable {
     let name: String
     let duration: String?
     let phases: [String]
+    let dependsOn: [String]
 
-    init(name: String, duration: String? = nil, phases: [String] = []) {
+    enum CodingKeys: String, CodingKey {
+        case name, duration, phases
+        case dependsOn = "depends_on"
+    }
+
+    init(name: String, duration: String? = nil, phases: [String] = [], dependsOn: [String] = []) {
         self.name = name
         self.duration = duration
         self.phases = phases
+        self.dependsOn = dependsOn
     }
 
     func encode(to encoder: Encoder) throws {
@@ -471,6 +478,9 @@ struct TargetBuildInfo: Codable {
         }
         if !phases.isEmpty {
             try container.encode(phases, forKey: .phases)
+        }
+        if !dependsOn.isEmpty {
+            try container.encode(dependsOn, forKey: .dependsOn)
         }
     }
 }
