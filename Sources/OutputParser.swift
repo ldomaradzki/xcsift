@@ -426,7 +426,8 @@ class OutputParser {
             }
         }
 
-        return slow.sorted { $0.test < $1.test }
+        // Sort by duration descending (slowest first)
+        return slow.sorted { $0.duration > $1.duration }
     }
 
     /// Detects flaky tests - tests that both passed and failed in the same run
@@ -525,8 +526,7 @@ class OutputParser {
                     let mergedFile = failedTest.file ?? existing.file
                     let mergedLine = failedTest.line ?? existing.line
                     let mergedMessage = failedTest.file != nil ? failedTest.message : existing.message
-                    let mergedDuration =
-                        failedTest.duration ?? existing.duration ?? failedTestDurations[normalizedTestName]
+                    let mergedDuration = failedTest.duration ?? existing.duration
 
                     // Update if we have new info
                     if mergedFile != existing.file || mergedLine != existing.line || mergedDuration != existing.duration

@@ -348,6 +348,101 @@ final class TOONFormatTests: XCTestCase {
         XCTAssertTrue(toonString!.contains("|"), "Should use pipe delimiter")
     }
 
+    // MARK: - Slow/Flaky Tests TOON Encoding
+
+    func testTOONEncoderWithSlowTests() throws {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testFast' passed (0.1 seconds).
+            Test Case 'SampleTests.testSlow' passed (5.0 seconds).
+            Test Case 'SampleTests.testVerySlow' passed (10.0 seconds).
+            """
+        let result = parser.parse(input: input, slowThreshold: 1.0)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("status: success"))
+        XCTAssertTrue(toonString!.contains("slow_tests: 2"))
+        XCTAssertTrue(toonString!.contains("slow_tests[2]{test,duration}"))
+        // Verify slowest first (sorted by duration descending)
+        XCTAssertTrue(toonString!.contains("testVerySlow"))
+        XCTAssertTrue(toonString!.contains("testSlow"))
+    }
+
+    func testTOONEncoderWithFlakyTests() throws {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testFlaky' passed (0.1 seconds).
+            Test Case 'SampleTests.testFlaky' failed (0.2 seconds).
+            Test Case 'SampleTests.testStable' passed (0.3 seconds).
+            """
+        let result = parser.parse(input: input)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("status: failed"))
+        XCTAssertTrue(toonString!.contains("flaky_tests: 1"))
+        XCTAssertTrue(toonString!.contains("flaky_tests[1]:"))
+        XCTAssertTrue(toonString!.contains("SampleTests.testFlaky"))
+    }
+
+    func testTOONEncoderWithSlowAndFlakyTests() throws {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testFast' passed (0.1 seconds).
+            Test Case 'SampleTests.testSlow' passed (5.0 seconds).
+            Test Case 'SampleTests.testFlakyAndSlow' passed (3.0 seconds).
+            Test Case 'SampleTests.testFlakyAndSlow' failed (2.5 seconds).
+            """
+        let result = parser.parse(input: input, slowThreshold: 1.0)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("status: failed"))
+        XCTAssertTrue(toonString!.contains("slow_tests: 2"))
+        XCTAssertTrue(toonString!.contains("flaky_tests: 1"))
+        XCTAssertTrue(toonString!.contains("slow_tests[2]{test,duration}"))
+        XCTAssertTrue(toonString!.contains("flaky_tests[1]:"))
+        // Verify both slow tests are present
+        XCTAssertTrue(toonString!.contains("testSlow"))
+        XCTAssertTrue(toonString!.contains("testFlakyAndSlow"))
+    }
+
+    func testTOONEncoderNoSlowTestsWhenThresholdNotSet() throws {
+        let parser = OutputParser()
+        let input = """
+            Test Case 'SampleTests.testSlow' passed (10.0 seconds).
+            """
+        // No slowThreshold set
+        let result = parser.parse(input: input)
+
+        let encoder = TOONEncoder()
+        encoder.indent = 2
+        encoder.delimiter = .comma
+        let toonData = try encoder.encode(result)
+        let toonString = String(data: toonData, encoding: .utf8)
+
+        XCTAssertNotNil(toonString)
+        XCTAssertTrue(toonString!.contains("status: success"))
+        // slow_tests should not appear in output when empty
+        XCTAssertFalse(toonString!.contains("slow_tests"))
+    }
+
     // MARK: - Benchmark Tests
 
     func testBenchmarkSmallOutput() throws {

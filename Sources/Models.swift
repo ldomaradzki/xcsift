@@ -216,6 +216,14 @@ struct BuildResult: Codable {
             parts.append(String(format: "%.1f%% coverage", coveragePercent))
         }
 
+        if let slowTests = summary.slowTests, slowTests > 0 {
+            parts.append("\(slowTests) slow test\(slowTests == 1 ? "" : "s")")
+        }
+
+        if let flakyTests = summary.flakyTests, flakyTests > 0 {
+            parts.append("\(flakyTests) flaky test\(flakyTests == 1 ? "" : "s")")
+        }
+
         return parts.joined(separator: ", ")
     }
 }
