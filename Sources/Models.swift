@@ -439,15 +439,31 @@ struct SlowTest: Codable {
 
 struct BuildInfo: Codable {
     let targets: [TargetBuildInfo]
+    let slowestTargets: [String]
 
-    init(targets: [TargetBuildInfo] = []) {
+    enum CodingKeys: String, CodingKey {
+        case targets
+        case slowestTargets = "slowest_targets"
+    }
+
+    init(targets: [TargetBuildInfo] = [], slowestTargets: [String] = []) {
         self.targets = targets
+        self.slowestTargets = slowestTargets
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        targets = try container.decodeIfPresent([TargetBuildInfo].self, forKey: .targets) ?? []
+        slowestTargets = try container.decodeIfPresent([String].self, forKey: .slowestTargets) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         if !targets.isEmpty {
             try container.encode(targets, forKey: .targets)
+        }
+        if !slowestTargets.isEmpty {
+            try container.encode(slowestTargets, forKey: .slowestTargets)
         }
     }
 }
@@ -468,6 +484,14 @@ struct TargetBuildInfo: Codable {
         self.duration = duration
         self.phases = phases
         self.dependsOn = dependsOn
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+        duration = try container.decodeIfPresent(String.self, forKey: .duration)
+        phases = try container.decodeIfPresent([String].self, forKey: .phases) ?? []
+        dependsOn = try container.decodeIfPresent([String].self, forKey: .dependsOn) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
