@@ -547,7 +547,7 @@ class OutputParser {
             // Check for target timing
             if let (targetName, duration) = parseTargetTiming(line) {
                 // Track order if this is the first time we see this target
-                if targetPhases[targetName] == nil && !targetOrder.contains(targetName) {
+                if !targetOrder.contains(targetName) {
                     targetOrder.append(targetName)
                 }
                 targetDurations[targetName] = duration

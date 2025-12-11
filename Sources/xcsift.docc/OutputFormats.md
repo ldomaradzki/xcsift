@@ -213,7 +213,7 @@ status: success
 summary:
   errors: 0
   warnings: 0
-  build_time: "15.3"
+  build_time: "15.3s"
 build_info:
   targets[2]{name,duration,phases,depends_on}:
     "MyFramework","12.4s",["CompileSwiftSources","Link"],[]
