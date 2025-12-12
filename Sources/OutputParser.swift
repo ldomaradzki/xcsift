@@ -521,6 +521,7 @@ class OutputParser {
         failedTests = []
         linkerErrors = []
         executables = []
+        seenExecutablePaths = []
         buildTime = nil
         seenTestNames = []
         executedTestsCount = nil
