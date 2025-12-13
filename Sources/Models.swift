@@ -11,12 +11,14 @@ struct BuildResult: Codable {
     let slowTests: [SlowTest]
     let flakyTests: [String]
     let buildInfo: BuildInfo?
+    let executables: [Executable]
     let printWarnings: Bool
     let printCoverageDetails: Bool
     let printBuildInfo: Bool
+    let printExecutables: Bool
 
     enum CodingKeys: String, CodingKey {
-        case status, summary, errors, warnings, coverage
+        case status, summary, errors, warnings, coverage, executables
         case failedTests = "failed_tests"
         case linkerErrors = "linker_errors"
         case slowTests = "slow_tests"
@@ -35,9 +37,11 @@ struct BuildResult: Codable {
         slowTests: [SlowTest] = [],
         flakyTests: [String] = [],
         buildInfo: BuildInfo? = nil,
+        executables: [Executable] = [],
         printWarnings: Bool,
         printCoverageDetails: Bool = false,
-        printBuildInfo: Bool = false
+        printBuildInfo: Bool = false,
+        printExecutables: Bool = false
     ) {
         self.status = status
         self.summary = summary
@@ -49,9 +53,11 @@ struct BuildResult: Codable {
         self.slowTests = slowTests
         self.flakyTests = flakyTests
         self.buildInfo = buildInfo
+        self.executables = executables
         self.printWarnings = printWarnings
         self.printCoverageDetails = printCoverageDetails
         self.printBuildInfo = printBuildInfo
+        self.printExecutables = printExecutables
     }
 
     init(from decoder: Decoder) throws {
@@ -66,9 +72,11 @@ struct BuildResult: Codable {
         slowTests = try container.decodeIfPresent([SlowTest].self, forKey: .slowTests) ?? []
         flakyTests = try container.decodeIfPresent([String].self, forKey: .flakyTests) ?? []
         buildInfo = try container.decodeIfPresent(BuildInfo.self, forKey: .buildInfo)
+        executables = try container.decodeIfPresent([Executable].self, forKey: .executables) ?? []
         printWarnings = false
         printCoverageDetails = false
         printBuildInfo = false
+        printExecutables = false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -109,6 +117,10 @@ struct BuildResult: Codable {
         // Only output build_info section when printBuildInfo flag is set and there are targets
         if printBuildInfo, let buildInfo = buildInfo, !buildInfo.targets.isEmpty {
             try container.encode(buildInfo, forKey: .buildInfo)
+        }
+
+        if printExecutables && !executables.isEmpty {
+            try container.encode(executables, forKey: .executables)
         }
     }
 
@@ -252,6 +264,7 @@ struct BuildSummary: Codable {
     let coveragePercent: Double?
     let slowTests: Int?
     let flakyTests: Int?
+    let executables: Int?
 
     enum CodingKeys: String, CodingKey {
         case errors
@@ -263,6 +276,7 @@ struct BuildSummary: Codable {
         case coveragePercent = "coverage_percent"
         case slowTests = "slow_tests"
         case flakyTests = "flaky_tests"
+        case executables
     }
 
     init(
@@ -274,7 +288,8 @@ struct BuildSummary: Codable {
         buildTime: String?,
         coveragePercent: Double?,
         slowTests: Int? = nil,
-        flakyTests: Int? = nil
+        flakyTests: Int? = nil,
+        executables: Int? = nil
     ) {
         self.errors = errors
         self.warnings = warnings
@@ -285,6 +300,7 @@ struct BuildSummary: Codable {
         self.coveragePercent = coveragePercent
         self.slowTests = slowTests
         self.flakyTests = flakyTests
+        self.executables = executables
     }
 
     func encode(to encoder: Encoder) throws {
@@ -309,6 +325,9 @@ struct BuildSummary: Codable {
         }
         if let flakyTests = flakyTests, flakyTests > 0 {
             try container.encode(flakyTests, forKey: .flakyTests)
+        }
+        if let executables = executables {
+            try container.encode(executables, forKey: .executables)
         }
     }
 }
@@ -507,4 +526,10 @@ struct TargetBuildInfo: Codable {
             try container.encode(dependsOn, forKey: .dependsOn)
         }
     }
+}
+
+struct Executable: Codable {
+    let path: String
+    let name: String
+    let target: String
 }

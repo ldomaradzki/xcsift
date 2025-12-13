@@ -680,4 +680,115 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.slowTests, 2)
         XCTAssertEqual(result.summary.flakyTests, 1)
     }
+
+    // MARK: - Executable Parsing Tests
+
+    func testParseExecutable() {
+        let parser = OutputParser()
+        let input = """
+            RegisterWithLaunchServices /Users/gustavoambrozio/Library/Developer/Xcode/DerivedData/ClaudeSettings-adehczsnoaxfyihgllrkwplhsetn/Build/Products/Debug/ClaudeSettings.app (in target 'ClaudeSettings' from project 'ClaudeSettings')
+            """
+
+        let result = parser.parse(input: input, printExecutables: true)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.executables.count, 1)
+        XCTAssertEqual(
+            result.executables[0].path,
+            "/Users/gustavoambrozio/Library/Developer/Xcode/DerivedData/ClaudeSettings-adehczsnoaxfyihgllrkwplhsetn/Build/Products/Debug/ClaudeSettings.app"
+        )
+        XCTAssertEqual(result.executables[0].name, "ClaudeSettings.app")
+        XCTAssertEqual(result.executables[0].target, "ClaudeSettings")
+        XCTAssertEqual(result.summary.executables, 1)
+    }
+
+    func testParseMultipleExecutables() {
+        let parser = OutputParser()
+        let input = """
+            RegisterWithLaunchServices /path/to/App1.app (in target 'App1' from project 'MyProject')
+            Building for debugging...
+            RegisterWithLaunchServices /path/to/App2.app (in target 'App2' from project 'MyProject')
+            """
+
+        let result = parser.parse(input: input, printExecutables: true)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.executables.count, 2)
+        XCTAssertEqual(result.executables[0].name, "App1.app")
+        XCTAssertEqual(result.executables[0].target, "App1")
+        XCTAssertEqual(result.executables[1].name, "App2.app")
+        XCTAssertEqual(result.executables[1].target, "App2")
+        XCTAssertEqual(result.summary.executables, 2)
+    }
+
+    func testExecutablesNotIncludedWhenFlagFalse() {
+        let parser = OutputParser()
+        let input = """
+            RegisterWithLaunchServices /path/to/App.app (in target 'App' from project 'MyProject')
+            """
+
+        let result = parser.parse(input: input, printExecutables: false)
+
+        // Executables are still parsed but not included in output
+        XCTAssertEqual(result.executables.count, 1)
+        XCTAssertEqual(result.printExecutables, false)
+        XCTAssertNil(result.summary.executables)
+
+        // Encode to JSON and verify executables are not included
+        let encoder = JSONEncoder()
+        let jsonData = try! encoder.encode(result)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+
+        XCTAssertFalse(jsonString.contains("\"executables\":["))
+    }
+
+    func testExecutablesIncludedInJSONWhenFlagTrue() {
+        let parser = OutputParser()
+        let input = """
+            RegisterWithLaunchServices /path/to/App.app (in target 'App' from project 'MyProject')
+            """
+
+        let result = parser.parse(input: input, printExecutables: true)
+
+        XCTAssertEqual(result.executables.count, 1)
+        XCTAssertEqual(result.printExecutables, true)
+
+        // Encode to JSON and verify executables are included
+        let encoder = JSONEncoder()
+        let jsonData = try! encoder.encode(result)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+
+        XCTAssertTrue(jsonString.contains("\"executables\":["))
+        XCTAssertTrue(jsonString.contains("App.app"))
+    }
+
+    func testNoExecutablesInOutput() {
+        let parser = OutputParser()
+        let input = """
+            Building for debugging...
+            Build complete!
+            """
+
+        let result = parser.parse(input: input, printExecutables: true)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.executables.count, 0)
+        XCTAssertNil(result.summary.executables)
+    }
+
+    func testExecutableDeduplicationByPath() {
+        let parser = OutputParser()
+        // Same app registered multiple times (can happen in incremental builds)
+        let input = """
+            RegisterWithLaunchServices /Users/dev/DerivedData/MyApp/Build/Products/Debug/MyApp.app (in target 'MyApp' from project 'MyApp')
+            RegisterWithLaunchServices /Users/dev/DerivedData/MyApp/Build/Products/Debug/MyApp.app (in target 'MyApp' from project 'MyApp')
+            RegisterWithLaunchServices /Users/dev/DerivedData/MyApp/Build/Products/Debug/MyApp.app (in target 'MyApp' from project 'MyApp')
+            """
+
+        let result = parser.parse(input: input, printExecutables: true)
+
+        XCTAssertEqual(result.executables.count, 1, "Duplicate executables should be deduplicated by path")
+        XCTAssertEqual(result.executables[0].name, "MyApp.app")
+        XCTAssertEqual(result.summary.executables, 1)
+    }
 }

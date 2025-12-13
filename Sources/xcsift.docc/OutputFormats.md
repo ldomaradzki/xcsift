@@ -52,6 +52,7 @@ The default format outputs structured JSON with build status, summary, and detai
 | `summary.coverage_percent` | Line coverage percentage (with `--coverage`) |
 | `summary.slow_tests` | Count of slow tests (with `--slow-threshold`) |
 | `summary.flaky_tests` | Count of flaky tests (auto-detected) |
+| `summary.executables` | Count of executable targets (with `--executable`) |
 
 ### Optional Arrays
 
@@ -61,6 +62,7 @@ The default format outputs structured JSON with build status, summary, and detai
 - `failed_tests[]` — Included when test failures detected (includes `duration` field)
 - `slow_tests[]` — Included when `--slow-threshold` is set; each entry has `test` name and `duration` in seconds
 - `flaky_tests[]` — Automatically included when flaky tests detected
+- `executables[]` — Only with `--executable`; each entry has `path`, `name`, and `target`
 - `coverage{}` — Only with `--coverage --coverage-details`
 - `build_info{}` — Only with `--build-info`
 
@@ -162,6 +164,33 @@ Supported phases:
 - **xcodebuild**: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
 - **SPM**: `Compiling`, `Linking`
 
+### Executable Targets
+
+**Executables** (with `--executable`):
+```json
+{
+  "summary": {
+    "executables": 2
+  },
+  "executables": [
+    {
+      "path": "/Users/dev/DerivedData/MyApp/Build/Products/Debug/MyApp.app",
+      "name": "MyApp.app",
+      "target": "MyApp"
+    },
+    {
+      "path": "/Users/dev/DerivedData/MyApp/Build/Products/Debug/HelperTool.app",
+      "name": "HelperTool.app",
+      "target": "HelperTool"
+    }
+  ]
+}
+```
+
+- Parses `RegisterWithLaunchServices` lines from xcodebuild output
+- Includes full path, filename, and target name
+- Duplicates are automatically deduplicated by path
+
 ## TOON Format
 
 TOON (Token-Oriented Object Notation) provides 30-60% token reduction compared to JSON, ideal for LLM consumption.
@@ -218,6 +247,21 @@ build_info:
   targets[2]{name,duration,phases,depends_on}:
     "MyFramework","12.4s",["CompileSwiftSources","Link"],[]
     "MyApp","23.1s",["CompileSwiftSources","Link","CopySwiftLibs"],["MyFramework"]
+```
+
+### Executables in TOON
+
+With `--executable`, TOON outputs executable targets in tabular format:
+
+```toon
+status: success
+summary:
+  errors: 0
+  warnings: 0
+  executables: 2
+executables[2]{path,name,target}:
+  "/Users/dev/DerivedData/MyApp/Build/Products/Debug/MyApp.app","MyApp.app","MyApp"
+  "/Users/dev/DerivedData/MyApp/Build/Products/Debug/HelperTool.app","HelperTool.app","HelperTool"
 ```
 
 ## GitHub Actions Format
