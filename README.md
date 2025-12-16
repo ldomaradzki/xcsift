@@ -23,6 +23,7 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 - **GitHub Actions integration** - Auto-detected workflow commands with inline PR annotations
 - **Structured error reporting** - Clear categorization of errors, warnings, and test failures
 - **Linker error parsing** - Captures undefined symbols, missing frameworks/libraries, architecture mismatches, and duplicate symbols with conflicting file paths
+- **Runtime warning parsing** - Parses SwiftUI and custom runtime warnings with type classification (`compile`, `runtime`, `swiftui`)
 - **File/line number extraction** - Easy navigation to problematic code locations
 - **Build status summary** - Quick overview of build results
 - **Automatic code coverage conversion** - Converts .profraw (SPM) and .xcresult (xcodebuild) to JSON automatically
@@ -192,7 +193,8 @@ xcodebuild build 2>&1 | xcsift -f github-actions
     {
       "file": "ViewController.swift",
       "line": 23,
-      "message": "variable 'temp' was never used; consider removing it"
+      "message": "variable 'temp' was never used; consider removing it",
+      "type": "compile"
     }
   ],
   "failed_tests": [
@@ -267,6 +269,13 @@ xcodebuild build 2>&1 | xcsift -f github-actions
 
 **Note on warnings:** By default, only the warning count appears in `summary.warnings`. The detailed `warnings` array (shown above) is only included when using the `--warnings` flag. This reduces token usage for coding agents that don't need to process every warning.
 
+**Warning types:** Each warning includes a `type` field:
+- `compile` — Standard compiler warnings (format: `file:line: warning: message`)
+- `swiftui` — SwiftUI runtime warnings (e.g., "Accessing Environment", "Publishing changes from background")
+- `runtime` — Custom runtime warnings from libraries like swift-issue-reporting (format: `file.swift:line message`)
+
+**Deduplication:** Warnings, errors, and linker errors are automatically deduplicated — identical entries (same file, line, and message) appear only once in the output.
+
 **Note on linker errors:** The `linker_errors` array is automatically included when linker errors are detected. Supported error types:
 - Undefined symbols (missing classes, functions, variables) - uses `referenced_from` field
 - Missing frameworks (`ld: framework not found`)
@@ -330,10 +339,10 @@ summary:
   linker_errors: 0
 errors[1]{file,line,message}:
   main.swift,15,"use of undeclared identifier \"unknown\""
-warnings[3]{file,line,message}:
-  Parser.swift,20,"immutable value \"result\" was never used"
-  Parser.swift,25,"variable \"foo\" was never mutated"
-  Model.swift,30,"initialization of immutable value \"bar\" was never used"
+warnings[3]{file,line,message,type}:
+  Parser.swift,20,"immutable value \"result\" was never used","compile"
+  Parser.swift,25,"variable \"foo\" was never mutated","compile"
+  Model.swift,30,"initialization of immutable value \"bar\" was never used","compile"
 ```
 
 #### Linker errors

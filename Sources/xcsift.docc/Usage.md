@@ -44,6 +44,13 @@ xcodebuild build 2>&1 | xcsift --warnings
 swift build 2>&1 | xcsift -w
 ```
 
+Includes both compiler warnings and runtime warnings (SwiftUI, swift-issue-reporting). Each warning has a `type` field:
+- `compile` — Standard compiler warnings
+- `swiftui` — SwiftUI runtime warnings (e.g., "Publishing changes from background threads")
+- `runtime` — Custom runtime warnings
+
+Warnings are automatically deduplicated — identical entries appear only once.
+
 ### `--Werror`, `-W`
 
 Treat warnings as errors. Build fails if any warnings are present.

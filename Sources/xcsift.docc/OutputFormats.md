@@ -57,7 +57,7 @@ The default format outputs structured JSON with build status, summary, and detai
 ### Optional Arrays
 
 - `errors[]` — Always included when errors exist
-- `warnings[]` — Only with `--warnings` flag
+- `warnings[]` — Only with `--warnings` flag; each entry includes `type` field
 - `linker_errors[]` — Included when linker errors detected
 - `failed_tests[]` — Included when test failures detected (includes `duration` field)
 - `slow_tests[]` — Included when `--slow-threshold` is set; each entry has `test` name and `duration` in seconds
@@ -65,6 +65,40 @@ The default format outputs structured JSON with build status, summary, and detai
 - `executables[]` — Only with `--executable`; each entry has `path`, `name`, and `target`
 - `coverage{}` — Only with `--coverage --coverage-details`
 - `build_info{}` — Only with `--build-info`
+
+### Warning Types
+
+Each warning includes a `type` field indicating its source:
+
+| Type | Description | Format |
+|------|-------------|--------|
+| `compile` | Standard compiler warnings | `file:line: warning: message` |
+| `swiftui` | SwiftUI runtime warnings | `file.swift:line message` |
+| `runtime` | Custom runtime warnings (e.g., swift-issue-reporting) | `file.swift:line message` |
+
+**Example with type field:**
+```json
+{
+  "warnings": [
+    {
+      "file": "ViewController.swift",
+      "line": 23,
+      "message": "variable 'temp' was never used",
+      "type": "compile"
+    },
+    {
+      "file": "ContentView.swift",
+      "line": 15,
+      "message": "Publishing changes from background threads is not allowed",
+      "type": "swiftui"
+    }
+  ]
+}
+```
+
+### Deduplication
+
+Warnings, errors, and linker errors are automatically deduplicated. Identical entries (same file, line, and message) appear only once in the output.
 
 ### Linker Errors
 
@@ -206,10 +240,10 @@ summary:
   linker_errors: 0
 errors[1]{file,line,message}:
   main.swift,15,"use of undeclared identifier \"unknown\""
-warnings[3]{file,line,message}:
-  Parser.swift,20,"immutable value \"result\" was never used"
-  Parser.swift,25,"variable \"foo\" was never mutated"
-  Model.swift,30,"initialization of immutable value \"bar\" was never used"
+warnings[3]{file,line,message,type}:
+  Parser.swift,20,"immutable value \"result\" was never used","compile"
+  Parser.swift,25,"variable \"foo\" was never mutated","compile"
+  Model.swift,30,"initialization of immutable value \"bar\" was never used","compile"
 ```
 
 ### Features

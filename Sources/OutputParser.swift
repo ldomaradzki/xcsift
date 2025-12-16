@@ -10,6 +10,9 @@ class OutputParser {
     private var seenExecutablePaths: Set<String> = []
     private var buildTime: String?
     private var seenTestNames: Set<String> = []
+    private var seenWarnings: Set<String> = []
+    private var seenErrors: Set<String> = []
+    private var seenLinkerErrors: Set<String> = []
     private var executedTestsCount: Int?
     private var summaryFailedTestsCount: Int?
     private var passedTestsCount: Int = 0
@@ -591,6 +594,7 @@ class OutputParser {
             || line.contains("Build failed") || line.contains("Executed") || line.contains("] Testing ")
             || line.contains("BUILD SUCCEEDED") || line.contains("BUILD FAILED") || line.contains("Build complete!")
             || line.contains("RegisterWithLaunchServices")
+            || (line.hasPrefix("/") && line.contains(".swift:"))  // runtime warnings
 
         if !containsRelevant {
             return
@@ -647,9 +651,23 @@ class OutputParser {
                 }
             }
         } else if let error = parseError(line) {
-            errors.append(error)
+            let key = "\(error.file ?? ""):\(error.line ?? 0):\(error.message)"
+            if !seenErrors.contains(key) {
+                seenErrors.insert(key)
+                errors.append(error)
+            }
         } else if let warning = parseWarning(line) {
-            warnings.append(warning)
+            let key = "\(warning.file ?? ""):\(warning.line ?? 0):\(warning.message)"
+            if !seenWarnings.contains(key) {
+                seenWarnings.insert(key)
+                warnings.append(warning)
+            }
+        } else if let runtimeWarning = parseRuntimeWarning(line) {
+            let key = "\(runtimeWarning.file ?? ""):\(runtimeWarning.line ?? 0):\(runtimeWarning.message)"
+            if !seenWarnings.contains(key) {
+                seenWarnings.insert(key)
+                warnings.append(runtimeWarning)
+            }
         } else if parsePassedTest(line) {
             return
         } else if let time = parseBuildTime(line) {
@@ -688,7 +706,7 @@ class OutputParser {
             // Extract the reference (everything after " in ")
             if let inRange = trimmed.range(of: " in ") {
                 let referencedFrom = String(trimmed[inRange.upperBound...])
-                linkerErrors.append(
+                appendLinkerErrorIfNew(
                     LinkerError(symbol: symbol, architecture: arch, referencedFrom: referencedFrom)
                 )
                 pendingLinkerSymbol = nil
@@ -699,14 +717,14 @@ class OutputParser {
         // Pattern: "ld: framework not found SomeFramework"
         if trimmed.hasPrefix("ld: framework not found ") {
             let framework = String(trimmed.dropFirst("ld: framework not found ".count))
-            linkerErrors.append(LinkerError(message: "framework not found \(framework)"))
+            appendLinkerErrorIfNew(LinkerError(message: "framework not found \(framework)"))
             return true
         }
 
         // Pattern: "ld: library not found for -lsomelib"
         if trimmed.hasPrefix("ld: library not found for ") {
             let library = String(trimmed.dropFirst("ld: library not found for ".count))
-            linkerErrors.append(LinkerError(message: "library not found for \(library)"))
+            appendLinkerErrorIfNew(LinkerError(message: "library not found for \(library)"))
             return true
         }
 
@@ -734,7 +752,7 @@ class OutputParser {
 
         // Pattern: "ld: building for iOS Simulator, but linking in dylib built for iOS"
         if trimmed.hasPrefix("ld: building for ") && trimmed.contains("but linking") {
-            linkerErrors.append(LinkerError(message: trimmed))
+            appendLinkerErrorIfNew(LinkerError(message: trimmed))
             return true
         }
 
@@ -747,7 +765,7 @@ class OutputParser {
                 if let archRange = trimmed.range(of: "for architecture ") {
                     arch = String(trimmed[archRange.upperBound...])
                 }
-                linkerErrors.append(
+                appendLinkerErrorIfNew(
                     LinkerError(symbol: symbol, architecture: arch, conflictingFiles: pendingConflictingFiles)
                 )
                 pendingDuplicateSymbol = nil
@@ -776,6 +794,14 @@ class OutputParser {
 
     private func hasSeenSimilarTest(_ normalizedTestName: String) -> Bool {
         return seenTestNames.contains(normalizedTestName)
+    }
+
+    private func appendLinkerErrorIfNew(_ error: LinkerError) {
+        let key = "\(error.symbol):\(error.message)"
+        if !seenLinkerErrors.contains(key) {
+            seenLinkerErrors.insert(key)
+            linkerErrors.append(error)
+        }
     }
 
     /// Checks if a line looks like JSON output (e.g., from the tool's own output or other JSON sources)
@@ -957,6 +983,88 @@ class OutputParser {
         }
 
         return nil
+    }
+
+    // MARK: - Runtime Warning Parsing
+
+    /// Parses runtime warnings in format: /path/to/file.swift:42 Message
+    /// These are SwiftUI and custom runtime warnings (e.g., from swift-issue-reporting)
+    private func parseRuntimeWarning(_ line: String) -> BuildWarning? {
+        // Skip if it's a compile warning/error (has `: warning:` or `: error:`)
+        if line.contains(": warning:") || line.contains(": error:") {
+            return nil
+        }
+
+        // Must be absolute path to .swift file
+        guard line.hasPrefix("/"), line.contains(".swift:") else {
+            return nil
+        }
+
+        // Skip visual lines (e.g., "    |   `- warning: message")
+        if line.contains("|") || line.contains("`-") {
+            return nil
+        }
+
+        // Parse /path/to/file.swift:42 Message
+        guard let swiftColonRange = line.range(of: ".swift:") else {
+            return nil
+        }
+
+        let afterColon = line[swiftColonRange.upperBound...]
+
+        // Find the line number (digits followed by space)
+        var lineNumEnd = afterColon.startIndex
+        while lineNumEnd < afterColon.endIndex && afterColon[lineNumEnd].isNumber {
+            lineNumEnd = afterColon.index(after: lineNumEnd)
+        }
+
+        // Must have at least one digit, then space, then message
+        guard lineNumEnd > afterColon.startIndex,
+            lineNumEnd < afterColon.endIndex,
+            afterColon[lineNumEnd] == " "
+        else {
+            return nil
+        }
+
+        let lineNumStr = String(afterColon[..<lineNumEnd])
+        guard let lineNum = Int(lineNumStr) else {
+            return nil
+        }
+
+        // Extract file path (everything before .swift: plus .swift)
+        let file = String(line[..<swiftColonRange.lowerBound]) + ".swift"
+        let message = String(afterColon[afterColon.index(after: lineNumEnd)...])
+
+        // Don't parse empty messages
+        guard !message.isEmpty else {
+            return nil
+        }
+
+        // Determine type based on message content
+        let type = detectRuntimeWarningType(message: message)
+
+        return BuildWarning(file: file, line: lineNum, message: message, type: type)
+    }
+
+    /// Detects whether a runtime warning is SwiftUI-specific or generic
+    private func detectRuntimeWarningType(message: String) -> WarningType {
+        let swiftuiKeywords = [
+            "Accessing Environment",
+            "Accessing StateObject",
+            "StateObject's wrappedValue",
+            "Publishing changes from background",
+            "Publishing changes from within view",
+            "Modifying state during view update",
+            "will always read the default value",
+        ]
+
+        for keyword in swiftuiKeywords {
+            if message.contains(keyword) {
+                return .swiftui
+            }
+        }
+
+        return .runtime
     }
 
     private func parsePassedTest(_ line: String) -> Bool {

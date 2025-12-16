@@ -205,6 +205,12 @@ The codebase follows a modular architecture:
 
 ### Key Features
 - **Error/Warning Parsing**: Multiple regex patterns handle various Xcode error formats
+- **Runtime Warning Parsing**: Parses SwiftUI and custom runtime warnings (e.g., from swift-issue-reporting)
+  - Format: `/path/to/file.swift:42 Message` (without `: warning:` keyword)
+  - Warning types: `compile`, `runtime`, `swiftui` (in `type` field)
+  - SwiftUI warnings detected by keywords: "Accessing Environment", "Accessing StateObject", "StateObject's wrappedValue", "Publishing changes", "Modifying state"
+  - Custom runtime warnings default to `type: "runtime"`
+  - Included with `--warnings` flag (no separate flag needed)
 - **Linker Error Parsing**: Captures undefined symbols, missing frameworks/libraries, architecture mismatches, and duplicate symbols (with structured conflicting file paths)
 - **Test Failure Detection**: XCUnit assertion failures and general test failures
 - **Build Time Extraction**: Captures build duration from output
@@ -270,6 +276,17 @@ To add new fixtures:
 Test cases cover:
 - Error parsing from various Xcode formats
 - Warning detection
+- **Runtime warning parsing** (10 tests):
+  - SwiftUI Environment warning parsing
+  - SwiftUI Publishing changes warning parsing
+  - SwiftUI Modifying state warning parsing
+  - SwiftUI StateObject wrappedValue warning parsing
+  - Custom runtime warning parsing (swift-issue-reporting style)
+  - Compile warning type detection
+  - Mixed compile and runtime warnings
+  - Runtime warning deduplication
+  - Runtime warning vs compile warning format distinction
+  - JSON encoding with type field
 - **Linker error parsing** (14 tests):
   - Undefined symbol errors
   - Multiple undefined symbols
@@ -382,7 +399,10 @@ The tool outputs structured data optimized for coding agents in two formats:
 - **JSON**: Structured format with `status`, `summary`, `errors`, `warnings` (optional), `failed_tests`, `linker_errors` (optional), `coverage` (optional), `phases` (optional), `timing` (optional)
   - **Summary always includes warning and linker error counts**: `{"summary": {"warnings": N, "linker_errors": N, ...}}`
   - **Summary includes coverage percentage** (when `--coverage` flag is used): `{"summary": {"coverage_percent": X.X, ...}}`
-  - **Detailed warnings list** (with `--warnings` flag): `{"warnings": [{"file": "...", "line": N, "message": "..."}]}`
+  - **Detailed warnings list** (with `--warnings` flag): `{"warnings": [{"file": "...", "line": N, "message": "...", "type": "compile|runtime|swiftui"}]}`
+    - `type: "compile"` - compiler warnings (format: `file:line: warning: message`)
+    - `type: "swiftui"` - SwiftUI runtime warnings (e.g., "Accessing Environment", "Publishing changes")
+    - `type: "runtime"` - custom runtime warnings (format: `file.swift:line message`)
   - **Linker errors**: Two types are supported:
     - **Undefined symbols**: `{"linker_errors": [{"symbol": "_MissingClass", "architecture": "arm64", "referenced_from": "ViewController.o", "message": "", "conflicting_files": []}]}`
     - **Duplicate symbols**: `{"linker_errors": [{"symbol": "_duplicateVar", "architecture": "arm64", "referenced_from": "", "message": "", "conflicting_files": ["/path/to/FileA.o", "/path/to/FileB.o"]}]}`
