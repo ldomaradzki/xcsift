@@ -246,6 +246,56 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.warnings.count, 2)
     }
 
+    // MARK: - Deduplication Tests
+
+    func testParseDuplicateWarnings() {
+        let parser = OutputParser()
+        let input = """
+            /path/to/File.swift:10:5: warning: unused variable 'x'
+            /path/to/File.swift:10:5: warning: unused variable 'x'
+            /path/to/File.swift:10:5: warning: unused variable 'x'
+            /path/to/Other.swift:20:1: warning: different warning
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.summary.warnings, 2)  // Only 2 unique warnings
+        XCTAssertEqual(result.warnings.count, 2)
+    }
+
+    func testParseDuplicateErrors() {
+        let parser = OutputParser()
+        let input = """
+            /path/to/File.swift:10:5: error: use of undeclared identifier
+            /path/to/File.swift:10:5: error: use of undeclared identifier
+            /path/to/Other.swift:20:1: error: different error
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.errors, 2)  // Only 2 unique errors
+        XCTAssertEqual(result.errors.count, 2)
+    }
+
+    func testParseDuplicateLinkerErrors() {
+        let parser = OutputParser()
+        let input = """
+            Undefined symbols for architecture arm64:
+              "_MissingSymbol", referenced from:
+                  ViewController.o in main.o
+            Undefined symbols for architecture arm64:
+              "_MissingSymbol", referenced from:
+                  ViewController.o in main.o
+            ld: symbol(s) not found for architecture arm64
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.summary.linkerErrors, 1)  // Only 1 unique linker error
+        XCTAssertEqual(result.linkerErrors.count, 1)
+    }
+
     func testPrintWarningsFlagFalse() {
         let parser = OutputParser()
         let input = """

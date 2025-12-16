@@ -10,6 +10,9 @@ class OutputParser {
     private var seenExecutablePaths: Set<String> = []
     private var buildTime: String?
     private var seenTestNames: Set<String> = []
+    private var seenWarnings: Set<String> = []
+    private var seenErrors: Set<String> = []
+    private var seenLinkerErrors: Set<String> = []
     private var executedTestsCount: Int?
     private var summaryFailedTestsCount: Int?
     private var passedTestsCount: Int = 0
@@ -647,9 +650,17 @@ class OutputParser {
                 }
             }
         } else if let error = parseError(line) {
-            errors.append(error)
+            let key = "\(error.file ?? ""):\(error.line ?? 0):\(error.message)"
+            if !seenErrors.contains(key) {
+                seenErrors.insert(key)
+                errors.append(error)
+            }
         } else if let warning = parseWarning(line) {
-            warnings.append(warning)
+            let key = "\(warning.file ?? ""):\(warning.line ?? 0):\(warning.message)"
+            if !seenWarnings.contains(key) {
+                seenWarnings.insert(key)
+                warnings.append(warning)
+            }
         } else if parsePassedTest(line) {
             return
         } else if let time = parseBuildTime(line) {
@@ -688,7 +699,7 @@ class OutputParser {
             // Extract the reference (everything after " in ")
             if let inRange = trimmed.range(of: " in ") {
                 let referencedFrom = String(trimmed[inRange.upperBound...])
-                linkerErrors.append(
+                appendLinkerErrorIfNew(
                     LinkerError(symbol: symbol, architecture: arch, referencedFrom: referencedFrom)
                 )
                 pendingLinkerSymbol = nil
@@ -699,14 +710,14 @@ class OutputParser {
         // Pattern: "ld: framework not found SomeFramework"
         if trimmed.hasPrefix("ld: framework not found ") {
             let framework = String(trimmed.dropFirst("ld: framework not found ".count))
-            linkerErrors.append(LinkerError(message: "framework not found \(framework)"))
+            appendLinkerErrorIfNew(LinkerError(message: "framework not found \(framework)"))
             return true
         }
 
         // Pattern: "ld: library not found for -lsomelib"
         if trimmed.hasPrefix("ld: library not found for ") {
             let library = String(trimmed.dropFirst("ld: library not found for ".count))
-            linkerErrors.append(LinkerError(message: "library not found for \(library)"))
+            appendLinkerErrorIfNew(LinkerError(message: "library not found for \(library)"))
             return true
         }
 
@@ -734,7 +745,7 @@ class OutputParser {
 
         // Pattern: "ld: building for iOS Simulator, but linking in dylib built for iOS"
         if trimmed.hasPrefix("ld: building for ") && trimmed.contains("but linking") {
-            linkerErrors.append(LinkerError(message: trimmed))
+            appendLinkerErrorIfNew(LinkerError(message: trimmed))
             return true
         }
 
@@ -747,7 +758,7 @@ class OutputParser {
                 if let archRange = trimmed.range(of: "for architecture ") {
                     arch = String(trimmed[archRange.upperBound...])
                 }
-                linkerErrors.append(
+                appendLinkerErrorIfNew(
                     LinkerError(symbol: symbol, architecture: arch, conflictingFiles: pendingConflictingFiles)
                 )
                 pendingDuplicateSymbol = nil
@@ -776,6 +787,14 @@ class OutputParser {
 
     private func hasSeenSimilarTest(_ normalizedTestName: String) -> Bool {
         return seenTestNames.contains(normalizedTestName)
+    }
+
+    private func appendLinkerErrorIfNew(_ error: LinkerError) {
+        let key = "\(error.symbol):\(error.message)"
+        if !seenLinkerErrors.contains(key) {
+            seenLinkerErrors.insert(key)
+            linkerErrors.append(error)
+        }
     }
 
     /// Checks if a line looks like JSON output (e.g., from the tool's own output or other JSON sources)
