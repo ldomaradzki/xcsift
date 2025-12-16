@@ -594,6 +594,7 @@ class OutputParser {
             || line.contains("Build failed") || line.contains("Executed") || line.contains("] Testing ")
             || line.contains("BUILD SUCCEEDED") || line.contains("BUILD FAILED") || line.contains("Build complete!")
             || line.contains("RegisterWithLaunchServices")
+            || (line.hasPrefix("/") && line.contains(".swift:"))  // runtime warnings
 
         if !containsRelevant {
             return
@@ -660,6 +661,12 @@ class OutputParser {
             if !seenWarnings.contains(key) {
                 seenWarnings.insert(key)
                 warnings.append(warning)
+            }
+        } else if let runtimeWarning = parseRuntimeWarning(line) {
+            let key = "\(runtimeWarning.file ?? ""):\(runtimeWarning.line ?? 0):\(runtimeWarning.message)"
+            if !seenWarnings.contains(key) {
+                seenWarnings.insert(key)
+                warnings.append(runtimeWarning)
             }
         } else if parsePassedTest(line) {
             return
@@ -976,6 +983,88 @@ class OutputParser {
         }
 
         return nil
+    }
+
+    // MARK: - Runtime Warning Parsing
+
+    /// Parses runtime warnings in format: /path/to/file.swift:42 Message
+    /// These are SwiftUI and custom runtime warnings (e.g., from swift-issue-reporting)
+    private func parseRuntimeWarning(_ line: String) -> BuildWarning? {
+        // Skip if it's a compile warning/error (has `: warning:` or `: error:`)
+        if line.contains(": warning:") || line.contains(": error:") {
+            return nil
+        }
+
+        // Must be absolute path to .swift file
+        guard line.hasPrefix("/"), line.contains(".swift:") else {
+            return nil
+        }
+
+        // Skip visual lines (e.g., "    |   `- warning: message")
+        if line.contains("|") || line.contains("`-") {
+            return nil
+        }
+
+        // Parse /path/to/file.swift:42 Message
+        guard let swiftColonRange = line.range(of: ".swift:") else {
+            return nil
+        }
+
+        let afterColon = line[swiftColonRange.upperBound...]
+
+        // Find the line number (digits followed by space)
+        var lineNumEnd = afterColon.startIndex
+        while lineNumEnd < afterColon.endIndex && afterColon[lineNumEnd].isNumber {
+            lineNumEnd = afterColon.index(after: lineNumEnd)
+        }
+
+        // Must have at least one digit, then space, then message
+        guard lineNumEnd > afterColon.startIndex,
+            lineNumEnd < afterColon.endIndex,
+            afterColon[lineNumEnd] == " "
+        else {
+            return nil
+        }
+
+        let lineNumStr = String(afterColon[..<lineNumEnd])
+        guard let lineNum = Int(lineNumStr) else {
+            return nil
+        }
+
+        // Extract file path (everything before .swift: plus .swift)
+        let file = String(line[..<swiftColonRange.lowerBound]) + ".swift"
+        let message = String(afterColon[afterColon.index(after: lineNumEnd)...])
+
+        // Don't parse empty messages
+        guard !message.isEmpty else {
+            return nil
+        }
+
+        // Determine type based on message content
+        let type = detectRuntimeWarningType(message: message)
+
+        return BuildWarning(file: file, line: lineNum, message: message, type: type)
+    }
+
+    /// Detects whether a runtime warning is SwiftUI-specific or generic
+    private func detectRuntimeWarningType(message: String) -> WarningType {
+        let swiftuiKeywords = [
+            "Accessing Environment",
+            "Accessing StateObject",
+            "StateObject's wrappedValue",
+            "Publishing changes from background",
+            "Publishing changes from within view",
+            "Modifying state during view update",
+            "will always read the default value",
+        ]
+
+        for keyword in swiftuiKeywords {
+            if message.contains(keyword) {
+                return .swiftui
+            }
+        }
+
+        return .runtime
     }
 
     private func parsePassedTest(_ line: String) -> Bool {

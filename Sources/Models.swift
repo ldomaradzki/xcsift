@@ -345,16 +345,31 @@ struct BuildError: Codable {
     }
 }
 
+enum WarningType: String, Codable {
+    case compile
+    case runtime
+    case swiftui
+}
+
 struct BuildWarning: Codable {
     let file: String?
     let line: Int?
     let message: String
+    let type: WarningType
 
     // Internal only - used for GitHub Actions format, not encoded to JSON/TOON
     var column: Int? = nil
 
     enum CodingKeys: String, CodingKey {
-        case file, line, message
+        case file, line, message, type
+    }
+
+    init(file: String?, line: Int?, message: String, type: WarningType = .compile, column: Int? = nil) {
+        self.file = file
+        self.line = line
+        self.message = message
+        self.type = type
+        self.column = column
     }
 }
 

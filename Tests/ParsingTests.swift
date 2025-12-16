@@ -263,6 +263,142 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.warnings.count, 2)
     }
 
+    // MARK: - Runtime Warning Tests
+
+    func testParseSwiftUIEnvironmentWarning() {
+        let parser = OutputParser()
+        let input =
+            "/Users/test/Project/Sources/View.swift:42 Accessing Environment<Bool>'s value outside of being installed on a View. This will always read the default value and will not update."
+
+        let result = parser.parse(input: input, printWarnings: true)
+
+        XCTAssertEqual(result.summary.warnings, 1)
+        XCTAssertEqual(result.warnings.count, 1)
+        XCTAssertEqual(result.warnings[0].file, "/Users/test/Project/Sources/View.swift")
+        XCTAssertEqual(result.warnings[0].line, 42)
+        XCTAssertEqual(result.warnings[0].type, .swiftui)
+        XCTAssertTrue(result.warnings[0].message.contains("Accessing Environment"))
+    }
+
+    func testParseSwiftUIPublishingChangesWarning() {
+        let parser = OutputParser()
+        let input =
+            "/path/to/ViewModel.swift:100 Publishing changes from background threads is not allowed; make sure to publish values from the main thread."
+
+        let result = parser.parse(input: input, printWarnings: true)
+
+        XCTAssertEqual(result.summary.warnings, 1)
+        XCTAssertEqual(result.warnings[0].type, .swiftui)
+        XCTAssertTrue(result.warnings[0].message.contains("Publishing changes from background"))
+    }
+
+    func testParseSwiftUIModifyingStateWarning() {
+        let parser = OutputParser()
+        let input = "/path/to/View.swift:50 Modifying state during view update, this will cause undefined behavior."
+
+        let result = parser.parse(input: input, printWarnings: true)
+
+        XCTAssertEqual(result.summary.warnings, 1)
+        XCTAssertEqual(result.warnings[0].type, .swiftui)
+    }
+
+    func testParseSwiftUIStateObjectWrappedValueWarning() {
+        let parser = OutputParser()
+        let input =
+            "/path/to/View.swift:30 StateObject's wrappedValue should only be accessed after the property has been installed on a View."
+
+        let result = parser.parse(input: input, printWarnings: true)
+
+        XCTAssertEqual(result.summary.warnings, 1)
+        XCTAssertEqual(result.warnings[0].type, .swiftui)
+        XCTAssertTrue(result.warnings[0].message.contains("StateObject's wrappedValue"))
+    }
+
+    func testParseCustomRuntimeWarning() {
+        let parser = OutputParser()
+        let input = "/path/to/Custom.swift:25 Custom warning from swift-issue-reporting library"
+
+        let result = parser.parse(input: input, printWarnings: true)
+
+        XCTAssertEqual(result.summary.warnings, 1)
+        XCTAssertEqual(result.warnings[0].file, "/path/to/Custom.swift")
+        XCTAssertEqual(result.warnings[0].line, 25)
+        XCTAssertEqual(result.warnings[0].type, .runtime)
+        XCTAssertEqual(result.warnings[0].message, "Custom warning from swift-issue-reporting library")
+    }
+
+    func testCompileWarningHasCompileType() {
+        let parser = OutputParser()
+        let input = "/path/to/File.swift:10:5: warning: unused variable 'x'"
+
+        let result = parser.parse(input: input, printWarnings: true)
+
+        XCTAssertEqual(result.summary.warnings, 1)
+        XCTAssertEqual(result.warnings[0].type, .compile)
+    }
+
+    func testMixedCompileAndRuntimeWarnings() {
+        let parser = OutputParser()
+        let input = """
+            /path/to/File.swift:10:5: warning: unused variable 'x'
+            /path/to/View.swift:42 Accessing Environment<Bool>'s value outside of being installed on a View.
+            /path/to/Custom.swift:25 Custom runtime warning message
+            """
+
+        let result = parser.parse(input: input, printWarnings: true)
+
+        XCTAssertEqual(result.summary.warnings, 3)
+        XCTAssertEqual(result.warnings.count, 3)
+
+        // Check types
+        let compileWarnings = result.warnings.filter { $0.type == .compile }
+        let swiftuiWarnings = result.warnings.filter { $0.type == .swiftui }
+        let runtimeWarnings = result.warnings.filter { $0.type == .runtime }
+
+        XCTAssertEqual(compileWarnings.count, 1)
+        XCTAssertEqual(swiftuiWarnings.count, 1)
+        XCTAssertEqual(runtimeWarnings.count, 1)
+    }
+
+    func testRuntimeWarningDeduplication() {
+        let parser = OutputParser()
+        let input = """
+            /path/to/View.swift:42 Accessing Environment<Bool>'s value outside of being installed on a View.
+            /path/to/View.swift:42 Accessing Environment<Bool>'s value outside of being installed on a View.
+            /path/to/Other.swift:10 Different runtime warning
+            """
+
+        let result = parser.parse(input: input, printWarnings: true)
+
+        XCTAssertEqual(result.summary.warnings, 2)  // Only 2 unique warnings
+        XCTAssertEqual(result.warnings.count, 2)
+    }
+
+    func testRuntimeWarningNotParsedForCompileWarningFormat() {
+        let parser = OutputParser()
+        // This has `: warning:` so should be parsed as compile warning, not runtime
+        let input = "/path/to/File.swift:10: warning: some warning message"
+
+        let result = parser.parse(input: input, printWarnings: true)
+
+        XCTAssertEqual(result.warnings.count, 1)
+        XCTAssertEqual(result.warnings[0].type, .compile)
+    }
+
+    func testRuntimeWarningJSONEncoding() throws {
+        let parser = OutputParser()
+        let input = "/path/to/View.swift:42 Accessing Environment<Bool>'s value outside of being installed on a View."
+
+        let result = parser.parse(input: input, printWarnings: true)
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(result)
+        let json = String(data: data, encoding: .utf8)!
+
+        XCTAssertTrue(json.contains("\"type\":\"swiftui\""))
+    }
+
     func testParseDuplicateErrors() {
         let parser = OutputParser()
         let input = """
