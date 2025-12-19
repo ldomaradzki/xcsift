@@ -204,6 +204,48 @@ Limit key folding depth (default: unlimited).
 xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 3
 ```
 
+## Configuration File Options
+
+### `--init`
+
+Generate a `.xcsift.toml` template in the current directory.
+
+```bash
+xcsift --init
+```
+
+Creates a commented template with all available options.
+
+### `--config`
+
+Use a specific configuration file instead of auto-detection.
+
+```bash
+xcodebuild build 2>&1 | xcsift --config ~/my-config.toml
+```
+
+If the specified file doesn't exist, xcsift fails with an error.
+
+### Configuration File Search Order
+
+When `--config` is not specified, xcsift searches for configuration files in this order:
+
+1. `.xcsift.toml` in current working directory
+2. `~/.config/xcsift/config.toml` in home directory
+
+If no configuration file is found, CLI defaults are used.
+
+### Priority
+
+**CLI flags always override configuration file values.** For example:
+
+```bash
+# Config has format = "toon", but CLI overrides to JSON
+xcodebuild build 2>&1 | xcsift -f json
+```
+
+See <doc:Configuration> for full documentation on configuration file format.
+
 ## Combined Examples
 
 ```bash

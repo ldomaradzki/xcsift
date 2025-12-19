@@ -9,6 +9,7 @@ xcsift transforms verbose Xcode build output into concise, structured formats th
 ### Key Features
 
 - **Multiple output formats** — JSON (default), TOON (30-60% fewer tokens), or GitHub Actions
+- **Configuration files** — Store default options in `.xcsift.toml` for project-wide or user-wide defaults
 - **Structured error reporting** — Clear categorization of errors, warnings, linker errors, and test failures
 - **Test analysis** — Duration tracking, slow test detection (`--slow-threshold`), automatic flaky test detection
 - **Automatic code coverage** — Converts `.profraw` (SPM) and `.xcresult` (xcodebuild) automatically
@@ -42,3 +43,4 @@ swift test 2>&1 | xcsift --slow-threshold 1.0
 
 - <doc:OutputFormats>
 - <doc:CodeCoverage>
+- <doc:Configuration>

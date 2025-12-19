@@ -64,7 +64,7 @@ struct XCSift: ParsableCommand {
         commandName: "xcsift",
         abstract: "A Swift tool to parse and format xcodebuild output for coding agents",
         usage:
-            "xcodebuild [options] 2>&1 | xcsift [--format|-f json|toon|github-actions] [--toon-delimiter comma|tab|pipe] [--warnings|-w] [--Werror|-W] [--quiet|-q] [--coverage|-c] [--executable|-e] [--slow-threshold N] [--build-info] [--version|-v] [--help|-h]",
+            "xcodebuild [options] 2>&1 | xcsift [--format|-f json|toon|github-actions] [--warnings|-w] [--Werror|-W] [--quiet|-q] [--coverage|-c] [--executable|-e] [--config PATH] [--init] [--version|-v] [--help|-h]",
         discussion: """
             xcsift parses xcodebuild/SPM output and formats it as JSON, TOON, or GitHub Actions.
 
@@ -101,6 +101,16 @@ struct XCSift: ParsableCommand {
               On CI, JSON/TOON output is followed by GitHub Actions annotations.
               Use -f github-actions for annotations only (no JSON/TOON).
 
+            Configuration file:
+              xcsift --init                      # Generate .xcsift.toml template
+              xcsift --config ~/my-config.toml  # Use custom config file
+
+              Config files are searched in order:
+              1. .xcsift.toml in current directory
+              2. ~/.config/xcsift/config.toml
+
+              CLI flags override config file values.
+
             Configuration options:
               --toon-delimiter [comma|tab|pipe]  # Default: comma
               --toon-key-folding [disabled|safe] # Default: disabled
@@ -113,6 +123,12 @@ struct XCSift: ParsableCommand {
 
     @Flag(name: [.short, .long], help: "Show version information")
     var version: Bool = false
+
+    @Flag(name: .long, help: "Generate example configuration file (.xcsift.toml) in current directory")
+    var `init`: Bool = false
+
+    @Option(name: .long, help: "Path to configuration file (default: auto-detect .xcsift.toml)")
+    var config: String?
 
     @Flag(name: [.short, .long], help: "Print detailed warnings list (by default only warning count is shown)")
     var warnings: Bool = false
@@ -145,7 +161,7 @@ struct XCSift: ParsableCommand {
         name: [.customShort("f"), .long],
         help: "Output format (json, toon, or github-actions). Default: json. On CI, annotations are auto-appended."
     )
-    var format: FormatType = .json
+    var format: FormatType?
 
     /// Detects if running in GitHub Actions CI environment
     private var isCI: Bool {
@@ -153,14 +169,14 @@ struct XCSift: ParsableCommand {
     }
 
     @Option(name: .long, help: "TOON delimiter (comma, tab, or pipe). Default: comma")
-    var toonDelimiter: TOONDelimiterType = .comma
+    var toonDelimiter: TOONDelimiterType?
 
     @Option(
         name: .long,
         help:
             "TOON key folding (disabled or safe). Default: disabled. When safe, nested single-key objects collapse to dotted paths"
     )
-    var toonKeyFolding: TOONKeyFoldingType = .disabled
+    var toonKeyFolding: TOONKeyFoldingType?
 
     @Option(name: .long, help: "TOON flatten depth limit for key folding. Default: unlimited")
     var toonFlattenDepth: Int?
@@ -172,10 +188,46 @@ struct XCSift: ParsableCommand {
     var slowThreshold: Double?
 
     func run() throws {
+        // Handle --version
         if version {
             print(getVersion())
             return
         }
+
+        // Handle --init
+        if `init` {
+            try generateConfigFile()
+            return
+        }
+
+        // Load and merge configuration
+        let configLoader = ConfigLoader()
+        let fileConfig: Configuration?
+
+        do {
+            fileConfig = try configLoader.loadConfig(explicitPath: config)
+        } catch let error as ConfigError {
+            writeToStderr("Error: \(error.description)\n")
+            throw ExitCode.failure
+        }
+
+        // Merge config file with CLI args
+        let resolved = ConfigMerger.merge(
+            config: fileConfig,
+            cliFormat: format,
+            cliWarnings: warnings,
+            cliWarningsAsErrors: warningsAsErrors,
+            cliQuiet: quiet,
+            cliCoverage: coverage,
+            cliCoverageDetails: coverageDetails,
+            cliCoveragePath: coveragePath,
+            cliSlowThreshold: slowThreshold,
+            cliBuildInfo: buildInfo,
+            cliExecutable: executable,
+            cliToonDelimiter: toonDelimiter,
+            cliToonKeyFolding: toonKeyFolding,
+            cliToonFlattenDepth: toonFlattenDepth
+        )
 
         // Check if stdin is a terminal (no piped input) before trying to read
         if isatty(STDIN_FILENO) == 1 {
@@ -196,28 +248,52 @@ struct XCSift: ParsableCommand {
 
         // Parse coverage if requested
         var coverageData: CodeCoverage? = nil
-        if coverage {
-            let path = coveragePath ?? ""
+        if resolved.coverage {
+            let path = resolved.coveragePath ?? ""
             let targetFilter = parser.extractTestedTarget(from: input)
             coverageData = CoverageParser.parseCoverageFromPath(path, targetFilter: targetFilter)
 
             // Warn if target filter was extracted but no coverage data was found
             if let filter = targetFilter, coverageData == nil {
-                writeToStderr("Warning: Target '\(filter)' was detected but no matching coverage data was found.\n")
+                writeToStderr(
+                    "Warning: Target '\(filter)' was detected but no matching coverage data was found.\n"
+                )
             }
         }
 
         let result = parser.parse(
             input: input,
-            printWarnings: warnings,
-            warningsAsErrors: warningsAsErrors,
+            printWarnings: resolved.warnings,
+            warningsAsErrors: resolved.warningsAsErrors,
             coverage: coverageData,
-            printCoverageDetails: coverageDetails,
-            slowThreshold: slowThreshold,
-            printBuildInfo: buildInfo,
-            printExecutables: executable
+            printCoverageDetails: resolved.coverageDetails,
+            slowThreshold: resolved.slowThreshold,
+            printBuildInfo: resolved.buildInfo,
+            printExecutables: resolved.executable
         )
-        outputResult(result, quiet: quiet)
+        outputResult(result, resolved: resolved)
+    }
+
+    private func generateConfigFile() throws {
+        let configLoader = ConfigLoader()
+        let filename = ConfigLoader.configFileName
+        let path = FileManager.default.currentDirectoryPath + "/" + filename
+
+        // Check if file already exists
+        if FileManager.default.fileExists(atPath: path) {
+            writeToStderr("Error: \(filename) already exists in current directory\n")
+            throw ExitCode.failure
+        }
+
+        // Write template
+        let template = configLoader.generateTemplate()
+        do {
+            try template.write(toFile: path, atomically: true, encoding: .utf8)
+            print("Created \(filename)")
+        } catch {
+            writeToStderr("Error: Failed to create \(filename): \(error.localizedDescription)\n")
+            throw ExitCode.failure
+        }
     }
 
     private func readStandardInput() -> String {
@@ -236,18 +312,18 @@ struct XCSift: ParsableCommand {
         }
     }
 
-    private func outputResult(_ result: BuildResult, quiet: Bool) {
+    private func outputResult(_ result: BuildResult, resolved: ResolvedConfig) {
         // In quiet mode, suppress output if build succeeded with no warnings or errors
-        if quiet && result.status == "success" && result.summary.warnings == 0 {
+        if resolved.quiet && result.status == "success" && result.summary.warnings == 0 {
             return
         }
 
-        switch format {
+        switch resolved.format {
         case .githubActions:
             // Explicit github-actions format: only annotations
             outputGitHubActions(result)
         case .toon:
-            outputTOON(result)
+            outputTOON(result, resolved: resolved)
             // Auto-append GitHub Actions annotations on CI
             if isCI {
                 outputGitHubActions(result)
@@ -278,12 +354,12 @@ struct XCSift: ParsableCommand {
         }
     }
 
-    private func outputTOON(_ result: BuildResult) {
+    private func outputTOON(_ result: BuildResult, resolved: ResolvedConfig) {
         let encoder = TOONEncoder()
         encoder.indent = 2
-        encoder.delimiter = toonDelimiter.toonDelimiter
-        encoder.keyFolding = toonKeyFolding.toonKeyFolding
-        if let depth = toonFlattenDepth {
+        encoder.delimiter = resolved.toonDelimiter.toonDelimiter
+        encoder.keyFolding = resolved.toonKeyFolding.toonKeyFolding
+        if let depth = resolved.toonFlattenDepth {
             encoder.flattenDepth = depth
         }
 

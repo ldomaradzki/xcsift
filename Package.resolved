@@ -1,5 +1,5 @@
 {
-  "originHash" : "6f2ec1107e09dc569ae9ca11ff67d9ac4215d32e4a5471034a29e5cf7222e57f",
+  "originHash" : "366acabf52812086b0e7014ed1e070d9174748dce876414fb34157c63f4d3511",
   "pins" : [
     {
       "identity" : "swift-argument-parser",
@@ -25,6 +25,15 @@
       "location" : "https://github.com/swiftlang/swift-docc-symbolkit",
       "state" : {
         "revision" : "b45d1f2ed151d057b54504d653e0da5552844e34",
+        "version" : "1.0.0"
+      }
+    },
+    {
+      "identity" : "swift-toml",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mattt/swift-toml",
+      "state" : {
+        "revision" : "1dfcf0e656e0bb4952a085eea0eb5c3bc6df0cce",
         "version" : "1.0.0"
       }
     },

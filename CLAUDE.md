@@ -167,6 +167,18 @@ xcodebuild test 2>&1 | xcsift --slow-threshold 1.0 --coverage
 xcodebuild build 2>&1 | xcsift --build-info
 swift build 2>&1 | xcsift --build-info
 xcodebuild build 2>&1 | xcsift -f toon --build-info -w
+
+# Configuration file - store default options in .xcsift.toml
+# Generate a template config file in current directory
+xcsift --init
+
+# Use custom config file path
+xcodebuild build 2>&1 | xcsift --config ~/my-config.toml
+
+# Config files are searched in order:
+# 1. .xcsift.toml in current directory
+# 2. ~/.config/xcsift/config.toml
+# CLI flags always override config file values
 ```
 
 ## Architecture
@@ -196,6 +208,12 @@ The codebase follows a modular architecture:
 4. **FileSystemProtocol.swift** & **ShellRunnerProtocol.swift** - Dependency injection
    - Protocols for file system and shell command abstraction
    - Enable mocking in tests to avoid slow I/O operations
+
+5. **Configuration.swift**, **ConfigLoader.swift**, **ConfigMerger.swift** - Configuration file support
+   - `Configuration` struct (Codable) for TOML config file parsing
+   - `ConfigLoader` handles file discovery and parsing with user-friendly errors
+   - `ConfigMerger` merges config file values with CLI arguments (CLI takes precedence)
+   - Uses swift-toml library for TOML parsing with C++ interoperability
 
 ### Data Flow
 1. Stdin input → `readStandardInput()`
@@ -365,6 +383,29 @@ Test cases cover:
     - Empty when no durations
     - Encoding (omitted when empty, encoded when not)
     - TOON format support
+- **Configuration file support** (28 tests):
+  - Configuration decoding (full, partial, empty)
+  - Format option variants (json, toon, github-actions)
+  - Delimiter option variants (comma, tab, pipe)
+  - TOON section-only decoding
+  - ConfigLoader tests:
+    - Explicit path not found error
+    - Auto-detect CWD config
+    - Auto-detect user config
+    - CWD priority over user config
+    - No config returns nil
+    - Read error handling
+    - Invalid TOML syntax error
+    - Template generation
+  - ConfigMerger tests:
+    - CLI format overrides config
+    - CLI boolean flags override config
+    - CLI TOON options override config
+    - Config used when CLI not set
+    - Defaults when neither set
+    - Empty coverage path treated as nil
+    - Zero flatten depth treated as unlimited
+  - ConfigError description tests
 
 Run individual tests:
 ```bash
@@ -375,6 +416,8 @@ swift test --filter OutputParserTests.testParseError
 
 - **Swift ArgumentParser**: CLI argument handling (Package.swift dependency)
 - **ToonFormat** (toon-swift): Token-Oriented Object Notation encoder for efficient LLM output (Package.swift dependency)
+- **swift-toml**: TOML configuration file parsing with Codable support (Package.swift dependency)
+  - Requires C++ interoperability mode (`swiftSettings: [.interoperabilityMode(.Cxx)]`)
 - **Foundation**: Core Swift framework for regex, JSON encoding, string processing
 - **XCTest**: Testing framework (test target only)
 
@@ -574,6 +617,83 @@ When running on GitHub Actions (`GITHUB_ACTIONS=true`), xcsift automatically app
 
 - name: Annotations only (no JSON/TOON)
   run: xcodebuild build 2>&1 | xcsift -f github-actions
+```
+
+## Configuration File
+
+xcsift supports TOML configuration files to reduce CLI flag complexity. Store your default options in a config file and override them with CLI flags when needed.
+
+### Config File Search Order
+
+1. `.xcsift.toml` in current working directory
+2. `~/.config/xcsift/config.toml` in home directory
+
+If no config file is found, xcsift uses CLI defaults.
+
+### CLI Flags
+
+- `--init` - Generate a `.xcsift.toml` template in the current directory
+- `--config PATH` - Use a specific config file (fails if not found)
+
+### Config File Format
+
+```toml
+# .xcsift.toml
+# All options are optional - omit to use defaults
+
+# Output format: "json" (default), "toon", or "github-actions"
+format = "toon"
+
+# Warning options
+warnings = true          # Print detailed warnings list (-w)
+werror = false           # Treat warnings as errors (-W)
+
+# Output control
+quiet = false            # Suppress output on success (-q)
+
+# Test analysis
+slow_threshold = 1.0     # Threshold in seconds for slow test detection
+
+# Coverage options
+coverage = false         # Enable coverage output (-c)
+coverage_details = false # Include per-file coverage breakdown
+coverage_path = ""       # Custom path to coverage data (empty = auto-detect)
+
+# Build info
+build_info = false       # Include per-target build phases and timing
+executable = false       # Include executable targets (-e)
+
+# TOON format configuration
+[toon]
+delimiter = "comma"      # "comma", "tab", or "pipe"
+key_folding = "disabled" # "disabled" or "safe"
+flatten_depth = 0        # 0 = unlimited, or positive integer
+```
+
+### Priority
+
+**CLI flags always override config file values.** This is documented in `--help`.
+
+Example:
+```bash
+# Config has format = "toon", but CLI overrides to JSON
+xcodebuild build 2>&1 | xcsift -f json
+```
+
+**Boolean flags use OR semantics:** `--warnings`, `--quiet`, `--coverage`, etc. are enabled if CLI flag is passed OR config value is `true`. There are no `--no-*` flags, so you cannot disable a boolean via CLI if it's enabled in config.
+
+### Error Messages
+
+Config errors provide user-friendly messages:
+
+```
+Error: Configuration file not found: /path/to/config.toml
+
+Error: TOML syntax error at line 5, column 12: unterminated string
+
+Error: Invalid value 'yaml' for 'format'. Valid options: json, toon, github-actions
+
+Error: Type mismatch at 'warnings': expected Bool, found String
 ```
 
 ## Documentation Maintenance
