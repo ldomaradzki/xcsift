@@ -115,13 +115,15 @@ struct ConfigLoader {
 
     private func findConfigFile() -> String? {
         // 1. Check current working directory
-        let cwdPath = fileSystem.currentDirectoryPath + "/" + Self.configFileName
+        let cwdPath = URL(fileURLWithPath: fileSystem.currentDirectoryPath)
+            .appendingPathComponent(Self.configFileName).path
         if fileSystem.fileExists(atPath: cwdPath) {
             return cwdPath
         }
 
         // 2. Check user config directory
-        let userPath = fileSystem.homeDirectoryForCurrentUser.path + "/" + Self.userConfigPath
+        let userPath = fileSystem.homeDirectoryForCurrentUser
+            .appendingPathComponent(Self.userConfigPath).path
         if fileSystem.fileExists(atPath: userPath) {
             return userPath
         }

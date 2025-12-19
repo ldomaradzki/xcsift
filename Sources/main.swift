@@ -277,7 +277,8 @@ struct XCSift: ParsableCommand {
     private func generateConfigFile() throws {
         let configLoader = ConfigLoader()
         let filename = ConfigLoader.configFileName
-        let path = FileManager.default.currentDirectoryPath + "/" + filename
+        let path = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent(filename).path
 
         // Check if file already exists
         if FileManager.default.fileExists(atPath: path) {
