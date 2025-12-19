@@ -75,8 +75,20 @@ For 30-60% token reduction when passing output to LLMs:
 xcodebuild build 2>&1 | xcsift --format toon
 ```
 
+### Configuration File
+
+Generate a configuration file to store your default options:
+
+```bash
+# Generate template in current directory
+xcsift --init
+```
+
+This creates `.xcsift.toml` where you can set defaults like output format, warnings, coverage, and more. CLI flags always override config file values.
+
 ## What's Next
 
 - <doc:Usage> — Complete CLI reference
+- <doc:Configuration> — Configuration file format and options
 - <doc:OutputFormats> — JSON, TOON, and GitHub Actions formats
 - <doc:CodeCoverage> — Automatic coverage conversion

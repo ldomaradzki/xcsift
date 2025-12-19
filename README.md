@@ -19,6 +19,7 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 ## Features
 
 - **Multiple output formats** - JSON (default), TOON (30-60% fewer tokens), or GitHub Actions
+- **Configuration files** - Store default options in `.xcsift.toml` for project or user-wide defaults
 - **TOON format support** - Token-Oriented Object Notation optimized for LLM consumption
 - **GitHub Actions integration** - Auto-detected workflow commands with inline PR annotations
 - **Structured error reporting** - Clear categorization of errors, warnings, and test failures
@@ -162,6 +163,15 @@ swift test 2>&1 | xcsift -f github-actions -w
 
 # Manual override in CI (auto-detected by default)
 xcodebuild build 2>&1 | xcsift -f github-actions
+
+# Configuration file - store default options
+xcsift --init                          # Generate .xcsift.toml template
+xcodebuild build 2>&1 | xcsift --config ~/my-config.toml  # Use custom config
+
+# Config files are searched in order:
+# 1. .xcsift.toml in current directory
+# 2. ~/.config/xcsift/config.toml
+# CLI flags always override config file values
 ```
 
 ## Output Format
@@ -429,6 +439,56 @@ Key folding collapses nested single-key objects into dotted paths for more compa
 xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-key-folding safe --toon-flatten-depth 5 -w -c
 ```
 
+### Configuration File
+
+Store default options in a TOML configuration file to reduce CLI flag complexity.
+
+**Quick Start:**
+```bash
+# Generate template in current directory
+xcsift --init
+
+# Use custom config file
+xcodebuild build 2>&1 | xcsift --config ~/my-config.toml
+```
+
+**Config File Search Order:**
+1. `.xcsift.toml` in current working directory
+2. `~/.config/xcsift/config.toml` in home directory
+
+**Example `.xcsift.toml`:**
+```toml
+# Output format: "json" (default), "toon", or "github-actions"
+format = "toon"
+
+# Warning options
+warnings = true          # Print detailed warnings list (-w)
+werror = false           # Treat warnings as errors (-W)
+
+# Output control
+quiet = false            # Suppress output on success (-q)
+
+# Test analysis
+slow_threshold = 1.0     # Threshold in seconds for slow test detection
+
+# Coverage options
+coverage = false         # Enable coverage output (-c)
+coverage_details = false # Include per-file coverage breakdown
+coverage_path = ""       # Custom path (empty = auto-detect)
+
+# Build info
+build_info = false       # Include per-target phases and timing
+executable = false       # Include executable targets (-e)
+
+# TOON format configuration
+[toon]
+delimiter = "comma"      # "comma", "tab", or "pipe"
+key_folding = "disabled" # "disabled" or "safe"
+flatten_depth = 0        # 0 = unlimited
+```
+
+**Priority:** CLI flags always override config file values.
+
 ### GitHub Actions Format (Auto-Appended on CI)
 
 On GitHub Actions (when `GITHUB_ACTIONS=true`), xcsift **automatically appends** workflow annotations after the JSON/TOON output. This creates inline annotations in pull requests and workflow runs **while preserving structured output**.
@@ -561,6 +621,7 @@ Documentation source files are in `Sources/xcsift.docc/`:
 - `xcsift.md` — Main overview
 - `GettingStarted.md` — Installation guide
 - `Usage.md` — CLI reference
+- `Configuration.md` — Configuration file format
 - `OutputFormats.md` — Format details
 - `CodeCoverage.md` — Coverage feature
 

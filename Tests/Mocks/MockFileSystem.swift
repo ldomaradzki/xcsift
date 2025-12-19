@@ -8,7 +8,9 @@ final class MockFileSystem: FileSystemProtocol {
     var directories: [String: [String]] = [:]
     var directoryFlags: Set<String> = []
     var fileAttributes: [String: [FileAttributeKey: Any]] = [:]
+    var fileContents: [String: String] = [:]
     var mockHomeDirectory = URL(fileURLWithPath: "/mock/home")
+    var mockCurrentDirectory = "/mock/cwd"
 
     func fileExists(atPath path: String) -> Bool {
         existingPaths.contains(path)
@@ -43,6 +45,17 @@ final class MockFileSystem: FileSystemProtocol {
 
     var homeDirectoryForCurrentUser: URL {
         mockHomeDirectory
+    }
+
+    var currentDirectoryPath: String {
+        mockCurrentDirectory
+    }
+
+    func contentsOfFile(atPath path: String) throws -> String {
+        guard let contents = fileContents[path] else {
+            throw NSError(domain: NSCocoaErrorDomain, code: NSFileNoSuchFileError)
+        }
+        return contents
     }
 }
 
