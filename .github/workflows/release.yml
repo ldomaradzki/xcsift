@@ -80,8 +80,6 @@ jobs:
     name: Update Homebrew Tap
     needs: release
     runs-on: ubuntu-latest
-    # Only run if HOMEBREW_TAP_TOKEN secret is available
-    if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
     steps:
       - name: Get version from tag
         id: version
