@@ -40,6 +40,8 @@ final class EncodingTests: XCTestCase {
     func testJSONIncludesNonNilOptionalFields() throws {
         let parser = OutputParser()
         let input = """
+            Building for debugging...
+            Build complete! (10.5s)
             Test Case 'SampleTests.testExample' passed (0.001 seconds).
             Executed 5 tests, with 0 failures (0 unexpected) in 5.017 (5.020) seconds
             """
@@ -61,6 +63,7 @@ final class EncodingTests: XCTestCase {
         // Verify that optional fields have values
         XCTAssertNotNil(result.summary.passedTests)
         XCTAssertNotNil(result.summary.buildTime)
+        XCTAssertNotNil(result.summary.testTime)
         XCTAssertNotNil(result.summary.coveragePercent)
 
         // Encode to JSON
@@ -72,6 +75,7 @@ final class EncodingTests: XCTestCase {
         // Verify that non-nil optional fields ARE present in JSON output
         XCTAssertTrue(jsonString.contains("\"passed_tests\""), "JSON should contain passed_tests when not nil")
         XCTAssertTrue(jsonString.contains("\"build_time\""), "JSON should contain build_time when not nil")
+        XCTAssertTrue(jsonString.contains("\"test_time\""), "JSON should contain test_time when not nil")
         XCTAssertTrue(jsonString.contains("\"coverage_percent\""), "JSON should contain coverage_percent when not nil")
     }
 
@@ -111,6 +115,8 @@ final class EncodingTests: XCTestCase {
     func testTOONIncludesNonNilOptionalFields() throws {
         let parser = OutputParser()
         let input = """
+            Building for debugging...
+            Build complete! (10.5s)
             Test Case 'SampleTests.testExample' passed (0.001 seconds).
             Executed 5 tests, with 0 failures (0 unexpected) in 5.017 (5.020) seconds
             """
@@ -132,6 +138,7 @@ final class EncodingTests: XCTestCase {
         // Verify that optional fields have values
         XCTAssertNotNil(result.summary.passedTests)
         XCTAssertNotNil(result.summary.buildTime)
+        XCTAssertNotNil(result.summary.testTime)
         XCTAssertNotNil(result.summary.coveragePercent)
 
         // Encode to TOON
@@ -144,6 +151,7 @@ final class EncodingTests: XCTestCase {
         // Verify that non-nil optional fields ARE present in TOON output
         XCTAssertTrue(toonString.contains("passed_tests:"), "TOON should contain passed_tests when not nil")
         XCTAssertTrue(toonString.contains("build_time:"), "TOON should contain build_time when not nil")
+        XCTAssertTrue(toonString.contains("test_time:"), "TOON should contain test_time when not nil")
         XCTAssertTrue(toonString.contains("coverage_percent:"), "TOON should contain coverage_percent when not nil")
     }
 }

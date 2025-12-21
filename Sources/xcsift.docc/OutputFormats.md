@@ -26,6 +26,7 @@ The default format outputs structured JSON with build status, summary, and detai
     "linker_errors": 0,
     "passed_tests": 28,
     "build_time": "3.2",
+    "test_time": "5.0",
     "coverage_percent": 85.5
   },
   "errors": [
@@ -48,7 +49,8 @@ The default format outputs structured JSON with build status, summary, and detai
 | `summary.failed_tests` | Count of failed tests |
 | `summary.linker_errors` | Count of linker errors |
 | `summary.passed_tests` | Count of passed tests (if available) |
-| `summary.build_time` | Build duration in seconds |
+| `summary.build_time` | Build/compilation duration in seconds |
+| `summary.test_time` | Test execution duration in seconds (when tests run) |
 | `summary.coverage_percent` | Line coverage percentage (with `--coverage`) |
 | `summary.slow_tests` | Count of slow tests (with `--slow-threshold`) |
 | `summary.flaky_tests` | Count of flaky tests (auto-detected) |
@@ -191,7 +193,7 @@ Two types of linker errors are captured:
 
 - Groups phases by target with per-target timing
 - Parses target dependencies from xcodebuild output
-- Total build time remains in `summary.build_time`
+- Build time remains in `summary.build_time`, test time in `summary.test_time`
 - Empty fields are omitted (targets without phases or dependencies)
 
 Supported phases:
