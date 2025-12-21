@@ -31,7 +31,15 @@ jobs:
         if: matrix.platform == 'linux-x64'
         run: apt-get update && apt-get install -y curl
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
+
+      - name: Cache SPM packages
+        uses: actions/cache@v5
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
 
       - name: Select Xcode 16 (macOS)
         if: matrix.platform == 'macos-arm64'
@@ -94,7 +102,7 @@ jobs:
           echo "sha256=${SHA}" >> $GITHUB_OUTPUT
 
       - name: Checkout Homebrew tap
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ldomaradzki/homebrew-xcsift
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
