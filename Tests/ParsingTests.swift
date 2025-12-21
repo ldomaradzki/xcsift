@@ -227,6 +227,23 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.failedTests, 0)
     }
 
+    /// Tests that test_time is accumulated correctly when both XCTest and Swift Testing are present
+    /// Regression test for fix where test times are summed across multiple test bundles
+    func testCombinedTestTimeAccumulation() {
+        let parser = OutputParser()
+        let input = """
+            Executed 100 tests, with 0 failures (0 unexpected) in 2.500 (2.600) seconds
+            􁁛  Test run with 50 tests in 5 suites passed after 1.500 seconds.
+            """
+
+        let result = parser.parse(input: input)
+
+        // XCTest: 2.500 seconds + Swift Testing: 1.500 seconds = 4.000 seconds total
+        XCTAssertEqual(result.summary.testTime, "4.000")
+        // Also verify counts are correct
+        XCTAssertEqual(result.summary.passedTests, 150)
+    }
+
     func testSwiftCompilerVisualErrorLinesAreFiltered() {
         let parser = OutputParser()
         // Swift compiler outputs each error twice:
