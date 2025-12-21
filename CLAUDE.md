@@ -231,7 +231,7 @@ The codebase follows a modular architecture:
   - Included with `--warnings` flag (no separate flag needed)
 - **Linker Error Parsing**: Captures undefined symbols, missing frameworks/libraries, architecture mismatches, and duplicate symbols (with structured conflicting file paths)
 - **Test Failure Detection**: XCUnit assertion failures and general test failures
-- **Build Time Extraction**: Captures build duration from output
+- **Build Time Extraction**: Captures build duration (`build_time`) and test execution time (`test_time`) separately
 - **File/Line Mapping**: Extracts precise source locations for navigation
 - **Executable Target Detection**: Parses `RegisterWithLaunchServices` lines to extract executable targets (path, name, target)
 - **Build Info**: Unified per-target phases, timing, and dependencies
@@ -242,7 +242,7 @@ The codebase follows a modular architecture:
   - Supports xcodebuild phase detection from "(in target 'X' from project 'Y')" patterns
   - Supports SPM phase detection from "[N/M] Compiling/Linking TARGET" patterns
   - Parses "Build target X (Ys)" and "** BUILD SUCCEEDED ** [Xs]" patterns
-  - Total build time always in `summary.build_time` (not duplicated in build_info)
+  - Build time in `summary.build_time`, test execution time in `summary.test_time` (not duplicated in build_info)
   - xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
   - SPM phases: `Compiling`, `Linking`
   - **Dependency Graph**: Extracts target dependencies from xcodebuild "Target dependency graph" output
@@ -520,7 +520,7 @@ The tool outputs structured data optimized for coding agents in two formats:
     - Groups phases by target with per-target timing
     - Parses target dependencies from xcodebuild "Target dependency graph" output
     - **Slowest targets**: Top 5 targets sorted by duration (descending)
-    - Total build time is in `summary.build_time` (not duplicated in build_info)
+    - Build time is in `summary.build_time`, test execution time is in `summary.test_time` (not duplicated in build_info)
     - xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
     - SPM phases: `Compiling`, `Linking`
     - Empty fields are omitted (targets without phases won't have `phases` field, targets without dependencies won't have `depends_on` field, no `slowest_targets` when empty)
@@ -546,6 +546,7 @@ summary:
   failed_tests: 0
   passed_tests: null
   build_time: null
+  test_time: null
   coverage_percent: null
 errors[1]{file,line,message}:
   main.swift,15,"use of undeclared identifier \"unknown\""

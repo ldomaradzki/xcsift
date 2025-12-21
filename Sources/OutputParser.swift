@@ -9,12 +9,15 @@ class OutputParser {
     private var executables: [Executable] = []
     private var seenExecutablePaths: Set<String> = []
     private var buildTime: String?
+    private var testTimeAccumulator: Double = 0
     private var seenTestNames: Set<String> = []
     private var seenWarnings: Set<String> = []
     private var seenErrors: Set<String> = []
     private var seenLinkerErrors: Set<String> = []
-    private var executedTestsCount: Int?
-    private var summaryFailedTestsCount: Int?
+    private var xctestExecutedCount: Int?
+    private var xctestFailedCount: Int?
+    private var swiftTestingExecutedCount: Int?
+    private var swiftTestingFailedCount: Int?
     private var passedTestsCount: Int = 0
     private var seenPassedTestNames: Set<String> = []
     private var parallelTestsTotalCount: Int?
@@ -372,18 +375,40 @@ class OutputParser {
         let status =
             finalErrors.isEmpty && failedTests.isEmpty && linkerErrors.isEmpty ? "success" : "failed"
 
-        let summaryFailedCount = summaryFailedTestsCount ?? failedTests.count
-        let computedPassedTests: Int? = {
-            // Priority 1: Use parallel test total count if available
-            // This is the authoritative count from [N/TOTAL] Testing lines
+        // Aggregate test counts from both XCTest and Swift Testing
+        let totalExecuted: Int? = {
+            // Priority 1: Use parallel test total count if available (Swift Testing parallel mode)
             if let parallelTotal = parallelTestsTotalCount {
-                return max(parallelTotal - summaryFailedCount, 0)
+                // Add XCTest count if available
+                if let xctest = xctestExecutedCount {
+                    return parallelTotal + xctest
+                }
+                return parallelTotal
             }
-            // Priority 2: Use executed tests count from summary line
-            if let executed = executedTestsCount {
-                return max(executed - summaryFailedCount, 0)
+
+            // Priority 2: Sum XCTest and Swift Testing counts from summary lines
+            let xctest = xctestExecutedCount ?? 0
+            let swiftTesting = swiftTestingExecutedCount ?? 0
+            if xctest > 0 || swiftTesting > 0 {
+                return xctest + swiftTesting
             }
-            // Priority 3: Use counted passed tests
+            return nil
+        }()
+
+        let totalFailed: Int = {
+            let xctestFailed = xctestFailedCount ?? 0
+            let swiftTestingFailed = swiftTestingFailedCount ?? 0
+            let aggregated = xctestFailed + swiftTestingFailed
+            // Fall back to parsed failed tests if no summary counts
+            return aggregated > 0 ? aggregated : failedTests.count
+        }()
+
+        let computedPassedTests: Int? = {
+            // Use aggregated counts from summary lines
+            if let executed = totalExecuted {
+                return max(executed - totalFailed, 0)
+            }
+            // Fallback: Use individually counted passed tests
             if passedTestsCount > 0 {
                 return passedTestsCount
             }
@@ -399,13 +424,20 @@ class OutputParser {
         // Detect flaky tests (tests that both passed and failed in the same run)
         let flakyTests = detectFlakyTests()
 
+        // Format accumulated test time (nil if no tests ran)
+        let formattedTestTime: String? =
+            testTimeAccumulator > 0
+            ? String(format: "%.3f", testTimeAccumulator)
+            : nil
+
         let summary = BuildSummary(
             errors: finalErrors.count,
             warnings: finalWarnings.count,
-            failedTests: failedTests.count,
+            failedTests: totalFailed,
             linkerErrors: linkerErrors.count,
             passedTests: computedPassedTests,
             buildTime: buildTime,
+            testTime: formattedTestTime,
             coveragePercent: coverage?.lineCoverage,
             slowTests: slowTests.isEmpty ? nil : slowTests.count,
             flakyTests: flakyTests.isEmpty ? nil : flakyTests.count,
@@ -526,9 +558,12 @@ class OutputParser {
         executables = []
         seenExecutablePaths = []
         buildTime = nil
+        testTimeAccumulator = 0
         seenTestNames = []
-        executedTestsCount = nil
-        summaryFailedTestsCount = nil
+        xctestExecutedCount = nil
+        xctestFailedCount = nil
+        swiftTestingExecutedCount = nil
+        swiftTestingFailedCount = nil
         passedTestsCount = 0
         seenPassedTestNames = []
         currentLinkerArchitecture = nil
@@ -670,8 +705,8 @@ class OutputParser {
             }
         } else if parsePassedTest(line) {
             return
-        } else if let time = parseBuildTime(line) {
-            buildTime = time
+        } else {
+            parseBuildAndTestTime(line)
         }
     }
 
@@ -1231,120 +1266,137 @@ class OutputParser {
         return nil
     }
 
-    private func parseBuildTime(_ line: String) -> String? {
+    private func parseBuildAndTestTime(_ line: String) {
         // Pattern: ** BUILD SUCCEEDED ** [45.2s] or ** BUILD FAILED ** [15.3s]
-        // xcodebuild format with bracket timing - highest priority
+        // xcodebuild format with bracket timing - BUILD time
         if line.contains("** BUILD SUCCEEDED **") || line.contains("** BUILD FAILED **") {
-            // Extract time from square brackets
             if let bracketStart = line.range(of: "[", options: .backwards),
                 let bracketEnd = line.range(of: "]", options: .backwards),
                 bracketStart.lowerBound < bracketEnd.lowerBound
             {
-                return String(line[bracketStart.upperBound ..< bracketEnd.lowerBound])
+                buildTime = String(line[bracketStart.upperBound ..< bracketEnd.lowerBound])
             }
+            return
         }
 
-        // Pattern: Build complete! (12.34s) - SPM format
+        // Pattern: Build complete! (12.34s) - SPM format - BUILD time
         if line.hasPrefix("Build complete!") {
             if let parenStart = line.range(of: "("),
                 let parenEnd = line.range(of: ")"),
                 parenStart.lowerBound < parenEnd.lowerBound
             {
-                return String(line[parenStart.upperBound ..< parenEnd.lowerBound])
+                buildTime = String(line[parenStart.upperBound ..< parenEnd.lowerBound])
             }
+            return
         }
 
-        // Pattern: Build succeeded in time
+        // Pattern: Build succeeded in time - BUILD time
         if line.hasPrefix("Build succeeded in ") {
-            return String(line.dropFirst(19))
+            buildTime = String(line.dropFirst(19))
+            return
         }
 
-        // Pattern: Build failed after time
+        // Pattern: Build failed after time - BUILD time
         if line.hasPrefix("Build failed after ") {
-            return String(line.dropFirst(19))
+            buildTime = String(line.dropFirst(19))
+            return
         }
 
         // Pattern: Executed N tests, with N failures (N unexpected) in time (seconds) seconds
-        if line.hasPrefix("Executed "), let withRange = line.range(of: ", with ") {
-            let afterExecuted = line[line.index(line.startIndex, offsetBy: 9) ..< withRange.lowerBound]
-            // Extract test count (skip "s" suffix)
+        // This is XCTest output format (may have leading whitespace/tab) - TEST time
+        let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+        if trimmedLine.hasPrefix("Executed "), let withRange = trimmedLine.range(of: ", with ") {
+            let afterExecuted = trimmedLine[
+                trimmedLine.index(trimmedLine.startIndex, offsetBy: 9) ..< withRange.lowerBound
+            ]
             let testCountStr = afterExecuted.split(separator: " ").first
             if let testCountStr = testCountStr, let total = Int(testCountStr) {
-                executedTestsCount = total
+                xctestExecutedCount = total
             }
 
             // Extract failures count
-            let afterWith = line[withRange.upperBound...]
-            let failuresStr = afterWith.split(separator: " ").first
-            if let failuresStr = failuresStr, let failures = Int(failuresStr) {
-                summaryFailedTestsCount = failures
-            }
-
-            // Extract time - look for " in " followed by time
-            if let inRange = line.range(of: " in ", range: withRange.upperBound ..< line.endIndex) {
-                let afterIn = line[inRange.upperBound...]
-                // Format: "time (seconds) seconds" or "time seconds"
-                if let parenStart = afterIn.range(of: " (") {
-                    return String(afterIn[..<parenStart.lowerBound])
-                } else if let secondsRange = afterIn.range(of: " seconds", options: .backwards) {
-                    return String(afterIn[..<secondsRange.lowerBound])
+            let afterWith = String(trimmedLine[withRange.upperBound...])
+            if let failureRange = afterWith.range(of: " failure") {
+                let beforeFailure = afterWith[..<failureRange.lowerBound]
+                let words = beforeFailure.split(separator: " ")
+                if let lastWord = words.last, let failures = Int(lastWord) {
+                    xctestFailedCount = failures
                 }
             }
+
+            // Extract TEST time and accumulate
+            if let inRange = trimmedLine.range(of: " in ", range: withRange.upperBound ..< trimmedLine.endIndex) {
+                let afterIn = trimmedLine[inRange.upperBound...]
+                if let parenStart = afterIn.range(of: " (") {
+                    accumulateTestTime(String(afterIn[..<parenStart.lowerBound]))
+                } else if let secondsRange = afterIn.range(of: " seconds", options: .backwards) {
+                    accumulateTestTime(String(afterIn[..<secondsRange.lowerBound]))
+                }
+            }
+            return
         }
 
         // Pattern: ✘ Test run with N test(s) failed, N test(s) passed after X seconds.
-        // Swift Testing failure summary format (check this BEFORE the passed-only pattern)
+        // Swift Testing failure summary format - TEST time
         if let testRunRange = line.range(of: "Test run with "),
             let failedRange = line.range(of: " failed, ", range: testRunRange.upperBound ..< line.endIndex),
             let passedRange = line.range(of: " passed after ", range: failedRange.upperBound ..< line.endIndex)
         {
-            // Extract failed count
             let beforeFailed = line[testRunRange.upperBound ..< failedRange.lowerBound]
             let failedCountStr = beforeFailed.split(separator: " ").first
             if let failedCountStr = failedCountStr, let failedCount = Int(failedCountStr) {
-                summaryFailedTestsCount = failedCount
+                swiftTestingFailedCount = failedCount
             }
 
-            // Extract passed count (for executedTestsCount calculation)
             let beforePassed = line[failedRange.upperBound ..< passedRange.lowerBound]
             let passedCountStr = beforePassed.split(separator: " ").first
             if let passedCountStr = passedCountStr, let passedCount = Int(passedCountStr),
-                let failedCount = summaryFailedTestsCount
+                let failedCount = swiftTestingFailedCount
             {
-                executedTestsCount = passedCount + failedCount
+                swiftTestingExecutedCount = passedCount + failedCount
             }
 
-            // Extract time
+            // Extract TEST time and accumulate
             let afterPassed = line[passedRange.upperBound...]
             if let secondsRange = afterPassed.range(of: " seconds", options: .backwards) {
-                return String(afterPassed[..<secondsRange.lowerBound])
+                accumulateTestTime(String(afterPassed[..<secondsRange.lowerBound]))
+            } else {
+                accumulateTestTime(String(afterPassed))
             }
-            return String(afterPassed).trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            return
         }
 
         // Pattern: Test run with N tests in N suites passed after X seconds.
-        // Note: Swift Testing output may have a Unicode checkmark prefix (e.g., "􁁛  Test run with...")
+        // Swift Testing output format (passed-only case) - TEST time
         if let testRunRange = line.range(of: "Test run with "),
             let passedAfter = line.range(of: " passed after ")
         {
             let afterPrefix = line[testRunRange.upperBound ..< passedAfter.lowerBound]
-            // Extract test count
             let testCountStr = afterPrefix.split(separator: " ").first
             if let testCountStr = testCountStr, let total = Int(testCountStr) {
-                executedTestsCount = total
-                summaryFailedTestsCount = 0  // All tests passed
-            }
+                swiftTestingExecutedCount = total
+                swiftTestingFailedCount = 0
 
-            // Extract time
-            let afterPassed = line[passedAfter.upperBound...]
-            if let secondsRange = afterPassed.range(of: " seconds", options: .backwards) {
-                return String(afterPassed[..<secondsRange.lowerBound])
+                // Only accumulate test time if there were actual tests
+                if total > 0 {
+                    let afterPassed = line[passedAfter.upperBound...]
+                    if let secondsRange = afterPassed.range(of: " seconds", options: .backwards) {
+                        accumulateTestTime(String(afterPassed[..<secondsRange.lowerBound]))
+                    } else {
+                        accumulateTestTime(String(afterPassed))
+                    }
+                }
             }
-            // Without " seconds" suffix
-            return String(afterPassed).trimmingCharacters(in: CharacterSet(charactersIn: "."))
         }
+    }
 
-        return nil
+    /// Parses time string and adds to accumulator
+    private func accumulateTestTime(_ timeString: String) {
+        // Remove any trailing characters like "." and whitespace
+        let cleaned = timeString.trimmingCharacters(in: CharacterSet(charactersIn: ". \t"))
+        if let time = Double(cleaned) {
+            testTimeAccumulator += time
+        }
     }
 
     // MARK: - Build Phase Parsing

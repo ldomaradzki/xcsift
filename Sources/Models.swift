@@ -261,6 +261,7 @@ struct BuildSummary: Codable {
     let linkerErrors: Int
     let passedTests: Int?
     let buildTime: String?
+    let testTime: String?
     let coveragePercent: Double?
     let slowTests: Int?
     let flakyTests: Int?
@@ -273,6 +274,7 @@ struct BuildSummary: Codable {
         case linkerErrors = "linker_errors"
         case passedTests = "passed_tests"
         case buildTime = "build_time"
+        case testTime = "test_time"
         case coveragePercent = "coverage_percent"
         case slowTests = "slow_tests"
         case flakyTests = "flaky_tests"
@@ -286,6 +288,7 @@ struct BuildSummary: Codable {
         linkerErrors: Int = 0,
         passedTests: Int?,
         buildTime: String?,
+        testTime: String? = nil,
         coveragePercent: Double?,
         slowTests: Int? = nil,
         flakyTests: Int? = nil,
@@ -297,6 +300,7 @@ struct BuildSummary: Codable {
         self.linkerErrors = linkerErrors
         self.passedTests = passedTests
         self.buildTime = buildTime
+        self.testTime = testTime
         self.coveragePercent = coveragePercent
         self.slowTests = slowTests
         self.flakyTests = flakyTests
@@ -316,6 +320,9 @@ struct BuildSummary: Codable {
         }
         if let buildTime = buildTime {
             try container.encode(buildTime, forKey: .buildTime)
+        }
+        if let testTime = testTime {
+            try container.encode(testTime, forKey: .testTime)
         }
         if let coveragePercent = coveragePercent {
             try container.encode(coveragePercent, forKey: .coveragePercent)

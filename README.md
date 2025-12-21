@@ -190,6 +190,7 @@ xcodebuild build 2>&1 | xcsift --config ~/my-config.toml  # Use custom config
     "linker_errors": 0,
     "passed_tests": 28,
     "build_time": "3.2",
+    "test_time": "5.0",
     "coverage_percent": 85.5
   },
   "errors": [
@@ -328,7 +329,7 @@ xcodebuild build 2>&1 | xcsift --config ~/my-config.toml  # Use custom config
 ```
 - Groups phases by target with per-target timing
 - **Slowest targets**: Top 5 targets sorted by duration (descending)
-- Total build time is always in `summary.build_time` (not duplicated in build_info)
+- Build time is in `summary.build_time`, test execution time is in `summary.test_time`
 - Parses xcodebuild timing from "Build target X (Ys)" patterns
 - xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
 - SPM phases: `Compiling`, `Linking`

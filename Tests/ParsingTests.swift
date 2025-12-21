@@ -141,7 +141,7 @@ final class ParsingTests: XCTestCase {
 
         XCTAssertEqual(result.summary.passedTests, 5)
         XCTAssertEqual(result.summary.failedTests, 0)
-        XCTAssertEqual(result.summary.buildTime, "5.017")
+        XCTAssertEqual(result.summary.testTime, "5.017")
     }
 
     func testPassedTestCountFromPassLineOnly() {
@@ -153,6 +153,77 @@ final class ParsingTests: XCTestCase {
         let result = parser.parse(input: input)
 
         XCTAssertEqual(result.summary.passedTests, 1)
+        XCTAssertEqual(result.summary.failedTests, 0)
+    }
+
+    /// Tests that XCTest and Swift Testing counts are aggregated correctly
+    /// Regression test for issue where only Swift Testing count was reported
+    func testCombinedXCTestAndSwiftTestingCounts() {
+        let parser = OutputParser()
+        // Simulates output from `swift test` with both XCTest and Swift Testing tests
+        let input = """
+            Test Suite 'All tests' started at 2024-01-01 12:00:00.000.
+            Test Suite 'MyPackageTests.xctest' started at 2024-01-01 12:00:00.001.
+            Test Suite 'MyXCTests' started at 2024-01-01 12:00:00.002.
+            Test Case '-[MyPackageTests.MyXCTests testExample1]' started.
+            Test Case '-[MyPackageTests.MyXCTests testExample1]' passed (0.001 seconds).
+            Test Case '-[MyPackageTests.MyXCTests testExample2]' started.
+            Test Case '-[MyPackageTests.MyXCTests testExample2]' passed (0.001 seconds).
+            Test Suite 'MyXCTests' passed at 2024-01-01 12:00:00.003.
+            Test Suite 'MyPackageTests.xctest' passed at 2024-01-01 12:00:00.004.
+            Test Suite 'All tests' passed at 2024-01-01 12:00:00.005.
+            Executed 1624 tests, with 0 failures (0 unexpected) in 2.728 (2.768) seconds
+            􀟈  Test run started.
+            ✓ Test "SwiftTest1" passed after 0.001 seconds.
+            ✓ Test "SwiftTest2" passed after 0.001 seconds.
+            ✓ Test "SwiftTest3" passed after 0.001 seconds.
+            􁁛  Test run with 82 tests in 7 suites passed after 0.166 seconds.
+            """
+
+        let result = parser.parse(input: input)
+
+        // Should aggregate both XCTest (1624) and Swift Testing (82) counts
+        XCTAssertEqual(result.summary.passedTests, 1624 + 82)
+        XCTAssertEqual(result.summary.failedTests, 0)
+        XCTAssertEqual(result.status, "success")
+    }
+
+    /// Tests combined counts when both XCTest and Swift Testing have failures
+    func testCombinedXCTestAndSwiftTestingWithFailures() {
+        let parser = OutputParser()
+        let input = """
+            Executed 100 tests, with 2 failures (2 unexpected) in 1.5 (1.6) seconds
+            ✘ Test run with 3 tests failed, 7 tests passed after 0.5 seconds.
+            """
+
+        let result = parser.parse(input: input)
+
+        // XCTest: 100 total, 2 failed = 98 passed
+        // Swift Testing: 3 failed + 7 passed = 10 total
+        // Combined: 100 + 10 = 110 total, 2 + 3 = 5 failed, 110 - 5 = 105 passed
+        XCTAssertEqual(result.summary.passedTests, 105)
+        XCTAssertEqual(result.summary.failedTests, 5)
+    }
+
+    /// Tests combined counts with Swift Testing parallel output + XCTest
+    /// Parallel output uses [N/M] Testing format which sets parallelTestsTotalCount
+    func testCombinedParallelSwiftTestingAndXCTest() {
+        let parser = OutputParser()
+        let input = """
+            Executed 50 tests, with 0 failures (0 unexpected) in 1.0 (1.1) seconds
+            [1/20] Testing MyModule.TestClass/testMethod1
+            [2/20] Testing MyModule.TestClass/testMethod2
+            [20/20] Testing MyModule.TestClass/testMethod20
+            ✓ Test "testMethod1" passed after 0.001 seconds.
+            􁁛  Test run with 20 tests in 3 suites passed after 0.5 seconds.
+            """
+
+        let result = parser.parse(input: input)
+
+        // XCTest: 50 tests from summary line
+        // Swift Testing: 20 tests from parallel count (not summary, which would also be 20)
+        // Combined: 50 + 20 = 70 passed, 0 failed
+        XCTAssertEqual(result.summary.passedTests, 70)
         XCTAssertEqual(result.summary.failedTests, 0)
     }
 
@@ -488,7 +559,7 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.status, "success")
         XCTAssertEqual(result.summary.passedTests, 23)
         XCTAssertEqual(result.summary.failedTests, 0)
-        XCTAssertEqual(result.summary.buildTime, "0.031")
+        XCTAssertEqual(result.summary.testTime, "0.031")
     }
 
     func testRealWorldSwiftTestingOutput() throws {
@@ -504,7 +575,7 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.errors, 0)
         XCTAssertEqual(result.summary.failedTests, 0)
         XCTAssertEqual(result.summary.passedTests, 23)
-        XCTAssertEqual(result.summary.buildTime, "0.031")
+        XCTAssertEqual(result.summary.testTime, "0.031")
     }
 
     func testJSONLikeLinesAreFiltered() {
@@ -638,7 +709,7 @@ final class ParsingTests: XCTestCase {
 
         XCTAssertEqual(result.status, "failed")
         XCTAssertEqual(result.summary.passedTests, 9)
-        XCTAssertEqual(result.summary.buildTime, "0.020")
+        XCTAssertEqual(result.summary.testTime, "0.020")
     }
 
     func testSwiftTestParallelLargeCount() {
@@ -689,7 +760,7 @@ final class ParsingTests: XCTestCase {
         // Without [N/TOTAL] lines, should use summary: 3 failed + 7 passed = 10 total
         // passed = 10 - 3 = 7
         XCTAssertEqual(result.summary.passedTests, 7)
-        XCTAssertEqual(result.summary.buildTime, "0.050")
+        XCTAssertEqual(result.summary.testTime, "0.050")
     }
 
     // MARK: - Test Duration Parsing
