@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "xcsift",
-    platforms: [.macOS(.v15)],
+    platforms: [.macOS(.v13)],
     products: [
         .executable(
             name: "xcsift",
