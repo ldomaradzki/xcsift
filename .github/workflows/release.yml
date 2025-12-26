@@ -21,7 +21,8 @@ jobs:
             platform: linux-x64
             arch: x86_64
             build-path: x86_64-unknown-linux-gnu/release
-            container: swift:6.0
+            container: swift:6.1-jammy
+            extra-flags: --static-swift-stdlib -Xlinker -lstdc++ -Xlinker -L/usr/lib/swift/linux
 
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
@@ -29,7 +30,7 @@ jobs:
     steps:
       - name: Install dependencies (Linux)
         if: matrix.platform == 'linux-x64'
-        run: apt-get update && apt-get install -y curl
+        run: apt-get update && apt-get install -y curl build-essential
 
       - uses: actions/checkout@v6
 
@@ -56,7 +57,7 @@ jobs:
           fi
 
       - name: Build release binary
-        run: swift build -c release --arch ${{ matrix.arch }}
+        run: swift build -c release --arch ${{ matrix.arch }} ${{ matrix.extra-flags }}
 
       - name: Create release archive
         run: |
@@ -91,7 +92,7 @@ jobs:
     steps:
       - name: Get version from tag
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
       - name: Download source tarball and calculate SHA256
         id: sha
@@ -99,7 +100,7 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           curl -sL "https://github.com/ldomaradzki/xcsift/archive/refs/tags/v${VERSION}.tar.gz" -o xcsift.tar.gz
           SHA=$(sha256sum xcsift.tar.gz | cut -d' ' -f1)
-          echo "sha256=${SHA}" >> $GITHUB_OUTPUT
+          echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout Homebrew tap
         uses: actions/checkout@v6
