@@ -427,7 +427,7 @@ class OutputParser {
         // Format accumulated test time (nil if no tests ran)
         let formattedTestTime: String? =
             testTimeAccumulator > 0
-            ? String(format: "%.3f", testTimeAccumulator)
+            ? String(format: "%.3fs", testTimeAccumulator)
             : nil
 
         let summary = BuildSummary(

@@ -25,8 +25,8 @@ The default format outputs structured JSON with build status, summary, and detai
     "failed_tests": 0,
     "linker_errors": 0,
     "passed_tests": 28,
-    "build_time": "3.2",
-    "test_time": "5.0",
+    "build_time": "3.2s",
+    "test_time": "5.0s",
     "coverage_percent": 85.5
   },
   "errors": [

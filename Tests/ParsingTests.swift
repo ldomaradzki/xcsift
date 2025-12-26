@@ -141,7 +141,7 @@ final class ParsingTests: XCTestCase {
 
         XCTAssertEqual(result.summary.passedTests, 5)
         XCTAssertEqual(result.summary.failedTests, 0)
-        XCTAssertEqual(result.summary.testTime, "5.017")
+        XCTAssertEqual(result.summary.testTime, "5.017s")
     }
 
     func testPassedTestCountFromPassLineOnly() {
@@ -239,7 +239,7 @@ final class ParsingTests: XCTestCase {
         let result = parser.parse(input: input)
 
         // XCTest: 2.500 seconds + Swift Testing: 1.500 seconds = 4.000 seconds total
-        XCTAssertEqual(result.summary.testTime, "4.000")
+        XCTAssertEqual(result.summary.testTime, "4.000s")
         // Also verify counts are correct
         XCTAssertEqual(result.summary.passedTests, 150)
     }
@@ -576,7 +576,7 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.status, "success")
         XCTAssertEqual(result.summary.passedTests, 23)
         XCTAssertEqual(result.summary.failedTests, 0)
-        XCTAssertEqual(result.summary.testTime, "0.031")
+        XCTAssertEqual(result.summary.testTime, "0.031s")
     }
 
     func testRealWorldSwiftTestingOutput() throws {
@@ -592,7 +592,7 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.errors, 0)
         XCTAssertEqual(result.summary.failedTests, 0)
         XCTAssertEqual(result.summary.passedTests, 23)
-        XCTAssertEqual(result.summary.testTime, "0.031")
+        XCTAssertEqual(result.summary.testTime, "0.031s")
     }
 
     func testJSONLikeLinesAreFiltered() {
@@ -726,7 +726,7 @@ final class ParsingTests: XCTestCase {
 
         XCTAssertEqual(result.status, "failed")
         XCTAssertEqual(result.summary.passedTests, 9)
-        XCTAssertEqual(result.summary.testTime, "0.020")
+        XCTAssertEqual(result.summary.testTime, "0.020s")
     }
 
     func testSwiftTestParallelLargeCount() {
@@ -777,7 +777,7 @@ final class ParsingTests: XCTestCase {
         // Without [N/TOTAL] lines, should use summary: 3 failed + 7 passed = 10 total
         // passed = 10 - 3 = 7
         XCTAssertEqual(result.summary.passedTests, 7)
-        XCTAssertEqual(result.summary.testTime, "0.050")
+        XCTAssertEqual(result.summary.testTime, "0.050s")
     }
 
     // MARK: - Test Duration Parsing
