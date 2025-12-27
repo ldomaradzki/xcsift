@@ -117,10 +117,11 @@ struct CoverageParser {
         }
 
         var xcresultPaths: [String] = []
-        for case let file as String in enumerator {
+        while let file = enumerator.nextObject() as? String {
             if file.hasSuffix(".xcresult") {
                 let fullPath = (directory as NSString).appendingPathComponent(file)
                 xcresultPaths.append(fullPath)
+                enumerator.skipDescendants()
             }
         }
         return xcresultPaths
@@ -193,10 +194,12 @@ struct CoverageParser {
             return nil
         }
 
-        for case let file as String in enumerator {
+        while let file = enumerator.nextObject() as? String {
             if file.hasSuffix(".xctest") {
                 let xctestPath = (buildDir as NSString).appendingPathComponent(file)
                 let macosPath = (xctestPath as NSString).appendingPathComponent("Contents/MacOS")
+
+                enumerator.skipDescendants()
 
                 guard let macosContents = try? fileSystem.contentsOfDirectory(atPath: macosPath)
                 else {
