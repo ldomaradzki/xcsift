@@ -103,6 +103,9 @@ struct ConfigLoader {
             # build_info = false      # Include per-target build phases and timing
             # executable = false      # Include executable targets (-e)
 
+            # Exit behavior
+            # exit_on_failure = false # Exit with failure code if build does not succeed (-E)
+
             # TOON format configuration
             # [toon]
             # delimiter = "comma"     # "comma", "tab", or "pipe"

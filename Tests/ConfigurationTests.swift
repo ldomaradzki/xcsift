@@ -312,6 +312,7 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertTrue(template.contains("coverage_path = \"\""))
         XCTAssertTrue(template.contains("build_info = false"))
         XCTAssertTrue(template.contains("executable = false"))
+        XCTAssertTrue(template.contains("exit_on_failure = false"))
         XCTAssertTrue(template.contains("[toon]"))
         XCTAssertTrue(template.contains("delimiter = \"comma\""))
         XCTAssertTrue(template.contains("key_folding = \"disabled\""))
@@ -341,6 +342,7 @@ final class ConfigMergerTests: XCTestCase {
             cliSlowThreshold: nil,
             cliBuildInfo: false,
             cliExecutable: false,
+            cliExitOnFailure: false,
             cliToonDelimiter: nil,
             cliToonKeyFolding: nil,
             cliToonFlattenDepth: nil
@@ -366,6 +368,7 @@ final class ConfigMergerTests: XCTestCase {
             cliSlowThreshold: nil,
             cliBuildInfo: false,
             cliExecutable: false,
+            cliExitOnFailure: false,
             cliToonDelimiter: nil,
             cliToonKeyFolding: nil,
             cliToonFlattenDepth: nil
@@ -394,6 +397,7 @@ final class ConfigMergerTests: XCTestCase {
             cliSlowThreshold: nil,
             cliBuildInfo: false,
             cliExecutable: false,
+            cliExitOnFailure: false,
             cliToonDelimiter: .pipe,  // CLI should override
             cliToonKeyFolding: .safe,  // CLI should override
             cliToonFlattenDepth: 3  // CLI should override
@@ -427,6 +431,7 @@ final class ConfigMergerTests: XCTestCase {
             cliSlowThreshold: nil,
             cliBuildInfo: false,
             cliExecutable: false,
+            cliExitOnFailure: false,
             cliToonDelimiter: nil,
             cliToonKeyFolding: nil,
             cliToonFlattenDepth: nil
@@ -459,6 +464,7 @@ final class ConfigMergerTests: XCTestCase {
             cliSlowThreshold: nil,
             cliBuildInfo: false,
             cliExecutable: false,
+            cliExitOnFailure: false,
             cliToonDelimiter: nil,  // Not set
             cliToonKeyFolding: nil,  // Not set
             cliToonFlattenDepth: nil  // Not set
@@ -484,6 +490,7 @@ final class ConfigMergerTests: XCTestCase {
             cliSlowThreshold: nil,
             cliBuildInfo: false,
             cliExecutable: false,
+            cliExitOnFailure: false,
             cliToonDelimiter: nil,
             cliToonKeyFolding: nil,
             cliToonFlattenDepth: nil
@@ -499,6 +506,7 @@ final class ConfigMergerTests: XCTestCase {
         XCTAssertNil(resolved.slowThreshold)
         XCTAssertEqual(resolved.buildInfo, false)
         XCTAssertEqual(resolved.executable, false)
+        XCTAssertEqual(resolved.exitOnFailure, false)
         XCTAssertEqual(resolved.toonDelimiter, .comma)
         XCTAssertEqual(resolved.toonKeyFolding, .disabled)
         XCTAssertNil(resolved.toonFlattenDepth)
@@ -522,6 +530,7 @@ final class ConfigMergerTests: XCTestCase {
             cliSlowThreshold: nil,
             cliBuildInfo: false,
             cliExecutable: false,
+            cliExitOnFailure: false,
             cliToonDelimiter: nil,
             cliToonKeyFolding: nil,
             cliToonFlattenDepth: nil
@@ -546,6 +555,7 @@ final class ConfigMergerTests: XCTestCase {
             cliSlowThreshold: nil,
             cliBuildInfo: false,
             cliExecutable: false,
+            cliExitOnFailure: false,
             cliToonDelimiter: nil,
             cliToonKeyFolding: nil,
             cliToonFlattenDepth: nil
@@ -573,6 +583,7 @@ final class ConfigMergerTests: XCTestCase {
             cliSlowThreshold: nil,
             cliBuildInfo: false,
             cliExecutable: false,
+            cliExitOnFailure: false,
             cliToonDelimiter: nil,
             cliToonKeyFolding: nil,
             cliToonFlattenDepth: nil
