@@ -71,6 +71,29 @@ xcodebuild build 2>&1 | xcsift --quiet
 swift build 2>&1 | xcsift -q
 ```
 
+## Exit Behavior
+
+### `--exit-on-failure`, `-E`
+
+Exit with non-zero code if build does not succeed. Useful for CI pipelines where you want the build step to fail based on xcsift's analysis.
+
+```bash
+# Exit with failure if build fails
+xcodebuild build 2>&1 | xcsift --exit-on-failure
+swift build 2>&1 | xcsift -E
+
+# CI integration: combine with --Werror for strict builds
+# Fails if there are any errors, warnings, or test failures
+xcodebuild build 2>&1 | xcsift --Werror --exit-on-failure
+swift build 2>&1 | xcsift -W -E
+```
+
+Build is considered failed when:
+- Compiler errors are present
+- Linker errors are present
+- Test failures are present
+- Warnings are present (when `--Werror` is also used)
+
 ## Test Analysis Options
 
 ### `--slow-threshold`
@@ -269,10 +292,16 @@ xcodebuild build 2>&1 | xcsift -e -w -f toon
 
 # Full build analysis
 xcodebuild build 2>&1 | xcsift -f toon -e -w --build-info
+
+# CI integration: strict builds that fail on any issues
+xcodebuild build 2>&1 | xcsift --Werror --exit-on-failure
+swift test 2>&1 | xcsift -W -E -f toon
 ```
 
 ## Exit Codes
 
-- `0` — Build succeeded
-- `1` — Build failed (errors, linker errors, or test failures)
-- `1` — Build has warnings (when `--Werror` is used)
+- `0` — Build succeeded (or xcsift completed normally without `--exit-on-failure`)
+- `1` — Build failed (errors, linker errors, or test failures) when `--exit-on-failure` is used
+- `1` — Build has warnings when both `--Werror` and `--exit-on-failure` are used
+
+**Note:** Without `--exit-on-failure`, xcsift always exits with `0` regardless of build status. The exit code reflects xcsift's own execution, not the build result. Use `--exit-on-failure` (`-E`) when you want xcsift's exit code to reflect the build status for CI integration.

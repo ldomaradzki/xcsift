@@ -21,6 +21,7 @@ final class ConfigurationDecodingTests: XCTestCase {
             coverage_path = "/custom/path"
             build_info = true
             executable = true
+            exit_on_failure = true
 
             [toon]
             delimiter = "pipe"
@@ -46,6 +47,7 @@ final class ConfigurationDecodingTests: XCTestCase {
         XCTAssertEqual(config?.coveragePath, "/custom/path")
         XCTAssertEqual(config?.buildInfo, true)
         XCTAssertEqual(config?.executable, true)
+        XCTAssertEqual(config?.exitOnFailure, true)
         XCTAssertEqual(config?.toon?.delimiter, .pipe)
         XCTAssertEqual(config?.toon?.keyFolding, .safe)
         XCTAssertEqual(config?.toon?.flattenDepth, 3)
@@ -78,6 +80,7 @@ final class ConfigurationDecodingTests: XCTestCase {
         XCTAssertNil(config?.coveragePath)
         XCTAssertNil(config?.buildInfo)
         XCTAssertNil(config?.executable)
+        XCTAssertNil(config?.exitOnFailure)
         XCTAssertNil(config?.toon)
     }
 
@@ -97,6 +100,40 @@ final class ConfigurationDecodingTests: XCTestCase {
         XCTAssertNil(config?.format)
         XCTAssertNil(config?.warnings)
         XCTAssertNil(config?.toon)
+    }
+
+    // MARK: - Exit On Failure
+
+    func testDecodeExitOnFailure() throws {
+        let toml = """
+            exit_on_failure = true
+            """
+
+        let mockFS = MockFileSystem()
+        mockFS.existingPaths.insert("/test/config.toml")
+        mockFS.fileContents["/test/config.toml"] = toml
+
+        let loader = ConfigLoader(fileSystem: mockFS)
+        let config = try loader.loadConfig(explicitPath: "/test/config.toml")
+
+        XCTAssertNotNil(config)
+        XCTAssertEqual(config?.exitOnFailure, true)
+    }
+
+    func testDecodeExitOnFailureFalse() throws {
+        let toml = """
+            exit_on_failure = false
+            """
+
+        let mockFS = MockFileSystem()
+        mockFS.existingPaths.insert("/test/config.toml")
+        mockFS.fileContents["/test/config.toml"] = toml
+
+        let loader = ConfigLoader(fileSystem: mockFS)
+        let config = try loader.loadConfig(explicitPath: "/test/config.toml")
+
+        XCTAssertNotNil(config)
+        XCTAssertEqual(config?.exitOnFailure, false)
     }
 
     // MARK: - TOON Section Only
@@ -590,6 +627,257 @@ final class ConfigMergerTests: XCTestCase {
         )
 
         XCTAssertNil(resolved.toonFlattenDepth)  // 0 becomes nil (unlimited)
+    }
+}
+
+// MARK: - ExitOnFailure Logic Tests
+
+final class ExitOnFailureTests: XCTestCase {
+
+    // MARK: - Exit Behavior Logic
+
+    /// Tests that exitOnFailure=true + status="failed" should exit with failure
+    func testExitOnFailureWithFailedStatus() {
+        let parser = OutputParser()
+        let input = """
+            /path/to/file.swift:10:5: error: use of undeclared identifier 'unknown'
+            """
+        let result = parser.parse(input: input)
+
+        // Verify build failed
+        XCTAssertEqual(result.status, "failed")
+
+        // With exitOnFailure=true, should indicate failure
+        let resolved = ConfigMerger.merge(
+            config: nil,
+            cliFormat: nil,
+            cliWarnings: false,
+            cliWarningsAsErrors: false,
+            cliQuiet: false,
+            cliCoverage: false,
+            cliCoverageDetails: false,
+            cliCoveragePath: nil,
+            cliSlowThreshold: nil,
+            cliBuildInfo: false,
+            cliExecutable: false,
+            cliExitOnFailure: true,
+            cliToonDelimiter: nil,
+            cliToonKeyFolding: nil,
+            cliToonFlattenDepth: nil
+        )
+
+        XCTAssertTrue(resolved.exitOnFailure)
+        // Exit condition: exitOnFailure && status != "success"
+        let shouldExitWithFailure = resolved.exitOnFailure && result.status != "success"
+        XCTAssertTrue(shouldExitWithFailure, "Should exit with failure when exitOnFailure=true and status=failed")
+    }
+
+    /// Tests that exitOnFailure=true + status="success" should exit normally
+    func testExitOnFailureWithSuccessStatus() {
+        let parser = OutputParser()
+        let input = """
+            Building for debugging...
+            Build complete!
+            """
+        let result = parser.parse(input: input)
+
+        // Verify build succeeded
+        XCTAssertEqual(result.status, "success")
+
+        // With exitOnFailure=true, should NOT indicate failure for success
+        let resolved = ConfigMerger.merge(
+            config: nil,
+            cliFormat: nil,
+            cliWarnings: false,
+            cliWarningsAsErrors: false,
+            cliQuiet: false,
+            cliCoverage: false,
+            cliCoverageDetails: false,
+            cliCoveragePath: nil,
+            cliSlowThreshold: nil,
+            cliBuildInfo: false,
+            cliExecutable: false,
+            cliExitOnFailure: true,
+            cliToonDelimiter: nil,
+            cliToonKeyFolding: nil,
+            cliToonFlattenDepth: nil
+        )
+
+        XCTAssertTrue(resolved.exitOnFailure)
+        // Exit condition: exitOnFailure && status != "success"
+        let shouldExitWithFailure = resolved.exitOnFailure && result.status != "success"
+        XCTAssertFalse(shouldExitWithFailure, "Should NOT exit with failure when exitOnFailure=true and status=success")
+    }
+
+    /// Tests that exitOnFailure=false + status="failed" should NOT exit with failure
+    func testNoExitOnFailureWithFailedStatus() {
+        let parser = OutputParser()
+        let input = """
+            /path/to/file.swift:10:5: error: use of undeclared identifier 'unknown'
+            """
+        let result = parser.parse(input: input)
+
+        // Verify build failed
+        XCTAssertEqual(result.status, "failed")
+
+        // With exitOnFailure=false, should NOT exit with failure
+        let resolved = ConfigMerger.merge(
+            config: nil,
+            cliFormat: nil,
+            cliWarnings: false,
+            cliWarningsAsErrors: false,
+            cliQuiet: false,
+            cliCoverage: false,
+            cliCoverageDetails: false,
+            cliCoveragePath: nil,
+            cliSlowThreshold: nil,
+            cliBuildInfo: false,
+            cliExecutable: false,
+            cliExitOnFailure: false,
+            cliToonDelimiter: nil,
+            cliToonKeyFolding: nil,
+            cliToonFlattenDepth: nil
+        )
+
+        XCTAssertFalse(resolved.exitOnFailure)
+        // Exit condition: exitOnFailure && status != "success"
+        let shouldExitWithFailure = resolved.exitOnFailure && result.status != "success"
+        XCTAssertFalse(shouldExitWithFailure, "Should NOT exit with failure when exitOnFailure=false")
+    }
+
+    /// Tests exitOnFailure with test failures (status="failed")
+    func testExitOnFailureWithTestFailures() {
+        let parser = OutputParser()
+        let input = """
+            Test Case '-[MyTests testExample]' started.
+            /path/to/Tests.swift:25: error: -[MyTests testExample] : XCTAssertTrue failed
+            Test Case '-[MyTests testExample]' failed (0.001 seconds).
+            Test Suite 'MyTests' failed at 2024-01-01 12:00:00.
+            """
+        let result = parser.parse(input: input)
+
+        // Verify build failed due to test failures
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.failedTests, 1)
+
+        let resolved = ConfigMerger.merge(
+            config: nil,
+            cliFormat: nil,
+            cliWarnings: false,
+            cliWarningsAsErrors: false,
+            cliQuiet: false,
+            cliCoverage: false,
+            cliCoverageDetails: false,
+            cliCoveragePath: nil,
+            cliSlowThreshold: nil,
+            cliBuildInfo: false,
+            cliExecutable: false,
+            cliExitOnFailure: true,
+            cliToonDelimiter: nil,
+            cliToonKeyFolding: nil,
+            cliToonFlattenDepth: nil
+        )
+
+        let shouldExitWithFailure = resolved.exitOnFailure && result.status != "success"
+        XCTAssertTrue(shouldExitWithFailure, "Should exit with failure when tests fail")
+    }
+
+    /// Tests combination of --Werror and --exit-on-failure
+    func testWerrorAndExitOnFailureCombined() {
+        let parser = OutputParser()
+        let input = """
+            /path/to/file.swift:10:5: warning: variable 'unused' was never used
+            Building for debugging...
+            Build complete!
+            """
+        // warningsAsErrors=true makes this "failed" status
+        let result = parser.parse(input: input, printWarnings: true, warningsAsErrors: true)
+
+        // Verify build failed due to warnings treated as errors
+        XCTAssertEqual(result.status, "failed")
+        // When warningsAsErrors is true, warnings are converted to errors
+        // so warnings count becomes 0 and errors count increases
+        XCTAssertEqual(result.summary.warnings, 0, "Warnings should be 0 as they are converted to errors")
+        XCTAssertEqual(result.summary.errors, 1, "Errors should include the converted warning")
+
+        let resolved = ConfigMerger.merge(
+            config: nil,
+            cliFormat: nil,
+            cliWarnings: true,
+            cliWarningsAsErrors: true,
+            cliQuiet: false,
+            cliCoverage: false,
+            cliCoverageDetails: false,
+            cliCoveragePath: nil,
+            cliSlowThreshold: nil,
+            cliBuildInfo: false,
+            cliExecutable: false,
+            cliExitOnFailure: true,
+            cliToonDelimiter: nil,
+            cliToonKeyFolding: nil,
+            cliToonFlattenDepth: nil
+        )
+
+        XCTAssertTrue(resolved.warningsAsErrors)
+        XCTAssertTrue(resolved.exitOnFailure)
+
+        let shouldExitWithFailure = resolved.exitOnFailure && result.status != "success"
+        XCTAssertTrue(
+            shouldExitWithFailure,
+            "Should exit with failure when --Werror and --exit-on-failure are combined and warnings present"
+        )
+    }
+
+    // MARK: - ConfigMerger exitOnFailure Tests
+
+    func testConfigMergerExitOnFailureCLIOverridesConfig() {
+        var config = Configuration()
+        config.exitOnFailure = false
+
+        let resolved = ConfigMerger.merge(
+            config: config,
+            cliFormat: nil,
+            cliWarnings: false,
+            cliWarningsAsErrors: false,
+            cliQuiet: false,
+            cliCoverage: false,
+            cliCoverageDetails: false,
+            cliCoveragePath: nil,
+            cliSlowThreshold: nil,
+            cliBuildInfo: false,
+            cliExecutable: false,
+            cliExitOnFailure: true,  // CLI should override
+            cliToonDelimiter: nil,
+            cliToonKeyFolding: nil,
+            cliToonFlattenDepth: nil
+        )
+
+        XCTAssertTrue(resolved.exitOnFailure)
+    }
+
+    func testConfigMergerExitOnFailureFromConfig() {
+        var config = Configuration()
+        config.exitOnFailure = true
+
+        let resolved = ConfigMerger.merge(
+            config: config,
+            cliFormat: nil,
+            cliWarnings: false,
+            cliWarningsAsErrors: false,
+            cliQuiet: false,
+            cliCoverage: false,
+            cliCoverageDetails: false,
+            cliCoveragePath: nil,
+            cliSlowThreshold: nil,
+            cliBuildInfo: false,
+            cliExecutable: false,
+            cliExitOnFailure: false,  // CLI not set (false = default)
+            cliToonDelimiter: nil,
+            cliToonKeyFolding: nil,
+            cliToonFlattenDepth: nil
+        )
+
+        XCTAssertTrue(resolved.exitOnFailure)  // Config value because CLI false = "not set"
     }
 }
 
