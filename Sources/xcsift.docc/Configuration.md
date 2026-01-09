@@ -64,6 +64,9 @@ coverage_path = ""       # Custom path to coverage data (empty = auto-detect)
 build_info = false       # Include per-target build phases and timing
 executable = false       # Include executable targets (-e)
 
+# Exit behavior
+exit_on_failure = false  # Exit with failure code if build does not succeed (-E)
+
 # TOON format configuration
 [toon]
 delimiter = "comma"      # "comma", "tab", or "pipe"
@@ -112,6 +115,12 @@ flatten_depth = 0        # 0 = unlimited, or positive integer
 |--------|------|---------|-------------|
 | `build_info` | bool | `false` | Include per-target build phases and timing |
 | `executable` | bool | `false` | Include executable targets |
+
+### Exit Behavior
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `exit_on_failure` | bool | `false` | Exit with failure code if build does not succeed |
 
 ### TOON Configuration
 
@@ -211,11 +220,14 @@ For CI, you might want different settings:
 # .xcsift.toml for CI
 format = "json"
 warnings = true
-werror = true           # Fail on warnings
+werror = true            # Fail on warnings
+exit_on_failure = true   # Return non-zero exit code on failure
 coverage = true
 coverage_details = true
 build_info = true
 ```
+
+**Tip:** Combining `werror = true` and `exit_on_failure = true` ensures your CI pipeline fails on any errors, warnings, or test failures. This is useful for enforcing code quality standards.
 
 ## Topics
 

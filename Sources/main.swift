@@ -157,6 +157,12 @@ struct XCSift: ParsableCommand {
     @Flag(name: .long, help: "Include per-target build phases and timing")
     var buildInfo: Bool = false
 
+    @Flag(
+        name: [.customShort("E"), .customLong("exit-on-failure")],
+        help: "Exit with failure code if build does not succeed"
+    )
+    var exitOnFailure: Bool = false
+
     @Option(
         name: [.customShort("f"), .long],
         help: "Output format (json, toon, or github-actions). Default: json. On CI, annotations are auto-appended."
@@ -224,6 +230,7 @@ struct XCSift: ParsableCommand {
             cliSlowThreshold: slowThreshold,
             cliBuildInfo: buildInfo,
             cliExecutable: executable,
+            cliExitOnFailure: exitOnFailure,
             cliToonDelimiter: toonDelimiter,
             cliToonKeyFolding: toonKeyFolding,
             cliToonFlattenDepth: toonFlattenDepth
@@ -272,6 +279,11 @@ struct XCSift: ParsableCommand {
             printExecutables: resolved.executable
         )
         outputResult(result, resolved: resolved)
+
+        // Exit with failure if requested and build did not succeed
+        if resolved.exitOnFailure && result.status != "success" {
+            throw ExitCode.failure
+        }
     }
 
     private func generateConfigFile() throws {
