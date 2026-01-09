@@ -15,6 +15,7 @@ struct ResolvedConfig: Sendable {
     let slowThreshold: Double?
     let buildInfo: Bool
     let executable: Bool
+    let exitOnFailure: Bool
     let toonDelimiter: TOONDelimiterType
     let toonKeyFolding: TOONKeyFoldingType
     let toonFlattenDepth: Int?
@@ -39,6 +40,7 @@ enum ConfigMerger {
     ///   - cliSlowThreshold: Slow threshold from CLI (nil if not set)
     ///   - cliBuildInfo: Build info flag from CLI
     ///   - cliExecutable: Executable flag from CLI
+    ///   - cliExitOnFailure: Exit on failure flag from CLI
     ///   - cliToonDelimiter: TOON delimiter from CLI (nil if not explicitly set)
     ///   - cliToonKeyFolding: TOON key folding from CLI (nil if not explicitly set)
     ///   - cliToonFlattenDepth: TOON flatten depth from CLI (nil if not set)
@@ -55,6 +57,7 @@ enum ConfigMerger {
         cliSlowThreshold: Double?,
         cliBuildInfo: Bool,
         cliExecutable: Bool,
+        cliExitOnFailure: Bool,
         cliToonDelimiter: TOONDelimiterType?,
         cliToonKeyFolding: TOONKeyFoldingType?,
         cliToonFlattenDepth: Int?
@@ -82,6 +85,7 @@ enum ConfigMerger {
         let coverageDetails = cliCoverageDetails || (config.coverageDetails ?? false)
         let buildInfo = cliBuildInfo || (config.buildInfo ?? false)
         let executable = cliExecutable || (config.executable ?? false)
+        let exitOnFailure = cliExitOnFailure || (config.exitOnFailure ?? false)
 
         // Optional string/numeric values: CLI > config > nil
         let coveragePath = cliCoveragePath ?? nonEmptyString(config.coveragePath)
@@ -126,6 +130,7 @@ enum ConfigMerger {
             slowThreshold: slowThreshold,
             buildInfo: buildInfo,
             executable: executable,
+            exitOnFailure: exitOnFailure,
             toonDelimiter: toonDelimiter,
             toonKeyFolding: toonKeyFolding,
             toonFlattenDepth: toonFlattenDepth
