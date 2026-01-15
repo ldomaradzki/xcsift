@@ -21,6 +21,7 @@ class OutputParser {
     private var passedTestsCount: Int = 0
     private var seenPassedTestNames: Set<String> = []
     private var parallelTestsTotalCount: Int?
+    private var testRunFailed: Bool = false
 
     // Linker error parsing state
     private var currentLinkerArchitecture: String?
@@ -373,7 +374,8 @@ class OutputParser {
         }
 
         let status =
-            finalErrors.isEmpty && failedTests.isEmpty && linkerErrors.isEmpty ? "success" : "failed"
+            finalErrors.isEmpty && failedTests.isEmpty && linkerErrors.isEmpty && !testRunFailed
+            ? "success" : "failed"
 
         // Aggregate test counts from both XCTest and Swift Testing
         let totalExecuted: Int? = {
@@ -571,6 +573,7 @@ class OutputParser {
         pendingDuplicateSymbol = nil
         pendingConflictingFiles = []
         parallelTestsTotalCount = nil
+        testRunFailed = false
         passedTestDurations = [:]
         failedTestDurations = [:]
         targetPhases = [:]
@@ -627,8 +630,9 @@ class OutputParser {
             line.contains("error:") || line.contains("warning:") || line.contains("failed") || line.contains("passed")
             || line.contains("✘") || line.contains("✓") || line.contains("❌") || line.contains("Build succeeded")
             || line.contains("Build failed") || line.contains("Executed") || line.contains("] Testing ")
-            || line.contains("BUILD SUCCEEDED") || line.contains("BUILD FAILED") || line.contains("Build complete!")
-            || line.contains("RegisterWithLaunchServices")
+            || line.contains("BUILD SUCCEEDED") || line.contains("BUILD FAILED") || line.contains("TEST FAILED")
+            || line.contains("Build complete!") || line.contains("RegisterWithLaunchServices")
+            || line.contains("Fatal error")
             || (line.hasPrefix("/") && line.contains(".swift:"))  // runtime warnings
 
         if !containsRelevant {
@@ -948,7 +952,7 @@ class OutputParser {
             }
         }
 
-        // Fast path for Fatal error
+        // Fast path for Fatal error with message
         if let fatalRange = line.range(of: ": Fatal error: ") {
             let beforeError = String(line[..<fatalRange.lowerBound])
             let message = String(line[fatalRange.upperBound...])
@@ -959,6 +963,16 @@ class OutputParser {
                 return BuildError(file: file, line: lineNum, message: message)
             } else {
                 return BuildError(file: beforeError, line: nil, message: message)
+            }
+        }
+
+        // Pattern: file:line: Fatal error (without trailing message)
+        if line.hasSuffix(": Fatal error") && !line.contains(" xctest[") {
+            let beforeFatal = String(line.dropLast(": Fatal error".count))
+            let components = beforeFatal.split(separator: ":", omittingEmptySubsequences: false)
+            if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
+                let file = components[0 ..< (components.count - 1)].joined(separator: ":")
+                return BuildError(file: file, line: lineNum, message: "Fatal error")
             }
         }
 
@@ -1276,6 +1290,12 @@ class OutputParser {
             {
                 buildTime = String(line[bracketStart.upperBound ..< bracketEnd.lowerBound])
             }
+            return
+        }
+
+        // Pattern: ** TEST FAILED **
+        if line.contains("** TEST FAILED **") {
+            testRunFailed = true
             return
         }
 

@@ -1065,4 +1065,110 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.executables[0].name, "MyApp.app")
         XCTAssertEqual(result.summary.executables, 1)
     }
+
+    // MARK: - TEST FAILED Parsing Tests
+
+    func testParseTestFailed() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'All tests' started at 2026-01-15 12:23:33.095.
+            Test Suite 'TestProjectTests.xctest' started at 2026-01-15 12:23:33.097.
+            Test Suite 'TestProjectTests' started at 2026-01-15 12:23:33.097.
+            Test Case '-[TestProjectTests.TestProjectTests testExample]' started.
+            TestProjectTests/TestProjectTests.swift:5: Fatal error
+            Restarting after unexpected exit, crash, or test timeout
+            Test Suite 'Selected tests' started at 2026-01-15 12:23:54.815.
+            Test Suite 'TestProjectTests' passed at 2026-01-15 12:23:54.816.
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+    }
+
+    func testParseTestFailedWithNoIndividualFailures() {
+        let parser = OutputParser()
+        let input = """
+            Building for testing...
+            Build complete!
+            Testing started
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.failedTests.count, 0)
+    }
+
+    func testParseTestSucceeded() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'All tests' started at 2026-01-15 12:23:33.095.
+            Test Case 'MyTests.testExample' passed (0.001 seconds).
+            Executed 1 test, with 0 failures in 0.001 seconds
+            ** TEST SUCCEEDED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+    }
+
+    // MARK: - Fatal Error Parsing Tests
+
+    func testParseFatalErrorWithoutMessage() {
+        let parser = OutputParser()
+        let input = "TestProjectTests/TestProjectTests.swift:5: Fatal error"
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertEqual(result.errors[0].file, "TestProjectTests/TestProjectTests.swift")
+        XCTAssertEqual(result.errors[0].line, 5)
+        XCTAssertEqual(result.errors[0].message, "Fatal error")
+    }
+
+    func testParseFatalErrorWithAbsolutePath() {
+        let parser = OutputParser()
+        let input = "/Users/dev/Project/Tests/MyTests.swift:42: Fatal error"
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertEqual(result.errors[0].file, "/Users/dev/Project/Tests/MyTests.swift")
+        XCTAssertEqual(result.errors[0].line, 42)
+        XCTAssertEqual(result.errors[0].message, "Fatal error")
+    }
+
+    func testParseFatalErrorSkipsXctestLogLine() {
+        let parser = OutputParser()
+        let input =
+            "2026-01-15 12:23:33.104297+0500 xctest[84150:24837354] TestProjectTests/TestProjectTests.swift:5: Fatal error"
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.errors.count, 0)
+    }
+
+    func testParseFatalErrorInTestCrash() {
+        let parser = OutputParser()
+        let input = """
+            Test Case '-[TestProjectTests.TestProjectTests testExample]' started.
+            TestProjectTests/TestProjectTests.swift:5: Fatal error
+            Restarting after unexpected exit, crash, or test timeout
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertEqual(result.errors[0].file, "TestProjectTests/TestProjectTests.swift")
+        XCTAssertEqual(result.errors[0].line, 5)
+        XCTAssertEqual(result.errors[0].message, "Fatal error")
+    }
 }
