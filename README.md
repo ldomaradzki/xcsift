@@ -39,23 +39,10 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 ### Option 1: Homebrew (Recommended)
 
 ```bash
-# Install from custom tap
-brew tap ldomaradzki/xcsift
 brew install xcsift
-
-# Or install directly from formula
-brew install https://raw.githubusercontent.com/ldomaradzki/xcsift/master/homebrew-formula/xcsift.rb
 ```
 
-### Option 2: Mint
-
-If you use [Mint](https://github.com/yonaskolb/mint) for managing Swift command-line tools:
-
-```bash
-mint install ldomaradzki/xcsift
-```
-
-### Option 3: mise
+### Option 2: mise
 
 If you use [mise](https://mise.jdx.dev/) for managing development tools:
 
@@ -72,6 +59,14 @@ mise use xcsift
 # Or add to your .mise.toml manually
 # [tools]
 # xcsift = "latest"
+```
+
+### Option 3: Mint
+
+If you use [Mint](https://github.com/yonaskolb/mint) for managing Swift command-line tools:
+
+```bash
+mint install ldomaradzki/xcsift
 ```
 
 ### Option 4: Build from Source

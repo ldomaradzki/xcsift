@@ -26,6 +26,15 @@ swift format --recursive --in-place .
 ```
 
 ### Installation
+
+**Homebrew (Recommended):**
+```bash
+brew install xcsift
+```
+
+xcsift is in homebrew-core with [Autobump](https://docs.brew.sh/Autobump) enabled — new releases are automatically picked up within 3 hours.
+
+**From Source:**
 ```bash
 swift build -c release
 cp .build/release/xcsift /usr/local/bin/

@@ -16,15 +16,7 @@ xcsift is a command-line tool that parses xcodebuild and Swift Package Manager o
 ### Using Homebrew (Recommended)
 
 ```bash
-# Install from custom tap
-brew tap ldomaradzki/xcsift
 brew install xcsift
-```
-
-### Using Mint
-
-```bash
-mint install ldomaradzki/xcsift
 ```
 
 ### Using mise
@@ -42,6 +34,12 @@ mise use xcsift
 # Or add to your .mise.toml manually
 # [tools]
 # xcsift = "latest"
+```
+
+### Using Mint
+
+```bash
+mint install ldomaradzki/xcsift
 ```
 
 ### From Source
