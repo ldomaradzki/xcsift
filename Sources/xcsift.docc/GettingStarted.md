@@ -30,8 +30,18 @@ mint install ldomaradzki/xcsift
 ### Using mise
 
 ```bash
-# Install from mise registry
+# Install globally from mise registry
 mise use -g xcsift
+
+# Or explicitly via github backend (downloads binary)
+mise use -g github:ldomaradzki/xcsift
+
+# For project-local installation (adds to .mise.toml)
+mise use xcsift
+
+# Or add to your .mise.toml manually
+# [tools]
+# xcsift = "latest"
 ```
 
 ### From Source
