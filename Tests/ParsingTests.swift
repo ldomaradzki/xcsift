@@ -1066,6 +1066,53 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.executables, 1)
     }
 
+    func testParseExecutableFromValidateLine() {
+        let parser = OutputParser()
+        let input = """
+            Validate /path/to/MyiOSApp.app (in target 'MyiOSApp' from project 'MyProject')
+            """
+
+        let result = parser.parse(input: input, printExecutables: true)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.executables.count, 1)
+        XCTAssertEqual(result.executables[0].path, "/path/to/MyiOSApp.app")
+        XCTAssertEqual(result.executables[0].name, "MyiOSApp.app")
+        XCTAssertEqual(result.executables[0].target, "MyiOSApp")
+        XCTAssertEqual(result.summary.executables, 1)
+    }
+
+    func testValidateLineOnlyCapturesAppBundles() {
+        let parser = OutputParser()
+        // Validate is used for many artifact types, but we only want .app bundles
+        let input = """
+            Validate /path/to/MyFramework.framework (in target 'MyFramework' from project 'MyProject')
+            Validate /path/to/MyApp.app (in target 'MyApp' from project 'MyProject')
+            Validate /path/to/resource.bundle (in target 'Resources' from project 'MyProject')
+            """
+
+        let result = parser.parse(input: input, printExecutables: true)
+
+        XCTAssertEqual(result.executables.count, 1, "Only .app bundles should be captured from Validate lines")
+        XCTAssertEqual(result.executables[0].name, "MyApp.app")
+        XCTAssertEqual(result.executables[0].target, "MyApp")
+    }
+
+    func testMixedRegisterAndValidateExecutables() {
+        let parser = OutputParser()
+        let input = """
+            RegisterWithLaunchServices /path/to/MacApp.app (in target 'MacApp' from project 'MyProject')
+            Validate /path/to/iOSApp.app (in target 'iOSApp' from project 'MyProject')
+            """
+
+        let result = parser.parse(input: input, printExecutables: true)
+
+        XCTAssertEqual(result.executables.count, 2)
+        XCTAssertEqual(result.executables[0].name, "MacApp.app")
+        XCTAssertEqual(result.executables[1].name, "iOSApp.app")
+        XCTAssertEqual(result.summary.executables, 2)
+    }
+
     // MARK: - TEST FAILED Parsing Tests
 
     func testParseTestFailed() {

@@ -631,8 +631,8 @@ class OutputParser {
             || line.contains("✘") || line.contains("✓") || line.contains("❌") || line.contains("Build succeeded")
             || line.contains("Build failed") || line.contains("Executed") || line.contains("] Testing ")
             || line.contains("BUILD SUCCEEDED") || line.contains("BUILD FAILED") || line.contains("TEST FAILED")
-            || line.contains("Build complete!") || line.contains("RegisterWithLaunchServices")
-            || line.contains("Fatal error")
+            || line.contains("Build complete!") || line.hasPrefix("RegisterWithLaunchServices")
+            || line.hasPrefix("Validate") || line.contains("Fatal error")
             || (line.hasPrefix("/") && line.contains(".swift:"))  // runtime warnings
 
         if !containsRelevant {
@@ -1615,18 +1615,25 @@ class OutputParser {
     // MARK: - Executable Parsing
 
     private func parseExecutable(_ line: String) -> Executable? {
-        // Pattern: RegisterWithLaunchServices /path/to/Executable.app (in target 'TargetName' from project 'ProjectName')
-        guard line.hasPrefix("RegisterWithLaunchServices ") else {
+        // Pattern 1: RegisterWithLaunchServices /path/to/Executable.app (in target 'TargetName' from project 'ProjectName')
+        // Pattern 2: Validate /path/to/Executable.app (in target 'TargetName' from project 'ProjectName')
+        let prefixes = ["RegisterWithLaunchServices ", "Validate "]
+        guard let prefix = prefixes.first(where: { line.hasPrefix($0) }) else {
             return nil
         }
+        let afterPrefix = line.dropFirst(prefix.count)
 
-        // Find the path (between "RegisterWithLaunchServices " and " (in target")
-        let afterPrefix = line.dropFirst("RegisterWithLaunchServices ".count)
+        // Find the path (between prefix and " (in target")
         guard let targetRange = afterPrefix.range(of: " (in target '") else {
             return nil
         }
 
         let path = String(afterPrefix[..<targetRange.lowerBound])
+
+        // Only capture .app bundles (not other validated artifacts)
+        if !path.hasSuffix(".app") {
+            return nil
+        }
 
         // Extract the name from the path (last component, e.g., "ClaudeSettings.app")
         let name = (path as NSString).lastPathComponent

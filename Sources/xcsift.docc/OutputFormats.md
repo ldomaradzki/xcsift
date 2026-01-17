@@ -223,7 +223,7 @@ Supported phases:
 }
 ```
 
-- Parses `RegisterWithLaunchServices` lines from xcodebuild output
+- Parses `RegisterWithLaunchServices` and `Validate` lines from xcodebuild output
 - Includes full path, filename, and target name
 - Duplicates are automatically deduplicated by path
 
