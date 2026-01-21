@@ -1263,4 +1263,69 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.errors[0].line, 5)
         XCTAssertEqual(result.errors[0].message, "Fatal error")
     }
+
+    // MARK: - Parallel Testing Format Tests
+
+    func testParseParallelTestingPassedFormat() {
+        let parser = OutputParser()
+        let input = """
+            Test case 'MenuBarFeatureTests.testExample()' passed on 'My Mac - App (Dev) (51424)' (0.565 seconds)
+            Test case 'FilesChannelTests.testAnother()' passed on 'My Mac - App (Dev) (52255)' (0.002 seconds)
+            Executed 2 tests, with 0 failures in 0.567 seconds
+            ** TEST SUCCEEDED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.passedTests, 2)
+        XCTAssertEqual(result.failedTests.count, 0)
+    }
+
+    func testParseParallelTestingFailedFormat() {
+        let parser = OutputParser()
+        let input = """
+            Test case 'PublishingServiceTests.testProcessEntry()' failed on 'My Mac - App (Dev) (51424)' (0.070 seconds)
+            Executed 1 test, with 1 failure in 0.070 seconds
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.failedTests.count, 1)
+        XCTAssertEqual(result.failedTests[0].test, "PublishingServiceTests.testProcessEntry()")
+        XCTAssertEqual(result.failedTests[0].duration, 0.070)
+    }
+
+    func testParseParallelTestingMixedResults() {
+        let parser = OutputParser()
+        let input = """
+            Test case 'Tests.testPassing()' passed on 'My Mac' (0.001 seconds)
+            Test case 'Tests.testFailing()' failed on 'My Mac' (0.002 seconds)
+            Executed 2 tests, with 1 failure in 0.003 seconds
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.passedTests, 1)
+        XCTAssertEqual(result.failedTests.count, 1)
+    }
+
+    func testParseParallelTestingDurationExtraction() {
+        let parser = OutputParser()
+        // Test with a complex device name containing parentheses
+        let input = """
+            Test case 'MyTests.testSomething()' passed on 'iPhone 15 Pro (iOS 17.0) (ABC123)' (1.234 seconds)
+            Executed 1 test, with 0 failures in 1.234 seconds
+            ** TEST SUCCEEDED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.passedTests, 1)
+    }
 }

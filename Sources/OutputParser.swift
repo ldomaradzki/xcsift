@@ -319,9 +319,9 @@ class OutputParser {
         Optionally(OneOrMore(.whitespace))
     }
 
-    // Target extraction pattern
+    // Target extraction pattern (handles both "Test Suite" and "Test suite" for parallel testing)
     private nonisolated(unsafe) static let testSuiteRegex = Regex {
-        "Test Suite '"
+        /[Tt]est [Ss]uite '/
         Capture(OneOrMore(.any, .reluctant))
         ".xctest'"
     }
@@ -600,7 +600,10 @@ class OutputParser {
             let lineStr = String(line)
 
             // Only match lines with .xctest to skip "All tests" and individual test classes
-            if lineStr.contains("Test Suite '"), lineStr.contains(".xctest"), lineStr.contains("started") {
+            // Standard: Test Suite 'X.xctest' started
+            // Parallel: Test suite 'X.xctest' started on 'Device Name'
+            let hasTestSuite = lineStr.contains("Test Suite '") || lineStr.contains("Test suite '")
+            if hasTestSuite, lineStr.contains(".xctest"), lineStr.contains("started") {
                 if let match = lineStr.firstMatch(of: Self.testSuiteRegex) {
                     var targetName = String(match.1)
                     if targetName.hasSuffix("Tests") {
@@ -1184,16 +1187,26 @@ class OutputParser {
     }
 
     private func parsePassedTest(_ line: String) -> Bool {
-        // Pattern: Test Case 'TestName' passed (0.123 seconds).
-        if line.hasPrefix("Test Case '"), let endQuote = line.range(of: "' passed (") {
-            let startIndex = line.index(line.startIndex, offsetBy: 11)  // "Test Case '".count
+        // Standard: Test Case 'TestName' passed (0.123 seconds).
+        // Parallel: Test case 'TestName' passed on 'Device Name' (0.123 seconds)
+        let isStandardPassed = line.hasPrefix("Test Case '") && line.contains("' passed (")
+        let isParallelPassed = line.hasPrefix("Test case '") && line.contains("' passed on '")
+
+        if isStandardPassed || isParallelPassed {
+            let prefixLength = 11  // "Test Case '" or "Test case '"
+            let startIndex = line.index(line.startIndex, offsetBy: prefixLength)
+
+            // Find end of test name
+            let passedPattern = isParallelPassed ? "' passed on '" : "' passed ("
+            guard let endQuote = line.range(of: passedPattern) else { return false }
             let testName = String(line[startIndex ..< endQuote.lowerBound])
 
-            // Extract duration from "(X.XXX seconds)"
+            // Extract duration - find last "(" before "seconds)"
             var duration: Double? = nil
-            let afterPassed = line[endQuote.upperBound...]
-            if let parenEnd = afterPassed.range(of: " seconds") {
-                let durationStr = String(afterPassed[..<parenEnd.lowerBound])
+            if let lastParen = line.range(of: "(", options: .backwards),
+                let secondsEnd = line.range(of: " seconds", options: .backwards)
+            {
+                let durationStr = String(line[lastParen.upperBound ..< secondsEnd.lowerBound])
                 duration = Double(durationStr)
             }
 
@@ -1264,16 +1277,26 @@ class OutputParser {
             )
         }
 
-        // Pattern: Test Case 'TestName' failed (0.123 seconds).
-        if line.hasPrefix("Test Case '"), let endQuote = line.range(of: "' failed (") {
-            let startIndex = line.index(line.startIndex, offsetBy: 11)
+        // Standard: Test Case 'TestName' failed (0.123 seconds).
+        // Parallel: Test case 'TestName' failed on 'Device Name' (0.123 seconds)
+        let isStandardFailed = line.hasPrefix("Test Case '") && line.contains("' failed (")
+        let isParallelFailed = line.hasPrefix("Test case '") && line.contains("' failed on '")
+
+        if isStandardFailed || isParallelFailed {
+            let prefixLength = 11  // "Test Case '" or "Test case '"
+            let startIndex = line.index(line.startIndex, offsetBy: prefixLength)
+
+            // Find end of test name
+            let failedPattern = isParallelFailed ? "' failed on '" : "' failed ("
+            guard let endQuote = line.range(of: failedPattern) else { return nil }
             let test = String(line[startIndex ..< endQuote.lowerBound])
 
-            // Extract duration from "(X.XXX seconds)"
+            // Extract duration - find last "(" before "seconds)"
             var duration: Double? = nil
-            let afterFailed = line[endQuote.upperBound...]
-            if let secondsRange = afterFailed.range(of: " seconds") {
-                let durationStr = String(afterFailed[..<secondsRange.lowerBound])
+            if let lastParen = line.range(of: "(", options: .backwards),
+                let secondsEnd = line.range(of: " seconds", options: .backwards)
+            {
+                let durationStr = String(line[lastParen.upperBound ..< secondsEnd.lowerBound])
                 duration = Double(durationStr)
             }
 

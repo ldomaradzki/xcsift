@@ -274,6 +274,10 @@ The codebase follows a modular architecture:
   - Included with `--warnings` flag (no separate flag needed)
 - **Linker Error Parsing**: Captures undefined symbols, missing frameworks/libraries, architecture mismatches, and duplicate symbols (with structured conflicting file paths)
 - **Test Failure Detection**: XCUnit assertion failures and general test failures
+  - **Standard format**: `Test Case 'X.test()' passed/failed (0.123 seconds)`
+  - **Parallel testing format**: `Test case 'X.test()' passed/failed on 'Device Name' (0.123 seconds)`
+  - Parallel format uses lowercase 'case' and includes device name before duration
+  - Both formats supported for xcodebuild parallel/multi-destination testing
 - **Build Time Extraction**: Captures build duration (`build_time`) and test execution time (`test_time`) separately
 - **File/Line Mapping**: Extracts precise source locations for navigation
 - **Executable Target Detection**: Parses `RegisterWithLaunchServices` and `Validate` lines to extract executable targets (path, name, target)
@@ -360,6 +364,11 @@ Test cases cover:
   - Swift mangled symbols
   - Real-world linker error output (fixture-based test)
 - Failed test extraction
+- **Parallel testing format** (4 tests):
+  - Parallel passed test parsing
+  - Parallel failed test parsing with duration
+  - Mixed passed/failed parallel tests
+  - Duration extraction with complex device names
 - Multi-error scenarios
 - Build time parsing
 - Edge cases (missing files, deprecated functions)
