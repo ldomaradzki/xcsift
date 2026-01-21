@@ -59,6 +59,16 @@ struct CursorInstaller {
         return "\(hooksDirectory)/pre-xcsift.sh"
     }
 
+    /// The skills directory path
+    var skillsDirectory: String {
+        return "\(baseDirectory)/skills/xcsift"
+    }
+
+    /// The skill file path
+    var skillFilePath: String {
+        return "\(skillsDirectory)/SKILL.md"
+    }
+
     init(global: Bool, fileManager: FileManager = .default) {
         self.global = global
         self.fileManager = fileManager
@@ -120,6 +130,33 @@ struct CursorInstaller {
         } catch {
             throw CursorInstallerError.setPermissionsFailed(path: hookScriptPath, underlying: error)
         }
+
+        // Create skills directory if needed
+        if !fileManager.fileExists(atPath: skillsDirectory) {
+            do {
+                try fileManager.createDirectory(
+                    atPath: skillsDirectory,
+                    withIntermediateDirectories: true,
+                    attributes: nil
+                )
+            } catch {
+                throw CursorInstallerError.createDirectoryFailed(
+                    path: skillsDirectory,
+                    underlying: error
+                )
+            }
+        }
+
+        // Write skill file
+        do {
+            try CursorTemplates.skillMarkdown.write(
+                toFile: skillFilePath,
+                atomically: true,
+                encoding: .utf8
+            )
+        } catch {
+            throw CursorInstallerError.writeFileFailed(path: skillFilePath, underlying: error)
+        }
     }
 
     /// Uninstall Cursor hooks
@@ -151,6 +188,31 @@ struct CursorInstaller {
             contents.isEmpty
         {
             try? fileManager.removeItem(atPath: hooksDir)
+        }
+
+        // Remove skill file if it exists
+        if fileManager.fileExists(atPath: skillFilePath) {
+            do {
+                try fileManager.removeItem(atPath: skillFilePath)
+            } catch {
+                throw CursorInstallerError.deleteFileFailed(path: skillFilePath, underlying: error)
+            }
+        }
+
+        // Try to remove skills/xcsift directory if empty
+        let skillsDir = skillsDirectory
+        if let contents = try? fileManager.contentsOfDirectory(atPath: skillsDir),
+            contents.isEmpty
+        {
+            try? fileManager.removeItem(atPath: skillsDir)
+        }
+
+        // Try to remove skills directory if empty
+        let parentSkillsDir = "\(baseDirectory)/skills"
+        if let contents = try? fileManager.contentsOfDirectory(atPath: parentSkillsDir),
+            contents.isEmpty
+        {
+            try? fileManager.removeItem(atPath: parentSkillsDir)
         }
     }
 }

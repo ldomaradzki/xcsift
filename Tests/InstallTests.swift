@@ -306,6 +306,25 @@ final class CursorInstallerTests: XCTestCase {
         XCTAssertEqual(installer.hookScriptPath, "/Users/testuser/.cursor/hooks/pre-xcsift.sh")
     }
 
+    // MARK: - Skill Paths
+
+    func testProjectSkillPaths() {
+        let installer = CursorInstaller(global: false)
+
+        XCTAssertEqual(installer.skillsDirectory, ".cursor/skills/xcsift")
+        XCTAssertEqual(installer.skillFilePath, ".cursor/skills/xcsift/SKILL.md")
+    }
+
+    func testGlobalSkillPaths() {
+        let mockFS = MockInstallFileManager()
+        mockFS.mockHomeDirectory = URL(fileURLWithPath: "/Users/testuser")
+
+        let installer = CursorInstaller(global: true, fileManager: mockFS)
+
+        XCTAssertEqual(installer.skillsDirectory, "/Users/testuser/.cursor/skills/xcsift")
+        XCTAssertEqual(installer.skillFilePath, "/Users/testuser/.cursor/skills/xcsift/SKILL.md")
+    }
+
     // MARK: - Templates
 
     func testProjectHooksJSONTemplate() {
@@ -337,6 +356,22 @@ final class CursorInstallerTests: XCTestCase {
         XCTAssertTrue(template.contains("permission"))
         XCTAssertTrue(template.contains("allow"))
         XCTAssertTrue(template.contains("updatedCommand"))
+    }
+
+    func testSkillMarkdownTemplate() {
+        let template = CursorTemplates.skillMarkdown
+
+        // Check YAML frontmatter
+        XCTAssertTrue(template.contains("---"))
+        XCTAssertTrue(template.contains("name: xcsift"))
+        XCTAssertTrue(template.contains("description:"))
+
+        // Check content sections
+        XCTAssertTrue(template.contains("# xcsift"))
+        XCTAssertTrue(template.contains("## When to Use"))
+        XCTAssertTrue(template.contains("## Usage Pattern"))
+        XCTAssertTrue(template.contains("xcodebuild build 2>&1 | xcsift"))
+        XCTAssertTrue(template.contains("-f toon"))
     }
 }
 
