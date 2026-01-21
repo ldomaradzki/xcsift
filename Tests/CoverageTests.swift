@@ -547,6 +547,21 @@ final class CoverageTests: XCTestCase {
         XCTAssertNil(target)
     }
 
+    func testExtractTestedTargetParallelFormat() {
+        let parser = OutputParser()
+        // Parallel testing uses lowercase "Test suite" instead of "Test Suite"
+        let input = """
+            Test suite 'All tests' started on 'My Mac - App (Dev) (12345)'
+            Test suite 'MyAppTests.xctest' started on 'My Mac - App (Dev) (12345)'
+            Test suite 'LoginTests' started on 'My Mac - App (Dev) (12345)'
+            """
+
+        let target = parser.extractTestedTarget(from: input)
+
+        XCTAssertNotNil(target)
+        XCTAssertEqual(target, "MyApp")
+    }
+
     func testCoverageTargetFiltering() throws {
         let xcodebuildJSON = """
             {
