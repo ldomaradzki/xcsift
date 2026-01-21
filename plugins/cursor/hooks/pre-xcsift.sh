@@ -18,6 +18,13 @@ if ! command -v xcsift &> /dev/null; then
     exit 0
 fi
 
+# Check if jq is available (required for JSON output)
+if ! command -v jq &> /dev/null; then
+    # jq not installed, allow command as-is
+    echo '{"permission": "allow"}'
+    exit 0
+fi
+
 # Patterns that should be piped through xcsift
 # Match: xcodebuild, swift build, swift test (with any arguments)
 # But NOT: already piped through xcsift

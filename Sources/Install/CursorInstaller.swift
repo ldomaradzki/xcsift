@@ -187,7 +187,17 @@ struct CursorInstaller {
         if let contents = try? fileManager.contentsOfDirectory(atPath: hooksDir),
             contents.isEmpty
         {
-            try? fileManager.removeItem(atPath: hooksDir)
+            do {
+                try fileManager.removeItem(atPath: hooksDir)
+            } catch {
+                // Log cleanup failure but don't throw - this is best-effort
+                FileHandle.standardError.write(
+                    Data(
+                        "Warning: Failed to remove empty hooks directory at \(hooksDir): \(error.localizedDescription)\n"
+                            .utf8
+                    )
+                )
+            }
         }
 
         // Remove skill file if it exists
@@ -204,7 +214,17 @@ struct CursorInstaller {
         if let contents = try? fileManager.contentsOfDirectory(atPath: skillsDir),
             contents.isEmpty
         {
-            try? fileManager.removeItem(atPath: skillsDir)
+            do {
+                try fileManager.removeItem(atPath: skillsDir)
+            } catch {
+                // Log cleanup failure but don't throw - this is best-effort
+                FileHandle.standardError.write(
+                    Data(
+                        "Warning: Failed to remove empty skills/xcsift directory at \(skillsDir): \(error.localizedDescription)\n"
+                            .utf8
+                    )
+                )
+            }
         }
 
         // Try to remove skills directory if empty
@@ -212,7 +232,17 @@ struct CursorInstaller {
         if let contents = try? fileManager.contentsOfDirectory(atPath: parentSkillsDir),
             contents.isEmpty
         {
-            try? fileManager.removeItem(atPath: parentSkillsDir)
+            do {
+                try fileManager.removeItem(atPath: parentSkillsDir)
+            } catch {
+                // Log cleanup failure but don't throw - this is best-effort
+                FileHandle.standardError.write(
+                    Data(
+                        "Warning: Failed to remove empty skills directory at \(parentSkillsDir): \(error.localizedDescription)\n"
+                            .utf8
+                    )
+                )
+            }
         }
     }
 }

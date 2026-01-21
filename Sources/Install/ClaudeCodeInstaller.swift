@@ -116,10 +116,19 @@ struct ClaudeCodeInstaller {
             }
         }
 
-        // Optionally remove marketplace (ignore errors)
-        _ = shellRunner.run(
+        // Optionally remove marketplace (ignore errors but log them)
+        let marketplaceRemoveResult = shellRunner.run(
             command: "claude plugin marketplace remove \(Self.marketplaceRepo)"
         )
+        if marketplaceRemoveResult.exitCode != 0 {
+            // Log to stderr but don't fail - this is a best-effort cleanup
+            FileHandle.standardError.write(
+                Data(
+                    "Warning: Failed to remove marketplace (this is usually safe to ignore): \(marketplaceRemoveResult.stderr)\n"
+                        .utf8
+                )
+            )
+        }
     }
 }
 
