@@ -337,13 +337,6 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    // PhaseScriptExecution failure pattern
-    nonisolated(unsafe) private static let phaseScriptExecutionFailedRegex = Regex {
-        "Command PhaseScriptExecution failed with a nonzero exit"
-        OneOrMore(.any, .reluctant)
-        Anchor.endOfSubject
-    }
-
     func parse(
         input: String,
         printWarnings: Bool = false,
@@ -360,41 +353,42 @@ class OutputParser {
 
         for (index, line) in lines.enumerated() {
             parseLine(line)
-            
+
             // Handle PhaseScriptExecution failures with context from preceding lines
             if line.contains("Command PhaseScriptExecution failed with a nonzero exit") {
                 // Look back for relevant context (skip unrelated warnings and metadata)
                 var contextLines: [String] = []
                 let startIndex = max(0, index - 3)  // Look back a few lines
-                for contextIdx in startIndex..<index {
+                for contextIdx in startIndex ..< index {
                     let contextLine = lines[contextIdx].trimmingCharacters(in: .whitespaces)
-                    
+
                     // Skip empty lines and build metadata warnings
-                    if contextLine.isEmpty || contextLine.hasPrefix("Warning:") || 
-                       contextLine.hasPrefix("Run script build phase") {
+                    if contextLine.isEmpty || contextLine.hasPrefix("Warning:")
+                        || contextLine.hasPrefix("Run script build phase")
+                    {
                         continue
                     }
-                    
+
                     // Skip lines that contain Xcode build phase info that's not error-related
                     if contextLine.contains(": warning:") && !contextLine.contains("error:") {
                         continue
                     }
-                    
+
                     // Include all other lines as they're likely actual error context
                     contextLines.append(contextLine)
                 }
-                
+
                 // Combine context with failure message, using spaces as separator
-                if !contextLines.isEmpty {
+                if !contextLines.isEmpty, let lastIndex = errors.indices.last,
+                    errors[lastIndex].message == line
+                {
                     let combinedMessage = contextLines.joined(separator: " ") + " " + line
                     // Update the last error (which was just added by parseLine) with combined message
-                    if !errors.isEmpty && errors.last?.message == line {
-                        errors[errors.count - 1] = BuildError(
-                            file: nil,
-                            line: nil,
-                            message: combinedMessage
-                        )
-                    }
+                    errors[lastIndex] = BuildError(
+                        file: nil,
+                        line: nil,
+                        message: combinedMessage
+                    )
                 }
             }
         }
