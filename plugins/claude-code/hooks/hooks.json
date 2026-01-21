@@ -1,0 +1,13 @@
+{
+  "hooks": [
+    {
+      "matcher": "Bash",
+      "hooks": [
+        {
+          "type": "preToolUse",
+          "command": "./scripts/pre-xcsift.sh"
+        }
+      ]
+    }
+  ]
+}

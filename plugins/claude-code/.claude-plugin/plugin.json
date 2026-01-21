@@ -1,0 +1,8 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "xcsift",
+  "version": "1.0.0",
+  "description": "Automatically pipe xcodebuild and swift build output through xcsift for structured TOON format optimized for LLM consumption",
+  "hooks": "./hooks/hooks.json",
+  "skills": "./skills"
+}

@@ -117,7 +117,24 @@ struct XCSift: ParsableCommand {
               --toon-flatten-depth N             # Default: unlimited
               --slow-threshold N                 # Slow test threshold in seconds
               --build-info                       # Per-target phases and timing
+
+            Plugin installation:
+              xcsift install-claude-code     # Install Claude Code plugin
+              xcsift uninstall-claude-code   # Uninstall Claude Code plugin
+              xcsift install-codex           # Install Codex skill
+              xcsift uninstall-codex         # Uninstall Codex skill
+              xcsift install-cursor          # Install Cursor hooks (project)
+              xcsift install-cursor --global # Install Cursor hooks (global)
+              xcsift uninstall-cursor        # Uninstall Cursor hooks
             """,
+        subcommands: [
+            InstallClaudeCode.self,
+            UninstallClaudeCode.self,
+            InstallCodex.self,
+            UninstallCodex.self,
+            InstallCursor.self,
+            UninstallCursor.self,
+        ],
         helpNames: [.short, .long]
     )
 
