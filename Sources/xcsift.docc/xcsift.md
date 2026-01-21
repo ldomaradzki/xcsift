@@ -38,6 +38,7 @@ swift test 2>&1 | xcsift --slow-threshold 1.0
 
 - <doc:GettingStarted>
 - <doc:Usage>
+- <doc:PluginInstallation>
 
 ### Reference
 

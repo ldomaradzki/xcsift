@@ -78,6 +78,45 @@ swift build -c release
 cp .build/release/xcsift /usr/local/bin/
 ```
 
+## Plugin Installation
+
+For automatic integration with coding assistants, xcsift provides built-in plugin installers:
+
+### Claude Code
+
+```bash
+# Install plugin from marketplace
+xcsift install-claude-code
+
+# Uninstall plugin
+xcsift uninstall-claude-code
+```
+
+### Codex
+
+```bash
+# Install skill
+xcsift install-codex
+
+# Uninstall skill
+xcsift uninstall-codex
+```
+
+### Cursor
+
+```bash
+# Install hooks (project-level)
+xcsift install-cursor
+
+# Install hooks (global)
+xcsift install-cursor --global
+
+# Uninstall hooks
+xcsift uninstall-cursor
+```
+
+See [Plugin Installation Documentation](https://ldomaradzki.github.io/xcsift/documentation/xcsift/plugininstallation) for detailed setup instructions.
+
 ## Usage
 
 Pipe xcodebuild output directly to xcsift:
