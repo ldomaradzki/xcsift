@@ -94,9 +94,30 @@ xcsift --init
 
 This creates `.xcsift.toml` where you can set defaults like output format, warnings, coverage, and more. CLI flags always override config file values.
 
+### Plugin Installation
+
+For automatic integration with coding assistants, install xcsift plugins:
+
+```bash
+# Claude Code
+xcsift install-claude-code
+
+# Codex
+xcsift install-codex
+
+# Cursor (project-level)
+xcsift install-cursor
+
+# Cursor (global)
+xcsift install-cursor --global
+```
+
+See <doc:PluginInstallation> for detailed plugin documentation.
+
 ## What's Next
 
 - <doc:Usage> — Complete CLI reference
+- <doc:PluginInstallation> — Install plugins for Claude Code, Codex, and Cursor
 - <doc:Configuration> — Configuration file format and options
 - <doc:OutputFormats> — JSON, TOON, and GitHub Actions formats
 - <doc:CodeCoverage> — Automatic coverage conversion
