@@ -349,10 +349,48 @@ class OutputParser {
     ) -> BuildResult {
         resetState()
         shouldParseBuildInfo = printBuildInfo
-        let lines = input.split(separator: "\n", omittingEmptySubsequences: false)
+        let lines = input.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
 
-        for line in lines {
-            parseLine(String(line))
+        for (index, line) in lines.enumerated() {
+            parseLine(line)
+
+            // Handle PhaseScriptExecution failures with context from preceding lines
+            if line.contains("Command PhaseScriptExecution failed with a nonzero exit") {
+                // Look back for relevant context (skip unrelated warnings and metadata)
+                var contextLines: [String] = []
+                let startIndex = max(0, index - 3)  // Look back a few lines
+                for contextIdx in startIndex ..< index {
+                    let contextLine = lines[contextIdx].trimmingCharacters(in: .whitespaces)
+
+                    // Skip empty lines and build metadata warnings
+                    if contextLine.isEmpty || contextLine.hasPrefix("Warning:")
+                        || contextLine.hasPrefix("Run script build phase")
+                    {
+                        continue
+                    }
+
+                    // Skip lines that contain Xcode build phase info that's not error-related
+                    if contextLine.contains(": warning:") && !contextLine.contains("error:") {
+                        continue
+                    }
+
+                    // Include all other lines as they're likely actual error context
+                    contextLines.append(contextLine)
+                }
+
+                // Combine context with failure message, using spaces as separator
+                if !contextLines.isEmpty, let lastIndex = errors.indices.last,
+                    errors[lastIndex].message == line
+                {
+                    let combinedMessage = contextLines.joined(separator: " ") + " " + line
+                    // Update the last error (which was just added by parseLine) with combined message
+                    errors[lastIndex] = BuildError(
+                        file: nil,
+                        line: nil,
+                        message: combinedMessage
+                    )
+                }
+            }
         }
 
         // If warnings-as-errors is enabled, convert warnings to errors
@@ -986,6 +1024,11 @@ class OutputParser {
         if line.hasPrefix("error: ") {
             let message = String(line.dropFirst(7))
             return BuildError(file: nil, line: nil, message: message)
+        }
+
+        // Pattern: Command PhaseScriptExecution failed with a nonzero exit code
+        if line.contains("Command PhaseScriptExecution failed with a nonzero exit") {
+            return BuildError(file: nil, line: nil, message: line)
         }
 
         return nil
