@@ -1,9 +1,8 @@
-import XCTest
 @testable import xcsift
+import XCTest
 
 /// Tests for basic parsing functionality: errors, warnings, tests, and build output
 final class ParsingTests: XCTestCase {
-
     func testParseError() {
         let parser = OutputParser()
         let input = """
@@ -1161,6 +1160,52 @@ final class ParsingTests: XCTestCase {
         let result = parser.parse(input: input)
 
         XCTAssertEqual(result.status, "success")
+    }
+
+    func testParseTestFailedWithPassedTests() {
+        // Issue #52: -skipMacroValidation can cause "** TEST FAILED **" even when tests pass
+        let parser = OutputParser()
+        let input = """
+            Building for testing...
+            Build complete!
+            Testing started
+            Test Suite 'MyTests.xctest' started at 2026-01-15 12:23:33.095.
+            Test Case 'MyTests.testExample' passed (0.001 seconds).
+            Test Case 'MyTests.testAnother' passed (0.002 seconds).
+            Executed 2 tests, with 0 failures in 0.003 seconds
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        // Should be success because tests actually passed
+        XCTAssertEqual(result.status, "success", "Status should be success when tests pass despite TEST FAILED flag")
+        XCTAssertEqual(result.failedTests.count, 0, "Should have no failed tests")
+        XCTAssertEqual(result.summary.passedTests, 2, "Should have 2 passed tests")
+        XCTAssertEqual(result.errors.count, 0, "Should have no errors")
+    }
+
+    func testParseSkipMacroValidationScenario() {
+        // Issue #52: -skipMacroValidation scenario with passed tests but TEST FAILED flag
+        let parser = OutputParser()
+        let input = """
+            Build complete!
+            Test Suite 'ListeningPostTests.xctest' started at 2026-01-21 10:15:23.456
+            Test Case '-[ListeningPostTests.ModelTests testDataParsing]' passed (0.123 seconds).
+            Test Case '-[ListeningPostTests.ViewTests testLayout]' passed (0.045 seconds).
+            Test Case '-[ListeningPostTests.ControllerTests testActions]' passed (0.078 seconds).
+            Executed 3 tests, with 0 failures (0 unexpected) in 0.246 (0.250) seconds
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        // Should be success because all tests passed
+        XCTAssertEqual(result.status, "success", "Status should be success for -skipMacroValidation with passed tests")
+        XCTAssertEqual(result.failedTests.count, 0, "Should have no failed tests")
+        XCTAssertEqual(result.summary.passedTests, 3, "Should have 3 passed tests")
+        XCTAssertEqual(result.errors.count, 0, "Should have no errors")
+        XCTAssertEqual(result.warnings.count, 0, "Should have no warnings")
     }
 
     // MARK: - Fatal Error Parsing Tests
