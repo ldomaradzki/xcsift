@@ -917,12 +917,4 @@ final class ConfigErrorTests: XCTestCase {
         let error = ConfigError.readError(path: "/test/config.toml", underlying: underlying)
         XCTAssertTrue(error.description.contains("Failed to read '/test/config.toml'"))
     }
-
-    func testTomlNotAvailableDescription() {
-        let error = ConfigError.tomlNotAvailable
-        XCTAssertEqual(
-            error.description,
-            "Configuration files are not supported in this build. Use CLI flags instead."
-        )
-    }
 }
