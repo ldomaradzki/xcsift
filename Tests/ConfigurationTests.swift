@@ -324,8 +324,10 @@ final class ConfigLoaderTests: XCTestCase {
                 XCTFail("Expected ConfigError, got \(error)")
                 return
             }
-            if case .syntaxError = configError {
-                // Success
+            if case .syntaxError(let line, let column, _) = configError {
+                // swift-toml 2.0 provides line/column info for syntax errors
+                XCTAssertEqual(line, 1, "Expected error on line 1")
+                XCTAssertGreaterThan(column, 0, "Expected column > 0")
             } else {
                 XCTFail("Expected syntaxError error, got \(configError)")
             }

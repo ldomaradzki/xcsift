@@ -146,10 +146,18 @@ struct ConfigLoader {
 
         do {
             return try decoder.decode(Configuration.self, from: contents)
+        } catch let error as TOMLDecodingError {
+            // Handle swift-toml 2.0 specific errors with line/column info
+            switch error {
+            case .invalidSyntax(let line, let column, let message):
+                throw ConfigError.syntaxError(line: line, column: column, message: message)
+            default:
+                throw ConfigError.syntaxError(line: 0, column: 0, message: error.description)
+            }
         } catch let error as DecodingError {
             throw mapDecodingError(error)
         } catch {
-            // Generic TOML parsing error
+            // Generic parsing error
             throw ConfigError.syntaxError(line: 0, column: 0, message: error.localizedDescription)
         }
     }
