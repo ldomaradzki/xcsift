@@ -16,22 +16,30 @@ xcsift is a command-line tool that parses xcodebuild and Swift Package Manager o
 ### Using Homebrew (Recommended)
 
 ```bash
-# Install from custom tap
-brew tap ldomaradzki/xcsift
 brew install xcsift
+```
+
+### Using mise
+
+```bash
+# Install globally from mise registry
+mise use -g xcsift
+
+# Or explicitly via github backend (downloads binary)
+mise use -g github:ldomaradzki/xcsift
+
+# For project-local installation (adds to .mise.toml)
+mise use xcsift
+
+# Or add to your .mise.toml manually
+# [tools]
+# xcsift = "latest"
 ```
 
 ### Using Mint
 
 ```bash
 mint install ldomaradzki/xcsift
-```
-
-### Using mise
-
-```bash
-# Install from mise registry
-mise use -g xcsift
 ```
 
 ### From Source
@@ -86,9 +94,30 @@ xcsift --init
 
 This creates `.xcsift.toml` where you can set defaults like output format, warnings, coverage, and more. CLI flags always override config file values.
 
+### Plugin Installation
+
+For automatic integration with coding assistants, install xcsift plugins:
+
+```bash
+# Claude Code
+xcsift install-claude-code
+
+# Codex
+xcsift install-codex
+
+# Cursor (project-level)
+xcsift install-cursor
+
+# Cursor (global)
+xcsift install-cursor --global
+```
+
+See <doc:PluginInstallation> for detailed plugin documentation.
+
 ## What's Next
 
 - <doc:Usage> — Complete CLI reference
+- <doc:PluginInstallation> — Install plugins for Claude Code, Codex, and Cursor
 - <doc:Configuration> — Configuration file format and options
 - <doc:OutputFormats> — JSON, TOON, and GitHub Actions formats
 - <doc:CodeCoverage> — Automatic coverage conversion

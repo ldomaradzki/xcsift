@@ -1,9 +1,8 @@
-import XCTest
 @testable import xcsift
+import XCTest
 
 /// Tests for basic parsing functionality: errors, warnings, tests, and build output
 final class ParsingTests: XCTestCase {
-
     func testParseError() {
         let parser = OutputParser()
         let input = """
@@ -1066,6 +1065,53 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.executables, 1)
     }
 
+    func testParseExecutableFromValidateLine() {
+        let parser = OutputParser()
+        let input = """
+            Validate /path/to/MyiOSApp.app (in target 'MyiOSApp' from project 'MyProject')
+            """
+
+        let result = parser.parse(input: input, printExecutables: true)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.executables.count, 1)
+        XCTAssertEqual(result.executables[0].path, "/path/to/MyiOSApp.app")
+        XCTAssertEqual(result.executables[0].name, "MyiOSApp.app")
+        XCTAssertEqual(result.executables[0].target, "MyiOSApp")
+        XCTAssertEqual(result.summary.executables, 1)
+    }
+
+    func testValidateLineOnlyCapturesAppBundles() {
+        let parser = OutputParser()
+        // Validate is used for many artifact types, but we only want .app bundles
+        let input = """
+            Validate /path/to/MyFramework.framework (in target 'MyFramework' from project 'MyProject')
+            Validate /path/to/MyApp.app (in target 'MyApp' from project 'MyProject')
+            Validate /path/to/resource.bundle (in target 'Resources' from project 'MyProject')
+            """
+
+        let result = parser.parse(input: input, printExecutables: true)
+
+        XCTAssertEqual(result.executables.count, 1, "Only .app bundles should be captured from Validate lines")
+        XCTAssertEqual(result.executables[0].name, "MyApp.app")
+        XCTAssertEqual(result.executables[0].target, "MyApp")
+    }
+
+    func testMixedRegisterAndValidateExecutables() {
+        let parser = OutputParser()
+        let input = """
+            RegisterWithLaunchServices /path/to/MacApp.app (in target 'MacApp' from project 'MyProject')
+            Validate /path/to/iOSApp.app (in target 'iOSApp' from project 'MyProject')
+            """
+
+        let result = parser.parse(input: input, printExecutables: true)
+
+        XCTAssertEqual(result.executables.count, 2)
+        XCTAssertEqual(result.executables[0].name, "MacApp.app")
+        XCTAssertEqual(result.executables[1].name, "iOSApp.app")
+        XCTAssertEqual(result.summary.executables, 2)
+    }
+
     // MARK: - TEST FAILED Parsing Tests
 
     func testParseTestFailed() {
@@ -1114,6 +1160,52 @@ final class ParsingTests: XCTestCase {
         let result = parser.parse(input: input)
 
         XCTAssertEqual(result.status, "success")
+    }
+
+    func testParseTestFailedWithPassedTests() {
+        // Issue #52: -skipMacroValidation can cause "** TEST FAILED **" even when tests pass
+        let parser = OutputParser()
+        let input = """
+            Building for testing...
+            Build complete!
+            Testing started
+            Test Suite 'MyTests.xctest' started at 2026-01-15 12:23:33.095.
+            Test Case 'MyTests.testExample' passed (0.001 seconds).
+            Test Case 'MyTests.testAnother' passed (0.002 seconds).
+            Executed 2 tests, with 0 failures in 0.003 seconds
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        // Should be success because tests actually passed
+        XCTAssertEqual(result.status, "success", "Status should be success when tests pass despite TEST FAILED flag")
+        XCTAssertEqual(result.failedTests.count, 0, "Should have no failed tests")
+        XCTAssertEqual(result.summary.passedTests, 2, "Should have 2 passed tests")
+        XCTAssertEqual(result.errors.count, 0, "Should have no errors")
+    }
+
+    func testParseSkipMacroValidationScenario() {
+        // Issue #52: -skipMacroValidation scenario with passed tests but TEST FAILED flag
+        let parser = OutputParser()
+        let input = """
+            Build complete!
+            Test Suite 'ListeningPostTests.xctest' started at 2026-01-21 10:15:23.456
+            Test Case '-[ListeningPostTests.ModelTests testDataParsing]' passed (0.123 seconds).
+            Test Case '-[ListeningPostTests.ViewTests testLayout]' passed (0.045 seconds).
+            Test Case '-[ListeningPostTests.ControllerTests testActions]' passed (0.078 seconds).
+            Executed 3 tests, with 0 failures (0 unexpected) in 0.246 (0.250) seconds
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        // Should be success because all tests passed
+        XCTAssertEqual(result.status, "success", "Status should be success for -skipMacroValidation with passed tests")
+        XCTAssertEqual(result.failedTests.count, 0, "Should have no failed tests")
+        XCTAssertEqual(result.summary.passedTests, 3, "Should have 3 passed tests")
+        XCTAssertEqual(result.errors.count, 0, "Should have no errors")
+        XCTAssertEqual(result.warnings.count, 0, "Should have no warnings")
     }
 
     // MARK: - Fatal Error Parsing Tests
@@ -1170,5 +1262,70 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.errors[0].file, "TestProjectTests/TestProjectTests.swift")
         XCTAssertEqual(result.errors[0].line, 5)
         XCTAssertEqual(result.errors[0].message, "Fatal error")
+    }
+
+    // MARK: - Parallel Testing Format Tests
+
+    func testParseParallelTestingPassedFormat() {
+        let parser = OutputParser()
+        let input = """
+            Test case 'MenuBarFeatureTests.testExample()' passed on 'My Mac - App (Dev) (51424)' (0.565 seconds)
+            Test case 'FilesChannelTests.testAnother()' passed on 'My Mac - App (Dev) (52255)' (0.002 seconds)
+            Executed 2 tests, with 0 failures in 0.567 seconds
+            ** TEST SUCCEEDED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.passedTests, 2)
+        XCTAssertEqual(result.failedTests.count, 0)
+    }
+
+    func testParseParallelTestingFailedFormat() {
+        let parser = OutputParser()
+        let input = """
+            Test case 'PublishingServiceTests.testProcessEntry()' failed on 'My Mac - App (Dev) (51424)' (0.070 seconds)
+            Executed 1 test, with 1 failure in 0.070 seconds
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.failedTests.count, 1)
+        XCTAssertEqual(result.failedTests[0].test, "PublishingServiceTests.testProcessEntry()")
+        XCTAssertEqual(result.failedTests[0].duration, 0.070)
+    }
+
+    func testParseParallelTestingMixedResults() {
+        let parser = OutputParser()
+        let input = """
+            Test case 'Tests.testPassing()' passed on 'My Mac' (0.001 seconds)
+            Test case 'Tests.testFailing()' failed on 'My Mac' (0.002 seconds)
+            Executed 2 tests, with 1 failure in 0.003 seconds
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.passedTests, 1)
+        XCTAssertEqual(result.failedTests.count, 1)
+    }
+
+    func testParseParallelTestingDurationExtraction() {
+        let parser = OutputParser()
+        // Test with a complex device name containing parentheses
+        let input = """
+            Test case 'MyTests.testSomething()' passed on 'iPhone 15 Pro (iOS 17.0) (ABC123)' (1.234 seconds)
+            Executed 1 test, with 0 failures in 1.234 seconds
+            ** TEST SUCCEEDED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.passedTests, 1)
     }
 }

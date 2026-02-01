@@ -39,36 +39,35 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 ### Option 1: Homebrew (Recommended)
 
 ```bash
-# Install from custom tap
-brew tap ldomaradzki/xcsift
 brew install xcsift
-
-# Or install directly from formula
-brew install https://raw.githubusercontent.com/ldomaradzki/xcsift/master/homebrew-formula/xcsift.rb
 ```
 
-### Option 2: Mint
+### Option 2: mise
+
+If you use [mise](https://mise.jdx.dev/) for managing development tools:
+
+```bash
+# Install globally from mise registry
+mise use -g xcsift
+
+# Or explicitly via github backend (downloads binary)
+mise use -g github:ldomaradzki/xcsift
+
+# For project-local installation (adds to .mise.toml)
+mise use xcsift
+
+# Or add to your .mise.toml manually
+# [tools]
+# xcsift = "latest"
+```
+
+### Option 3: Mint
 
 If you use [Mint](https://github.com/yonaskolb/mint) for managing Swift command-line tools:
 
 ```bash
 mint install ldomaradzki/xcsift
 ```
-
-### Option 3: mise
-
-If you use [mise](https://mise.jdx.dev/) for managing development tools:
-
-```bash
-# Install from mise registry
-mise use -g xcsift
-
-# Or add to your .mise.toml
-# [tools]
-# xcsift = "latest"
-```
-
-This will automatically download the latest binary from GitHub releases.
 
 ### Option 4: Build from Source
 
@@ -78,6 +77,45 @@ cd xcsift
 swift build -c release
 cp .build/release/xcsift /usr/local/bin/
 ```
+
+## Plugin Installation
+
+For automatic integration with coding assistants, xcsift provides built-in plugin installers:
+
+### Claude Code
+
+```bash
+# Install plugin from marketplace
+xcsift install-claude-code
+
+# Uninstall plugin
+xcsift uninstall-claude-code
+```
+
+### Codex
+
+```bash
+# Install skill
+xcsift install-codex
+
+# Uninstall skill
+xcsift uninstall-codex
+```
+
+### Cursor
+
+```bash
+# Install hooks (project-level)
+xcsift install-cursor
+
+# Install hooks (global)
+xcsift install-cursor --global
+
+# Uninstall hooks
+xcsift uninstall-cursor
+```
+
+See [Plugin Installation Documentation](https://ldomaradzki.github.io/xcsift/documentation/xcsift/plugininstallation) for detailed setup instructions.
 
 ## Usage
 

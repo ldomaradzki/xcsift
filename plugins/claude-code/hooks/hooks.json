@@ -1,0 +1,17 @@
+{
+  "description": "xcsift: automatically pipe xcodebuild/swift build commands through xcsift for structured TOON output",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/pre-xcsift.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:xcsift}",
+            "name": "Debug xcsift",
+            "program": "${workspaceFolder:xcsift}/.build/debug/xcsift",
+            "preLaunchTask": "swift: Build Debug xcsift"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:xcsift}",
+            "name": "Release xcsift",
+            "program": "${workspaceFolder:xcsift}/.build/release/xcsift",
+            "preLaunchTask": "swift: Build Release xcsift"
+        }
+    ]
+}

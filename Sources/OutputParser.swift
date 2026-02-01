@@ -48,7 +48,7 @@ class OutputParser {
     // MARK: - Static Regex Patterns (compiled once)
 
     // Error patterns
-    nonisolated(unsafe) private static let fileLineColumnErrorRegex = Regex {
+    private nonisolated(unsafe) static let fileLineColumnErrorRegex = Regex {
         Capture(OneOrMore(.any, .reluctant))
         ":"
         Capture(OneOrMore(.digit))
@@ -59,7 +59,7 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let fileLineErrorRegex = Regex {
+    private nonisolated(unsafe) static let fileLineErrorRegex = Regex {
         Capture(OneOrMore(.any, .reluctant))
         ":"
         Capture(OneOrMore(.digit))
@@ -68,14 +68,14 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let fileErrorRegex = Regex {
+    private nonisolated(unsafe) static let fileErrorRegex = Regex {
         Capture(OneOrMore(.any, .reluctant))
         ": error: "
         Capture(OneOrMore(.any, .reluctant))
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let fileFatalErrorRegex = Regex {
+    private nonisolated(unsafe) static let fileFatalErrorRegex = Regex {
         Capture(OneOrMore(.any, .reluctant))
         ":"
         Capture(OneOrMore(.digit))
@@ -84,27 +84,27 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let fatalErrorRegex = Regex {
+    private nonisolated(unsafe) static let fatalErrorRegex = Regex {
         Capture(OneOrMore(.any, .reluctant))
         ": Fatal error: "
         Capture(OneOrMore(.any, .reluctant))
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let emojiErrorRegex = Regex {
+    private nonisolated(unsafe) static let emojiErrorRegex = Regex {
         "❌ "
         Capture(OneOrMore(.any, .reluctant))
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let simpleErrorRegex = Regex {
+    private nonisolated(unsafe) static let simpleErrorRegex = Regex {
         "error: "
         Capture(OneOrMore(.any, .reluctant))
         Anchor.endOfSubject
     }
 
     // Warning patterns
-    nonisolated(unsafe) private static let fileLineColumnWarningRegex = Regex {
+    private nonisolated(unsafe) static let fileLineColumnWarningRegex = Regex {
         Capture(OneOrMore(.any, .reluctant))
         ":"
         Capture(OneOrMore(.digit))
@@ -115,7 +115,7 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let fileLineWarningRegex = Regex {
+    private nonisolated(unsafe) static let fileLineWarningRegex = Regex {
         Capture(OneOrMore(.any, .reluctant))
         ":"
         Capture(OneOrMore(.digit))
@@ -124,21 +124,21 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let fileWarningRegex = Regex {
+    private nonisolated(unsafe) static let fileWarningRegex = Regex {
         Capture(OneOrMore(.any, .reluctant))
         ": warning: "
         Capture(OneOrMore(.any, .reluctant))
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let simpleWarningRegex = Regex {
+    private nonisolated(unsafe) static let simpleWarningRegex = Regex {
         "warning: "
         Capture(OneOrMore(.any, .reluctant))
         Anchor.endOfSubject
     }
 
     // Test patterns
-    nonisolated(unsafe) private static let testCasePassedRegex = Regex {
+    private nonisolated(unsafe) static let testCasePassedRegex = Regex {
         "Test Case '"
         Capture(OneOrMore(.any, .reluctant))
         "' passed ("
@@ -148,7 +148,7 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let swiftTestingPassedRegex = Regex {
+    private nonisolated(unsafe) static let swiftTestingPassedRegex = Regex {
         "✓ Test \""
         Capture(OneOrMore(.any, .reluctant))
         "\" passed"
@@ -156,7 +156,7 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let xctestFailedRegex = Regex {
+    private nonisolated(unsafe) static let xctestFailedRegex = Regex {
         Capture(OneOrMore(.any, .reluctant))
         ":"
         Capture(OneOrMore(.digit))
@@ -167,13 +167,13 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let testNameBracketRegex = Regex {
+    private nonisolated(unsafe) static let testNameBracketRegex = Regex {
         "-["
         Capture(OneOrMore(.any, .reluctant))
         "]"
     }
 
-    nonisolated(unsafe) private static let testCaseFailedRegex = Regex {
+    private nonisolated(unsafe) static let testCaseFailedRegex = Regex {
         "Test Case '"
         Capture(OneOrMore(.any, .reluctant))
         "' failed ("
@@ -183,7 +183,7 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let swiftTestingIssueRegex = Regex {
+    private nonisolated(unsafe) static let swiftTestingIssueRegex = Regex {
         "✘ Test \""
         Capture(OneOrMore(.any, .reluctant))
         "\" recorded an issue at "
@@ -197,7 +197,7 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let swiftTestingFailedRegex = Regex {
+    private nonisolated(unsafe) static let swiftTestingFailedRegex = Regex {
         "✘ Test \""
         Capture(OneOrMore(.any, .reluctant))
         "\" failed after "
@@ -210,7 +210,7 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let emojiTestFailedRegex = Regex {
+    private nonisolated(unsafe) static let emojiTestFailedRegex = Regex {
         "❌ "
         Capture(OneOrMore(.any, .reluctant))
         " ("
@@ -219,7 +219,7 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let testFailedRegex = Regex {
+    private nonisolated(unsafe) static let testFailedRegex = Regex {
         Capture(OneOrMore(.any, .reluctant))
         " ("
         Capture(OneOrMore(.any, .reluctant))
@@ -227,7 +227,7 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let colonFailedRegex = Regex {
+    private nonisolated(unsafe) static let colonFailedRegex = Regex {
         Capture(OneOrMore(.any, .reluctant))
         ": "
         Capture(OneOrMore(.any, .reluctant))
@@ -237,19 +237,19 @@ class OutputParser {
     }
 
     // Build time patterns
-    nonisolated(unsafe) private static let buildSucceededRegex = Regex {
+    private nonisolated(unsafe) static let buildSucceededRegex = Regex {
         "Build succeeded in "
         Capture(OneOrMore(.any, .reluctant))
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let buildFailedRegex = Regex {
+    private nonisolated(unsafe) static let buildFailedRegex = Regex {
         "Build failed after "
         Capture(OneOrMore(.any, .reluctant))
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let executedTestsRegex = Regex {
+    private nonisolated(unsafe) static let executedTestsRegex = Regex {
         "Executed "
         Capture(OneOrMore(.digit))
         " test"
@@ -268,7 +268,7 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let swiftTestingSummaryRegex = Regex {
+    private nonisolated(unsafe) static let swiftTestingSummaryRegex = Regex {
         "Test run with "
         Capture(OneOrMore(.digit))
         " test"
@@ -276,7 +276,7 @@ class OutputParser {
         " passed"
     }
 
-    nonisolated(unsafe) private static let executedTestsSimpleRegex = Regex {
+    private nonisolated(unsafe) static let executedTestsSimpleRegex = Regex {
         "Executed "
         Capture(OneOrMore(.digit))
         " test"
@@ -292,7 +292,7 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    nonisolated(unsafe) private static let swiftTestingPassedFullRegex = Regex {
+    private nonisolated(unsafe) static let swiftTestingPassedFullRegex = Regex {
         "Test run with "
         Capture(OneOrMore(.digit))
         " test"
@@ -309,7 +309,7 @@ class OutputParser {
     }
 
     // JSON detection pattern
-    nonisolated(unsafe) private static let jsonKeyValueRegex = Regex {
+    private nonisolated(unsafe) static let jsonKeyValueRegex = Regex {
         Optionally(OneOrMore(.whitespace))
         "\""
         OneOrMore(.any, .reluctant)
@@ -319,15 +319,15 @@ class OutputParser {
         Optionally(OneOrMore(.whitespace))
     }
 
-    // Target extraction pattern
-    nonisolated(unsafe) private static let testSuiteRegex = Regex {
-        "Test Suite '"
+    // Target extraction pattern (handles both "Test Suite" and "Test suite" for parallel testing)
+    private nonisolated(unsafe) static let testSuiteRegex = Regex {
+        /[Tt]est [Ss]uite '/
         Capture(OneOrMore(.any, .reluctant))
         ".xctest'"
     }
 
     // Parallel test scheduling pattern: [N/TOTAL] Testing Module.Class/method
-    nonisolated(unsafe) private static let parallelTestSchedulingRegex = Regex {
+    private nonisolated(unsafe) static let parallelTestSchedulingRegex = Regex {
         "["
         Capture(OneOrMore(.digit))
         "/"
@@ -349,10 +349,48 @@ class OutputParser {
     ) -> BuildResult {
         resetState()
         shouldParseBuildInfo = printBuildInfo
-        let lines = input.split(separator: "\n", omittingEmptySubsequences: false)
+        let lines = input.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
 
-        for line in lines {
-            parseLine(String(line))
+        for (index, line) in lines.enumerated() {
+            parseLine(line)
+
+            // Handle PhaseScriptExecution failures with context from preceding lines
+            if line.contains("Command PhaseScriptExecution failed with a nonzero exit") {
+                // Look back for relevant context (skip unrelated warnings and metadata)
+                var contextLines: [String] = []
+                let startIndex = max(0, index - 3)  // Look back a few lines
+                for contextIdx in startIndex ..< index {
+                    let contextLine = lines[contextIdx].trimmingCharacters(in: .whitespaces)
+
+                    // Skip empty lines and build metadata warnings
+                    if contextLine.isEmpty || contextLine.hasPrefix("Warning:")
+                        || contextLine.hasPrefix("Run script build phase")
+                    {
+                        continue
+                    }
+
+                    // Skip lines that contain Xcode build phase info that's not error-related
+                    if contextLine.contains(": warning:") && !contextLine.contains("error:") {
+                        continue
+                    }
+
+                    // Include all other lines as they're likely actual error context
+                    contextLines.append(contextLine)
+                }
+
+                // Combine context with failure message, using spaces as separator
+                if !contextLines.isEmpty, let lastIndex = errors.indices.last,
+                    errors[lastIndex].message == line
+                {
+                    let combinedMessage = contextLines.joined(separator: " ") + " " + line
+                    // Update the last error (which was just added by parseLine) with combined message
+                    errors[lastIndex] = BuildError(
+                        file: nil,
+                        line: nil,
+                        message: combinedMessage
+                    )
+                }
+            }
         }
 
         // If warnings-as-errors is enabled, convert warnings to errors
@@ -372,10 +410,6 @@ class OutputParser {
             }
             finalWarnings = []
         }
-
-        let status =
-            finalErrors.isEmpty && failedTests.isEmpty && linkerErrors.isEmpty && !testRunFailed
-            ? "success" : "failed"
 
         // Aggregate test counts from both XCTest and Swift Testing
         let totalExecuted: Int? = {
@@ -415,6 +449,34 @@ class OutputParser {
                 return passedTestsCount
             }
             return nil
+        }()
+
+        // Determine build status with priority on parsed results over testRunFailed flag
+        // Issue #52: -skipMacroValidation can set testRunFailed even when tests pass
+        let status: String = {
+            let hasActualFailures = !finalErrors.isEmpty || !failedTests.isEmpty || !linkerErrors.isEmpty
+            let hasPassedTests = (computedPassedTests ?? 0) > 0
+
+            // Pattern matching for all possible condition combinations
+            switch (hasActualFailures, testRunFailed, hasPassedTests) {
+            case (true, _, _):
+                // Real errors/failures present - definitively failed
+                return "failed"
+
+            case (false, true, true):
+                // testRunFailed set BUT tests passed successfully
+                // This is a false positive (e.g., -skipMacroValidation)
+                return "success"
+
+            case (false, true, false):
+                // testRunFailed set AND no successful tests
+                // Real crash (tests didn't run at all)
+                return "failed"
+
+            case (false, false, _):
+                // No errors, no failure flag - success
+                return "success"
+            }
         }()
 
         // Detect slow tests (if threshold is set)
@@ -538,7 +600,10 @@ class OutputParser {
             let lineStr = String(line)
 
             // Only match lines with .xctest to skip "All tests" and individual test classes
-            if lineStr.contains("Test Suite '") && lineStr.contains(".xctest") && lineStr.contains("started") {
+            // Standard: Test Suite 'X.xctest' started
+            // Parallel: Test suite 'X.xctest' started on 'Device Name'
+            let hasTestSuite = lineStr.contains("Test Suite '") || lineStr.contains("Test suite '")
+            if hasTestSuite, lineStr.contains(".xctest"), lineStr.contains("started") {
                 if let match = lineStr.firstMatch(of: Self.testSuiteRegex) {
                     var targetName = String(match.1)
                     if targetName.hasSuffix("Tests") {
@@ -631,8 +696,8 @@ class OutputParser {
             || line.contains("✘") || line.contains("✓") || line.contains("❌") || line.contains("Build succeeded")
             || line.contains("Build failed") || line.contains("Executed") || line.contains("] Testing ")
             || line.contains("BUILD SUCCEEDED") || line.contains("BUILD FAILED") || line.contains("TEST FAILED")
-            || line.contains("Build complete!") || line.contains("RegisterWithLaunchServices")
-            || line.contains("Fatal error")
+            || line.contains("Build complete!") || line.hasPrefix("RegisterWithLaunchServices")
+            || line.hasPrefix("Validate") || line.contains("Fatal error")
             || (line.hasPrefix("/") && line.contains(".swift:"))  // runtime warnings
 
         if !containsRelevant {
@@ -925,7 +990,7 @@ class OutputParser {
         }
 
         // Skip visual error lines (e.g., "    |   `- error: message")
-        if line.hasPrefix(" ") && (line.contains("|") || line.contains("`")) {
+        if line.hasPrefix(" "), line.contains("|") || line.contains("`") {
             return nil
         }
 
@@ -967,7 +1032,7 @@ class OutputParser {
         }
 
         // Pattern: file:line: Fatal error (without trailing message)
-        if line.hasSuffix(": Fatal error") && !line.contains(" xctest[") {
+        if line.hasSuffix(": Fatal error"), !line.contains(" xctest[") {
             let beforeFatal = String(line.dropLast(": Fatal error".count))
             let components = beforeFatal.split(separator: ":", omittingEmptySubsequences: false)
             if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
@@ -988,6 +1053,11 @@ class OutputParser {
             return BuildError(file: nil, line: nil, message: message)
         }
 
+        // Pattern: Command PhaseScriptExecution failed with a nonzero exit code
+        if line.contains("Command PhaseScriptExecution failed with a nonzero exit") {
+            return BuildError(file: nil, line: nil, message: line)
+        }
+
         return nil
     }
 
@@ -998,7 +1068,7 @@ class OutputParser {
         }
 
         // Skip visual warning lines (e.g., "    |   `- warning: message")
-        if line.hasPrefix(" ") && (line.contains("|") || line.contains("`")) {
+        if line.hasPrefix(" "), line.contains("|") || line.contains("`") {
             return nil
         }
 
@@ -1063,7 +1133,7 @@ class OutputParser {
 
         // Find the line number (digits followed by space)
         var lineNumEnd = afterColon.startIndex
-        while lineNumEnd < afterColon.endIndex && afterColon[lineNumEnd].isNumber {
+        while lineNumEnd < afterColon.endIndex, afterColon[lineNumEnd].isNumber {
             lineNumEnd = afterColon.index(after: lineNumEnd)
         }
 
@@ -1117,16 +1187,26 @@ class OutputParser {
     }
 
     private func parsePassedTest(_ line: String) -> Bool {
-        // Pattern: Test Case 'TestName' passed (0.123 seconds).
-        if line.hasPrefix("Test Case '"), let endQuote = line.range(of: "' passed (") {
-            let startIndex = line.index(line.startIndex, offsetBy: 11)  // "Test Case '".count
+        // Standard: Test Case 'TestName' passed (0.123 seconds).
+        // Parallel: Test case 'TestName' passed on 'Device Name' (0.123 seconds)
+        let isStandardPassed = line.hasPrefix("Test Case '") && line.contains("' passed (")
+        let isParallelPassed = line.hasPrefix("Test case '") && line.contains("' passed on '")
+
+        if isStandardPassed || isParallelPassed {
+            let prefixLength = 11  // "Test Case '" or "Test case '"
+            let startIndex = line.index(line.startIndex, offsetBy: prefixLength)
+
+            // Find end of test name
+            let passedPattern = isParallelPassed ? "' passed on '" : "' passed ("
+            guard let endQuote = line.range(of: passedPattern) else { return false }
             let testName = String(line[startIndex ..< endQuote.lowerBound])
 
-            // Extract duration from "(X.XXX seconds)"
+            // Extract duration - find last "(" before "seconds)"
             var duration: Double? = nil
-            let afterPassed = line[endQuote.upperBound...]
-            if let parenEnd = afterPassed.range(of: " seconds") {
-                let durationStr = String(afterPassed[..<parenEnd.lowerBound])
+            if let lastParen = line.range(of: "(", options: .backwards),
+                let secondsEnd = line.range(of: " seconds", options: .backwards)
+            {
+                let durationStr = String(line[lastParen.upperBound ..< secondsEnd.lowerBound])
                 duration = Double(durationStr)
             }
 
@@ -1197,16 +1277,26 @@ class OutputParser {
             )
         }
 
-        // Pattern: Test Case 'TestName' failed (0.123 seconds).
-        if line.hasPrefix("Test Case '"), let endQuote = line.range(of: "' failed (") {
-            let startIndex = line.index(line.startIndex, offsetBy: 11)
+        // Standard: Test Case 'TestName' failed (0.123 seconds).
+        // Parallel: Test case 'TestName' failed on 'Device Name' (0.123 seconds)
+        let isStandardFailed = line.hasPrefix("Test Case '") && line.contains("' failed (")
+        let isParallelFailed = line.hasPrefix("Test case '") && line.contains("' failed on '")
+
+        if isStandardFailed || isParallelFailed {
+            let prefixLength = 11  // "Test Case '" or "Test case '"
+            let startIndex = line.index(line.startIndex, offsetBy: prefixLength)
+
+            // Find end of test name
+            let failedPattern = isParallelFailed ? "' failed on '" : "' failed ("
+            guard let endQuote = line.range(of: failedPattern) else { return nil }
             let test = String(line[startIndex ..< endQuote.lowerBound])
 
-            // Extract duration from "(X.XXX seconds)"
+            // Extract duration - find last "(" before "seconds)"
             var duration: Double? = nil
-            let afterFailed = line[endQuote.upperBound...]
-            if let secondsRange = afterFailed.range(of: " seconds") {
-                let durationStr = String(afterFailed[..<secondsRange.lowerBound])
+            if let lastParen = line.range(of: "(", options: .backwards),
+                let secondsEnd = line.range(of: " seconds", options: .backwards)
+            {
+                let durationStr = String(line[lastParen.upperBound ..< secondsEnd.lowerBound])
                 duration = Double(durationStr)
             }
 
@@ -1467,7 +1557,7 @@ class OutputParser {
         }
 
         // Special case: SwiftDriver\ Compilation or SwiftDriver Compilation
-        if line.contains("SwiftDriver") && line.contains("Compilation"),
+        if line.contains("SwiftDriver"), line.contains("Compilation"),
             let target = extractTarget(from: line)
         {
             return ("SwiftCompilation", target)
@@ -1575,7 +1665,7 @@ class OutputParser {
     /// Returns (targetName, duration) tuple if line contains target timing
     private func parseTargetTiming(_ line: String) -> (String, String)? {
         // Pattern: Build target MyApp of project MyProject with configuration Debug (23.1s)
-        if line.hasPrefix("Build target ") && line.contains(" of project ") {
+        if line.hasPrefix("Build target "), line.contains(" of project ") {
             // Extract target name
             let afterBuildTarget = line.dropFirst("Build target ".count)
             if let ofProjectRange = afterBuildTarget.range(of: " of project ") {
@@ -1593,7 +1683,7 @@ class OutputParser {
         }
 
         // Pattern: Build target 'MyApp' completed. (12.3s)
-        if line.hasPrefix("Build target '") && line.contains("' completed") {
+        if line.hasPrefix("Build target '"), line.contains("' completed") {
             let afterPrefix = line.dropFirst("Build target '".count)
             if let endQuote = afterPrefix.range(of: "'") {
                 let targetName = String(afterPrefix[..<endQuote.lowerBound])
@@ -1615,18 +1705,25 @@ class OutputParser {
     // MARK: - Executable Parsing
 
     private func parseExecutable(_ line: String) -> Executable? {
-        // Pattern: RegisterWithLaunchServices /path/to/Executable.app (in target 'TargetName' from project 'ProjectName')
-        guard line.hasPrefix("RegisterWithLaunchServices ") else {
+        // Pattern 1: RegisterWithLaunchServices /path/to/Executable.app (in target 'TargetName' from project 'ProjectName')
+        // Pattern 2: Validate /path/to/Executable.app (in target 'TargetName' from project 'ProjectName')
+        let prefixes = ["RegisterWithLaunchServices ", "Validate "]
+        guard let prefix = prefixes.first(where: { line.hasPrefix($0) }) else {
             return nil
         }
+        let afterPrefix = line.dropFirst(prefix.count)
 
-        // Find the path (between "RegisterWithLaunchServices " and " (in target")
-        let afterPrefix = line.dropFirst("RegisterWithLaunchServices ".count)
+        // Find the path (between prefix and " (in target")
         guard let targetRange = afterPrefix.range(of: " (in target '") else {
             return nil
         }
 
         let path = String(afterPrefix[..<targetRange.lowerBound])
+
+        // Only capture .app bundles (not other validated artifacts)
+        if !path.hasSuffix(".app") {
+            return nil
+        }
 
         // Extract the name from the path (last component, e.g., "ClaudeSettings.app")
         let name = (path as NSString).lastPathComponent

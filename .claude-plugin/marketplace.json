@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "xcsift",
+  "owner": {
+    "name": "xcsift",
+    "email": "github@ldomaradzki.com"
+  },
+  "plugins": [
+    {
+      "name": "xcsift",
+      "source": "./plugins/claude-code",
+      "description": "Pipe xcodebuild/swift build output through xcsift for structured TOON format"
+    }
+  ]
+}
