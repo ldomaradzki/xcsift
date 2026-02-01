@@ -256,7 +256,7 @@ The codebase follows a modular architecture:
    - `Configuration` struct (Codable) for TOML config file parsing
    - `ConfigLoader` handles file discovery and parsing with user-friendly errors
    - `ConfigMerger` merges config file values with CLI arguments (CLI takes precedence)
-   - Uses swift-toml library for TOML parsing with C++ interoperability
+   - Uses swift-toml library for TOML parsing
 
 ### Data Flow
 1. Stdin input → `readStandardInput()`
@@ -469,7 +469,6 @@ swift test --filter OutputParserTests.testParseError
 - **Swift ArgumentParser**: CLI argument handling (Package.swift dependency)
 - **ToonFormat** (toon-swift): Token-Oriented Object Notation encoder for efficient LLM output (Package.swift dependency)
 - **swift-toml**: TOML configuration file parsing with Codable support (Package.swift dependency)
-  - Requires C++ interoperability mode (`swiftSettings: [.interoperabilityMode(.Cxx)]`)
 - **Foundation**: Core Swift framework for regex, JSON encoding, string processing
 - **XCTest**: Testing framework (test target only)
 

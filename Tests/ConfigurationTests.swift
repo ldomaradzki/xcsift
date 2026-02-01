@@ -324,8 +324,10 @@ final class ConfigLoaderTests: XCTestCase {
                 XCTFail("Expected ConfigError, got \(error)")
                 return
             }
-            if case .syntaxError = configError {
-                // Success
+            if case .syntaxError(let line, let column, _) = configError {
+                // swift-toml 2.0 provides line/column info for syntax errors
+                XCTAssertEqual(line, 1, "Expected error on line 1")
+                XCTAssertGreaterThan(column, 0, "Expected column > 0")
             } else {
                 XCTFail("Expected syntaxError error, got \(configError)")
             }
@@ -916,13 +918,5 @@ final class ConfigErrorTests: XCTestCase {
         let underlying = NSError(domain: NSCocoaErrorDomain, code: NSFileReadNoPermissionError)
         let error = ConfigError.readError(path: "/test/config.toml", underlying: underlying)
         XCTAssertTrue(error.description.contains("Failed to read '/test/config.toml'"))
-    }
-
-    func testTomlNotAvailableDescription() {
-        let error = ConfigError.tomlNotAvailable
-        XCTAssertEqual(
-            error.description,
-            "Configuration files are not supported in this build. Use CLI flags instead."
-        )
     }
 }

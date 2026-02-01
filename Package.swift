@@ -14,7 +14,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.0.0"),
         .package(url: "https://github.com/toon-format/toon-swift.git", from: "0.3.0"),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.5"),
-        .package(url: "https://github.com/mattt/swift-toml", from: "1.0.0"),
+        .package(url: "https://github.com/mattt/swift-toml", from: "2.0.0"),
     ],
     targets: [
         .executableTarget(
@@ -23,9 +23,6 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "ToonFormat", package: "toon-swift"),
                 .product(name: "TOML", package: "swift-toml"),
-            ],
-            swiftSettings: [
-                .interoperabilityMode(.Cxx)
             ]
         ),
         .testTarget(
@@ -36,11 +33,7 @@ let package = Package(
                 .copy("Fixtures/build.txt"),
                 .copy("Fixtures/swift-testing-output.txt"),
                 .copy("Fixtures/linker-error-output.txt"),
-            ],
-            swiftSettings: [
-                .interoperabilityMode(.Cxx)
             ]
         ),
-    ],
-    cxxLanguageStandard: .cxx17
+    ]
 )
