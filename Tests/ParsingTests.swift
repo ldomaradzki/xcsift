@@ -804,6 +804,43 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.failedTests[0].duration, 0.001)
     }
 
+    func testSwiftTestingWithQuotes() {
+        let parser = OutputParser()
+        let input = """
+            ✘ Test "Food truck exists" recorded an issue at FoodTruckTests.swift:15:5: Assertion failed
+            ✘ Test "Food truck exists" failed after 0.002 seconds with 1 issue.
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.failedTests.count, 1)
+        XCTAssertEqual(result.failedTests[0].test, "Food truck exists")
+        XCTAssertEqual(result.failedTests[0].message, "Assertion failed")
+        XCTAssertEqual(result.failedTests[0].file, "FoodTruckTests.swift")
+        XCTAssertEqual(result.failedTests[0].line, 15)
+    }
+
+    func testSwiftTestingMixedFormats() {
+        // Test that both quoted and unquoted formats work together
+        let parser = OutputParser()
+        let input = """
+            ✘ Test "Human readable test" recorded an issue at Tests.swift:10:3: First failure
+            ✘ Test "Human readable test" failed after 0.001 seconds with 1 issue.
+            􀢄  Test functionTest() recorded an issue at Tests.swift:20:5: Second failure
+            􀢄  Test functionTest() failed after 0.002 seconds with 1 issue.
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.failedTests.count, 2)
+        XCTAssertEqual(result.failedTests[0].test, "Human readable test")
+        XCTAssertEqual(result.failedTests[0].message, "First failure")
+        XCTAssertEqual(result.failedTests[1].test, "functionTest()")
+        XCTAssertEqual(result.failedTests[1].message, "Second failure")
+    }
+
     // MARK: - Test Duration Parsing
 
     func testParseDurationFromXCTestPassed() {

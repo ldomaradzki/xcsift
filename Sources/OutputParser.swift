@@ -897,6 +897,43 @@ class OutputParser {
         return testName
     }
 
+    // MARK: - Swift Testing Name Extraction
+
+    /// Extracts test name from Swift Testing output line.
+    /// Handles both formats:
+    /// - With displayName: `Test "Human readable name" ...`
+    /// - Without displayName: `Test functionName() ...`
+    ///
+    /// Returns: (testName, endIndex) or nil if not found
+    private func extractSwiftTestingName(
+        from line: String,
+        after startIndex: String.Index
+    ) -> (name: String, endIndex: String.Index)? {
+        let afterTest = line[startIndex...]
+
+        // Format 1: With quotes (displayName)
+        if afterTest.hasPrefix("\"") {
+            let nameStart = line.index(after: startIndex)
+            if let quoteEnd = line[nameStart...].firstIndex(of: "\"") {
+                let name = String(line[nameStart ..< quoteEnd])
+                return (name, line.index(after: quoteEnd))
+            }
+        }
+
+        // Format 2: Without quotes (function name)
+        // Find end markers: " recorded", " failed", " passed", " started"
+        let endMarkers = [" recorded", " failed", " passed", " started"]
+        for marker in endMarkers {
+            if let markerRange = afterTest.range(of: marker) {
+                let name = String(line[startIndex ..< markerRange.lowerBound])
+                    .trimmingCharacters(in: .whitespaces)
+                return (name, markerRange.lowerBound)
+            }
+        }
+
+        return nil
+    }
+
     private func hasSeenSimilarTest(_ normalizedTestName: String) -> Bool {
         return seenTestNames.contains(normalizedTestName)
     }
@@ -1311,86 +1348,59 @@ class OutputParser {
             return FailedTest(test: test, message: message, file: nil, line: nil, duration: duration)
         }
 
-        // Pattern: ✘ Test "name" recorded an issue at file:line:column: message
-        if line.hasPrefix("✘ Test \""), let issueAt = line.range(of: "\" recorded an issue at ") {
-            let startIndex = line.index(line.startIndex, offsetBy: 8)
-            let test = String(line[startIndex ..< issueAt.lowerBound])
-            let afterIssue = String(line[issueAt.upperBound...])
+        // Swift Testing: Test {name} recorded an issue / failed after
+        // Supports: any leading symbol (✘, 􀢄, ◇, etc.), with or without quotes
+        // Formats:
+        //   - Test "Human readable name" recorded an issue at file:line:col: message
+        //   - Test functionName() recorded an issue at file:line:col: message
+        //   - Test "name" failed after 0.123 seconds [with N issues]
+        //   - Test name() failed after 0.123 seconds [with N issues]
+        if let testStart = line.range(of: "Test ") {
+            // Skip "Test run with" (summary line) and "Test Case" (XCTest format)
+            let beforeTest = line[..<testStart.lowerBound]
+            let afterTestStr = line[testStart.upperBound...]
 
-            // Parse file:line:column: message
-            let parts = afterIssue.split(separator: ":", maxSplits: 3, omittingEmptySubsequences: false)
-            if parts.count >= 4, let lineNum = Int(parts[1]) {
-                let file = String(parts[0])
-                let message = String(parts[3]).trimmingCharacters(in: .whitespaces)
-                return FailedTest(test: test, message: message, file: file, line: lineNum)
-            }
-        }
+            if !afterTestStr.hasPrefix("run with ") && !afterTestStr.hasPrefix("Case ") {
+                if let (testName, nameEnd) = extractSwiftTestingName(from: line, after: testStart.upperBound) {
+                    let afterName = line[nameEnd...]
 
-        // Pattern: Test name() recorded an issue at file:line:column: message (Swift Testing, no quotes, leading glyphs)
-        if let testStart = line.range(of: "Test "),
-            let issueAt = line.range(of: " recorded an issue at ", range: testStart.upperBound ..< line.endIndex)
-        {
-            let afterTest = line[testStart.upperBound...]
-            if !afterTest.hasPrefix("run with ") {
-                let test = String(line[testStart.upperBound ..< issueAt.lowerBound]).trimmingCharacters(in: .whitespaces)
-                let afterIssue = String(line[issueAt.upperBound...])
+                    // Pattern: recorded an issue at file:line:col: message
+                    if let issueAt = afterName.range(of: " recorded an issue at ") {
+                        let afterIssue = String(line[issueAt.upperBound...])
 
-                // Parse file:line:column: message
-                let parts = afterIssue.split(separator: ":", maxSplits: 3, omittingEmptySubsequences: false)
-                if parts.count >= 4, let lineNum = Int(parts[1]) {
-                    let file = String(parts[0])
-                    let message = String(parts[3]).trimmingCharacters(in: .whitespaces)
-                    return FailedTest(test: test, message: message, file: file, line: lineNum)
+                        // Parse file:line:column: message
+                        let parts = afterIssue.split(separator: ":", maxSplits: 3, omittingEmptySubsequences: false)
+                        if parts.count >= 4, let lineNum = Int(parts[1]) {
+                            let file = String(parts[0])
+                            let message = String(parts[3]).trimmingCharacters(in: .whitespaces)
+                            return FailedTest(test: testName, message: message, file: file, line: lineNum)
+                        }
+                    }
+
+                    // Pattern: failed after X.XXX seconds [with N issue(s)]
+                    if let failedAfter = afterName.range(of: " failed after ") {
+                        var duration: Double? = nil
+                        let afterFailed = line[failedAfter.upperBound...]
+                        if let secondsRange = afterFailed.range(of: " seconds") {
+                            let durationStr = String(afterFailed[..<secondsRange.lowerBound])
+                            duration = Double(durationStr)
+                        }
+
+                        // Track duration for slow test detection
+                        let normalizedTest = normalizeTestName(testName)
+                        if let dur = duration {
+                            failedTestDurations[normalizedTest] = dur
+                        }
+
+                        return FailedTest(
+                            test: testName,
+                            message: "Test failed",
+                            file: nil,
+                            line: nil,
+                            duration: duration
+                        )
+                    }
                 }
-            }
-        }
-
-        // Pattern: ✘ Test "name" failed after 0.123 seconds with N issues.
-        if line.hasPrefix("✘ Test \""), let failedAfter = line.range(of: "\" failed after ") {
-            let startIndex = line.index(line.startIndex, offsetBy: 8)
-            let test = String(line[startIndex ..< failedAfter.lowerBound])
-
-            // Extract duration from "failed after X.XXX seconds"
-            var duration: Double? = nil
-            let afterStr = line[failedAfter.upperBound...]
-            if let secondsRange = afterStr.range(of: " seconds") {
-                let durationStr = String(afterStr[..<secondsRange.lowerBound])
-                duration = Double(durationStr)
-            }
-
-            // Track duration for slow test detection
-            let normalizedTest = normalizeTestName(test)
-            if let dur = duration {
-                failedTestDurations[normalizedTest] = dur
-            }
-
-            return FailedTest(test: test, message: "Test failed", file: nil, line: nil, duration: duration)
-        }
-
-        // Pattern: Test name() failed after 0.123 seconds with N issues. (Swift Testing, no quotes, leading glyphs)
-        if let testStart = line.range(of: "Test "),
-            let failedAfter = line.range(of: " failed after ", range: testStart.upperBound ..< line.endIndex)
-        {
-            let afterTest = line[testStart.upperBound...]
-            if !afterTest.hasPrefix("run with ") {
-                let test = String(line[testStart.upperBound ..< failedAfter.lowerBound])
-                    .trimmingCharacters(in: .whitespaces)
-
-                // Extract duration from "failed after X.XXX seconds"
-                var duration: Double? = nil
-                let afterStr = line[failedAfter.upperBound...]
-                if let secondsRange = afterStr.range(of: " seconds") {
-                    let durationStr = String(afterStr[..<secondsRange.lowerBound])
-                    duration = Double(durationStr)
-                }
-
-                // Track duration for slow test detection
-                let normalizedTest = normalizeTestName(test)
-                if let dur = duration {
-                    failedTestDurations[normalizedTest] = dur
-                }
-
-                return FailedTest(test: test, message: "Test failed", file: nil, line: nil, duration: duration)
             }
         }
 
@@ -1542,7 +1552,10 @@ class OutputParser {
                 // Extract issue count (if present) from the trailing "with Y issue(s)"
                 let afterSeconds = afterFailed[secondsRange.upperBound...]
                 if let withRange = afterSeconds.range(of: " with "),
-                    let issueRange = afterSeconds.range(of: " issue", range: withRange.upperBound ..< afterSeconds.endIndex)
+                    let issueRange = afterSeconds.range(
+                        of: " issue",
+                        range: withRange.upperBound ..< afterSeconds.endIndex
+                    )
                 {
                     let issueCountStr = afterSeconds[withRange.upperBound ..< issueRange.lowerBound]
                     if let issueCount = Int(issueCountStr.trimmingCharacters(in: .whitespaces)) {
