@@ -779,6 +779,31 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.testTime, "0.050s")
     }
 
+    func testSwiftTesting() {
+        let parser = OutputParser()
+        let input = """
+            􀟈  Test shouldPass() started.
+            􀟈  Test shouldFail() started.
+            􁁛  Test shouldPass() passed after 0.001 seconds.
+            􀢄  Test shouldFail() recorded an issue at xcsift_problemsTests.swift:9:5: Expectation failed: Bool(false)
+            􀢄  Test shouldFail() failed after 0.001 seconds with 1 issue.
+            􀢄  Test run with 2 tests in 0 suites failed after 0.001 seconds with 1 issue.
+
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.passedTests, 1)
+        XCTAssertEqual(result.summary.failedTests, 1)
+        XCTAssertEqual(result.failedTests.count, 1)
+        XCTAssertEqual(result.failedTests[0].test, "shouldFail()")
+        XCTAssertEqual(result.failedTests[0].message, "Expectation failed: Bool(false)")
+        XCTAssertEqual(result.failedTests[0].file, "xcsift_problemsTests.swift")
+        XCTAssertEqual(result.failedTests[0].line, 9)
+        XCTAssertEqual(result.failedTests[0].duration, 0.001)
+    }
+
     // MARK: - Test Duration Parsing
 
     func testParseDurationFromXCTestPassed() {

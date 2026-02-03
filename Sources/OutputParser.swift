@@ -696,7 +696,8 @@ class OutputParser {
             || line.contains("✘") || line.contains("✓") || line.contains("❌") || line.contains("Build succeeded")
             || line.contains("Build failed") || line.contains("Executed") || line.contains("] Testing ")
             || line.contains("BUILD SUCCEEDED") || line.contains("BUILD FAILED") || line.contains("TEST FAILED")
-            || line.contains("Build complete!") || line.hasPrefix("RegisterWithLaunchServices")
+            || line.contains("Build complete!") || line.contains("recorded an issue")
+            || line.hasPrefix("RegisterWithLaunchServices")
             || line.hasPrefix("Validate") || line.contains("Fatal error")
             || (line.hasPrefix("/") && line.contains(".swift:"))  // runtime warnings
 
@@ -1325,6 +1326,25 @@ class OutputParser {
             }
         }
 
+        // Pattern: Test name() recorded an issue at file:line:column: message (Swift Testing, no quotes, leading glyphs)
+        if let testStart = line.range(of: "Test "),
+            let issueAt = line.range(of: " recorded an issue at ", range: testStart.upperBound ..< line.endIndex)
+        {
+            let afterTest = line[testStart.upperBound...]
+            if !afterTest.hasPrefix("run with ") {
+                let test = String(line[testStart.upperBound ..< issueAt.lowerBound]).trimmingCharacters(in: .whitespaces)
+                let afterIssue = String(line[issueAt.upperBound...])
+
+                // Parse file:line:column: message
+                let parts = afterIssue.split(separator: ":", maxSplits: 3, omittingEmptySubsequences: false)
+                if parts.count >= 4, let lineNum = Int(parts[1]) {
+                    let file = String(parts[0])
+                    let message = String(parts[3]).trimmingCharacters(in: .whitespaces)
+                    return FailedTest(test: test, message: message, file: file, line: lineNum)
+                }
+            }
+        }
+
         // Pattern: ✘ Test "name" failed after 0.123 seconds with N issues.
         if line.hasPrefix("✘ Test \""), let failedAfter = line.range(of: "\" failed after ") {
             let startIndex = line.index(line.startIndex, offsetBy: 8)
@@ -1345,6 +1365,33 @@ class OutputParser {
             }
 
             return FailedTest(test: test, message: "Test failed", file: nil, line: nil, duration: duration)
+        }
+
+        // Pattern: Test name() failed after 0.123 seconds with N issues. (Swift Testing, no quotes, leading glyphs)
+        if let testStart = line.range(of: "Test "),
+            let failedAfter = line.range(of: " failed after ", range: testStart.upperBound ..< line.endIndex)
+        {
+            let afterTest = line[testStart.upperBound...]
+            if !afterTest.hasPrefix("run with ") {
+                let test = String(line[testStart.upperBound ..< failedAfter.lowerBound])
+                    .trimmingCharacters(in: .whitespaces)
+
+                // Extract duration from "failed after X.XXX seconds"
+                var duration: Double? = nil
+                let afterStr = line[failedAfter.upperBound...]
+                if let secondsRange = afterStr.range(of: " seconds") {
+                    let durationStr = String(afterStr[..<secondsRange.lowerBound])
+                    duration = Double(durationStr)
+                }
+
+                // Track duration for slow test detection
+                let normalizedTest = normalizeTestName(test)
+                if let dur = duration {
+                    failedTestDurations[normalizedTest] = dur
+                }
+
+                return FailedTest(test: test, message: "Test failed", file: nil, line: nil, duration: duration)
+            }
         }
 
         // Pattern: ❌ testname (message)
@@ -1472,6 +1519,42 @@ class OutputParser {
                 accumulateTestTime(String(afterPassed[..<secondsRange.lowerBound]))
             } else {
                 accumulateTestTime(String(afterPassed))
+            }
+            return
+        }
+
+        // Pattern: Test run with N test(s) in M suite(s) failed after X seconds with Y issue(s).
+        // Swift Testing failure summary format - TEST time
+        if let testRunRange = line.range(of: "Test run with "),
+            let failedAfterRange = line.range(of: " failed after ", range: testRunRange.upperBound ..< line.endIndex)
+        {
+            let beforeFailed = line[testRunRange.upperBound ..< failedAfterRange.lowerBound]
+            let totalCountStr = beforeFailed.split(separator: " ").first
+            if let totalCountStr = totalCountStr, let totalCount = Int(totalCountStr) {
+                swiftTestingExecutedCount = totalCount
+            }
+
+            // Extract TEST time and accumulate
+            let afterFailed = line[failedAfterRange.upperBound...]
+            if let secondsRange = afterFailed.range(of: " seconds", options: .backwards) {
+                accumulateTestTime(String(afterFailed[..<secondsRange.lowerBound]))
+
+                // Extract issue count (if present) from the trailing "with Y issue(s)"
+                let afterSeconds = afterFailed[secondsRange.upperBound...]
+                if let withRange = afterSeconds.range(of: " with "),
+                    let issueRange = afterSeconds.range(of: " issue", range: withRange.upperBound ..< afterSeconds.endIndex)
+                {
+                    let issueCountStr = afterSeconds[withRange.upperBound ..< issueRange.lowerBound]
+                    if let issueCount = Int(issueCountStr.trimmingCharacters(in: .whitespaces)) {
+                        if let totalCount = swiftTestingExecutedCount {
+                            swiftTestingFailedCount = min(issueCount, totalCount)
+                        } else {
+                            swiftTestingFailedCount = issueCount
+                        }
+                    }
+                }
+            } else {
+                accumulateTestTime(String(afterFailed))
             }
             return
         }
