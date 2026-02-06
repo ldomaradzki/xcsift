@@ -1,5 +1,5 @@
 {
-  "originHash" : "c159f8971bdf746a0cd267b26ac1511d49d285092022ef4f7a3046e120c73882",
+  "originHash" : "eaf1261a9531cfc67483d5bfbfe2a1bb1e756fe4de7d4d11f419686e540bcb85",
   "pins" : [
     {
       "identity" : "swift-argument-parser",
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/toon-format/toon-swift.git",
       "state" : {
-        "revision" : "2561ea3a337c2fa42c307c0c44fdbad358c7c49c",
-        "version" : "0.3.0"
+        "revision" : "b519ede235854489e1fbfe05d171c69a3bf558e5",
+        "version" : "0.4.0"
       }
     }
   ],
