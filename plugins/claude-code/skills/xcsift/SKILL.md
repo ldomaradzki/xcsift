@@ -1,3 +1,9 @@
+---
+name: formatting-build-output
+description: Formats xcodebuild and swift build output through xcsift into structured TOON format optimized for LLM consumption. Activates when running swift build, swift test, xcodebuild build, or xcodebuild test commands.
+version: 1.0.2
+---
+
 # xcsift - Xcode Build Output Formatter
 
 xcsift is a Swift command-line tool that parses and formats xcodebuild/SPM output for coding agents. It transforms verbose Xcode build output into token-efficient TOON format optimized for machine readability.

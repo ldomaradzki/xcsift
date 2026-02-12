@@ -8,6 +8,7 @@
   "plugins": [
     {
       "name": "xcsift",
+      "version": "1.0.2",
       "source": "./plugins/claude-code",
       "description": "Pipe xcodebuild/swift build output through xcsift for structured TOON format"
     }
