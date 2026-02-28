@@ -35,6 +35,10 @@ class OutputParser {
     private var passedTestDurations: [String: Double] = [:]
     private var failedTestDurations: [String: Double] = [:]
 
+    // Crash / signal tracking
+    private var lastStartedTestName: String?
+    private var pendingSignalCode: Int?
+
     // Build info tracking - phases grouped by target
     private var targetPhases: [String: [String]] = [:]  // target -> [phase names]
     private var targetDurations: [String: String] = [:]  // target -> duration
@@ -451,6 +455,20 @@ class OutputParser {
             return nil
         }()
 
+        // Safety net: if a test was started but never completed and testRunFailed is set
+        if testRunFailed, let testName = lastStartedTestName {
+            let normalizedName = normalizeTestName(testName)
+            if !hasSeenSimilarTest(normalizedName) {
+                let message =
+                    pendingSignalCode.map { "Crashed (signal \($0)): last test started before crash" }
+                    ?? "Test did not complete (possible crash or timeout)"
+                failedTests.append(FailedTest(test: testName, message: message, file: nil, line: nil))
+                seenTestNames.insert(normalizedName)
+            }
+            lastStartedTestName = nil
+            pendingSignalCode = nil
+        }
+
         // Determine build status with priority on parsed results over testRunFailed flag
         // Issue #52: -skipMacroValidation can set testRunFailed even when tests pass
         let status: String = {
@@ -647,6 +665,8 @@ class OutputParser {
         shouldParseBuildInfo = false
         targetDependencies = [:]
         currentDependencyTarget = nil
+        lastStartedTestName = nil
+        pendingSignalCode = nil
     }
 
     private func parseLine(_ line: String) {
@@ -700,8 +720,46 @@ class OutputParser {
             || line.hasPrefix("RegisterWithLaunchServices")
             || line.hasPrefix("Validate") || line.contains("Fatal error")
             || (line.hasPrefix("/") && line.contains(".swift:"))  // runtime warnings
+            || line.contains("' started")  // XCTest: "Test Case '...' started."
+            || line.contains("\" started")  // Swift Testing: Test "..." started
+            || line.contains("signal code ")  // "Exited with [unexpected] signal code N"
+            || line.hasPrefix("Restarting after")  // crash confirmation
 
         if !containsRelevant {
+            return
+        }
+
+        // Track "Test Case '...' started." for crash association
+        if parseStartedTest(line) {
+            return
+        }
+
+        // Signal code: "Exited with [unexpected] signal code N"
+        if line.contains("signal code ") {
+            if let lastSpace = line.lastIndex(of: " ") {
+                let codeStr = String(line[line.index(after: lastSpace)...])
+                pendingSignalCode = Int(codeStr)
+            }
+            return
+        }
+
+        // Crash confirmation: "Restarting after unexpected exit, crash, or test timeout"
+        if line.hasPrefix("Restarting after") {
+            if let testName = lastStartedTestName {
+                let message: String
+                if let code = pendingSignalCode {
+                    message = "Crashed (signal \(code)): last test started before crash"
+                } else {
+                    message = "Crashed: last test started before crash"
+                }
+                let normalizedName = normalizeTestName(testName)
+                if !hasSeenSimilarTest(normalizedName) {
+                    failedTests.append(FailedTest(test: testName, message: message, file: nil, line: nil))
+                    seenTestNames.insert(normalizedName)
+                }
+            }
+            lastStartedTestName = nil
+            pendingSignalCode = nil
             return
         }
 
@@ -726,6 +784,11 @@ class OutputParser {
 
         if let failedTest = parseFailedTest(line) {
             let normalizedTestName = normalizeTestName(failedTest.test)
+
+            // Clear lastStartedTestName if this failed test matches
+            if normalizeTestName(lastStartedTestName ?? "") == normalizedTestName {
+                lastStartedTestName = nil
+            }
 
             // Check if we've already seen this test name or a similar one
             if !hasSeenSimilarTest(normalizedTestName) {
@@ -760,6 +823,21 @@ class OutputParser {
             if !seenErrors.contains(key) {
                 seenErrors.insert(key)
                 errors.append(error)
+            }
+            // Fatal error + lastStartedTestName → also create FailedTest
+            if line.contains("Fatal error"), let testName = lastStartedTestName {
+                let normalizedName = normalizeTestName(testName)
+                if !hasSeenSimilarTest(normalizedName) {
+                    failedTests.append(
+                        FailedTest(
+                            test: testName,
+                            message: "Crashed (Fatal error): last test started before crash",
+                            file: error.file,
+                            line: error.line
+                        )
+                    )
+                    seenTestNames.insert(normalizedName)
+                }
             }
         } else if let warning = parseWarning(line) {
             let key = "\(warning.file ?? ""):\(warning.line ?? 0):\(warning.message)"
@@ -1008,8 +1086,48 @@ class OutputParser {
         return false
     }
 
+    // MARK: - Crash Association
+
+    /// Parses "Test Case '...' started." or "◇ Test "..." started." lines.
+    /// Updates `lastStartedTestName` for crash association.
+    private func parseStartedTest(_ line: String) -> Bool {
+        // XCTest: Test Case '-[Module.Class testMethod]' started.
+        // XCTest parallel: Test case '-[Module.Class testMethod]' started.
+        if (line.hasPrefix("Test Case '") || line.hasPrefix("Test case '"))
+            && line.contains("' started")
+        {
+            let prefixLength = 11  // "Test Case '" or "Test case '"
+            let startIndex = line.index(line.startIndex, offsetBy: prefixLength)
+            if let endQuote = line.range(of: "' started", range: startIndex ..< line.endIndex) {
+                lastStartedTestName = String(line[startIndex ..< endQuote.lowerBound])
+            }
+            return true
+        }
+
+        // Swift Testing: ◇ Test "shouldCrash()" started.
+        // or: ◇ Test functionName() started.
+        if line.hasPrefix("◇ Test ") {
+            let afterPrefix = line.index(line.startIndex, offsetBy: "◇ Test ".count)
+            if let result = extractSwiftTestingName(from: line, after: afterPrefix) {
+                let afterName = line[result.endIndex...]
+                if afterName.hasPrefix(" started") {
+                    lastStartedTestName = result.name
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
     private func recordPassedTest(named testName: String, duration: Double? = nil) {
         let normalizedTestName = normalizeTestName(testName)
+
+        // Clear lastStartedTestName if this passed test matches
+        if normalizeTestName(lastStartedTestName ?? "") == normalizedTestName {
+            lastStartedTestName = nil
+        }
+
         guard seenPassedTestNames.insert(normalizedTestName).inserted else {
             return
         }

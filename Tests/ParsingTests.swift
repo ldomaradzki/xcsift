@@ -1324,6 +1324,155 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.errors[0].file, "TestProjectTests/TestProjectTests.swift")
         XCTAssertEqual(result.errors[0].line, 5)
         XCTAssertEqual(result.errors[0].message, "Fatal error")
+        // Crash should also be associated with the last started test
+        XCTAssertEqual(result.failedTests.count, 1)
+        guard result.failedTests.count == 1 else { return }
+        XCTAssertTrue(result.failedTests[0].test.contains("testExample"))
+    }
+
+    // MARK: - Crash Association Tests
+
+    func testCrashSignalAssociatedWithLastStartedTest() {
+        let parser = OutputParser()
+        let input = """
+            Test Case '-[MyTests.CrashTests testDivideByZero]' started.
+            Exited with unexpected signal code 5
+            Restarting after unexpected exit, crash, or test timeout
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.failedTests.count, 1)
+        guard result.failedTests.count == 1 else { return }
+        XCTAssertTrue(result.failedTests[0].test.contains("testDivideByZero"))
+        XCTAssertTrue(result.failedTests[0].message.contains("signal 5"))
+    }
+
+    func testCrashSignalWithoutUnexpected() {
+        let parser = OutputParser()
+        let input = """
+            Test Case '-[MyTests.CrashTests testAbort]' started.
+            Exited with signal code 6
+            Restarting after unexpected exit, crash, or test timeout
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.failedTests.count, 1)
+        guard result.failedTests.count == 1 else { return }
+        XCTAssertTrue(result.failedTests[0].test.contains("testAbort"))
+        XCTAssertTrue(result.failedTests[0].message.contains("signal 6"))
+    }
+
+    func testFatalErrorAssociatedWithLastStartedTest() {
+        let parser = OutputParser()
+        let input = """
+            Test Case '-[MyTests.CrashTests testPrecondition]' started.
+            /path/to/MyTests.swift:42: Fatal error: Precondition failed
+            Restarting after unexpected exit, crash, or test timeout
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        // Fatal error should be in errors (parser strips "Fatal error: " prefix)
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertEqual(result.errors[0].message, "Precondition failed")
+        // AND also in failedTests (associated with the started test)
+        XCTAssertEqual(result.failedTests.count, 1)
+        guard result.failedTests.count == 1 else { return }
+        XCTAssertTrue(result.failedTests[0].test.contains("testPrecondition"))
+    }
+
+    func testCrashWithNoStartedTestProducesNoFailedTest() {
+        let parser = OutputParser()
+        let input = """
+            Exited with unexpected signal code 5
+            Restarting after unexpected exit, crash, or test timeout
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        // No "started" line → no test to associate with
+        XCTAssertEqual(result.failedTests.count, 0)
+    }
+
+    func testStartedTestClearsAfterPass() {
+        let parser = OutputParser()
+        let input = """
+            Test Case '-[MyTests.OKTests testPass]' started.
+            Test Case '-[MyTests.OKTests testPass]' passed (0.001 seconds).
+            Test Case '-[MyTests.CrashTests testCrash]' started.
+            Exited with unexpected signal code 5
+            Restarting after unexpected exit, crash, or test timeout
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        // Only testCrash should be in failedTests, not testPass
+        XCTAssertEqual(result.failedTests.count, 1)
+        guard result.failedTests.count == 1 else { return }
+        XCTAssertTrue(result.failedTests[0].test.contains("testCrash"))
+        XCTAssertFalse(result.failedTests[0].test.contains("testPass"))
+    }
+
+    func testSwiftTestingStartedFormat() {
+        let parser = OutputParser()
+        let input = """
+            ◇ Test "shouldCrash()" started.
+            Exited with unexpected signal code 5
+            Restarting after unexpected exit, crash, or test timeout
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.failedTests.count, 1)
+        guard result.failedTests.count == 1 else { return }
+        XCTAssertTrue(result.failedTests[0].test.contains("shouldCrash"))
+    }
+
+    func testCrashInFullTestSuiteOutput() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'All tests' started at 2024-01-15 10:00:00.000.
+            Test Suite 'MyTests.xctest' started at 2024-01-15 10:00:00.000.
+            Test Suite 'CrashTests' started at 2024-01-15 10:00:00.000.
+            Test Case '-[MyTests.CrashTests testAssertCrash]' started.
+            Exited with unexpected signal code 5
+            Restarting after unexpected exit, crash, or test timeout
+            Test Suite 'CrashTests' failed at 2024-01-15 10:00:01.000.
+            Executed 1 test, with 1 failure in 0.500 seconds
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.failedTests.count, 1)
+        guard result.failedTests.count == 1 else { return }
+        XCTAssertTrue(result.failedTests[0].test.contains("testAssertCrash"))
+    }
+
+    func testEndOfParseSafetyNet() {
+        let parser = OutputParser()
+        // "started" but NO "Restarting" line — safety net should catch it
+        let input = """
+            Test Case '-[MyTests.CrashTests testHang]' started.
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.failedTests.count, 1)
+        guard result.failedTests.count == 1 else { return }
+        XCTAssertTrue(result.failedTests[0].test.contains("testHang"))
     }
 
     // MARK: - Parallel Testing Format Tests
