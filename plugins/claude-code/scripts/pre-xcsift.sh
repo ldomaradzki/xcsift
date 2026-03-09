@@ -2,7 +2,7 @@
 # xcsift pre-tool hook for Claude Code
 # Intercepts xcodebuild and swift build/test commands and pipes through xcsift
 
-set -e
+ALLOW='{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}'
 
 # Read tool input from stdin (JSON with tool_input field)
 INPUT=$(cat)
@@ -12,14 +12,14 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 if [ -z "$COMMAND" ]; then
     # No command field, allow as-is
-    echo '{"decision": "allow"}'
+    echo "$ALLOW"
     exit 0
 fi
 
 # Check if xcsift is available
 if ! command -v xcsift &> /dev/null; then
     # xcsift not installed, allow command as-is
-    echo '{"decision": "allow"}'
+    echo "$ALLOW"
     exit 0
 fi
 
@@ -37,9 +37,9 @@ if echo "$COMMAND" | grep -qE '^\s*(xcodebuild|swift\s+(build|test))\b' && \
     # Pipe through xcsift with TOON format
     MODIFIED_COMMAND="$COMMAND | xcsift -f toon"
 
-    # Return modified command
-    jq -n --arg cmd "$MODIFIED_COMMAND" '{"decision": "allow", "updatedCommand": $cmd}'
+    # Return modified command with rewritten input
+    jq -n --arg cmd "$MODIFIED_COMMAND" '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","updatedInput":{"command":$cmd}}}'
 else
     # Not a build command, allow as-is
-    echo '{"decision": "allow"}'
+    echo "$ALLOW"
 fi

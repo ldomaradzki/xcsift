@@ -331,7 +331,7 @@ final class CursorInstallerTests: XCTestCase {
         let template = CursorTemplates.projectHooksJSON
 
         XCTAssertTrue(template.contains("\"version\": 1"))
-        XCTAssertTrue(template.contains("beforeShellExecution"))
+        XCTAssertTrue(template.contains("preToolUse"))
         XCTAssertTrue(template.contains("./.cursor/hooks/pre-xcsift.sh"))
     }
 
@@ -339,7 +339,7 @@ final class CursorInstallerTests: XCTestCase {
         let template = CursorTemplates.globalHooksJSON
 
         XCTAssertTrue(template.contains("\"version\": 1"))
-        XCTAssertTrue(template.contains("beforeShellExecution"))
+        XCTAssertTrue(template.contains("preToolUse"))
         XCTAssertTrue(template.contains("~/.cursor/hooks/pre-xcsift.sh"))
     }
 
@@ -355,7 +355,7 @@ final class CursorInstallerTests: XCTestCase {
         XCTAssertTrue(template.contains("xcsift"))
         XCTAssertTrue(template.contains("permission"))
         XCTAssertTrue(template.contains("allow"))
-        XCTAssertTrue(template.contains("updatedCommand"))
+        XCTAssertTrue(template.contains("updated_input"))
     }
 
     func testSkillMarkdownTemplate() {
