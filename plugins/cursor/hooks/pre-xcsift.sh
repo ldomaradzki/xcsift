@@ -1,27 +1,25 @@
 #!/bin/bash
-# xcsift pre-shell hook for Cursor
+# xcsift pre-tool hook for Cursor
 # Intercepts xcodebuild and swift build/test commands and pipes through xcsift
 
-# Read the command from environment or argument
-COMMAND="${CURSOR_SHELL_COMMAND:-$1}"
+ALLOW='{"permission":"allow"}'
+
+# Read tool input from stdin (JSON with tool_input field)
+INPUT=$(cat)
+
+# Extract the command from the tool input
+COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 if [ -z "$COMMAND" ]; then
-    # No command, allow execution
-    echo '{"permission": "allow"}'
+    # No command field, allow as-is
+    echo "$ALLOW"
     exit 0
 fi
 
 # Check if xcsift is available
 if ! command -v xcsift &> /dev/null; then
     # xcsift not installed, allow command as-is
-    echo '{"permission": "allow"}'
-    exit 0
-fi
-
-# Check if jq is available (required for JSON output)
-if ! command -v jq &> /dev/null; then
-    # jq not installed, allow command as-is
-    echo '{"permission": "allow"}'
+    echo "$ALLOW"
     exit 0
 fi
 
@@ -40,8 +38,8 @@ if echo "$COMMAND" | grep -qE '^\s*(xcodebuild|swift\s+(build|test))\b' && \
     MODIFIED_COMMAND="$COMMAND | xcsift -f toon"
 
     # Return modified command
-    jq -n --arg cmd "$MODIFIED_COMMAND" '{"permission": "allow", "updatedCommand": $cmd}'
+    jq -n --arg cmd "$MODIFIED_COMMAND" '{"permission":"allow","updated_input":{"command":$cmd}}'
 else
     # Not a build command, allow as-is
-    echo '{"permission": "allow"}'
+    echo "$ALLOW"
 fi

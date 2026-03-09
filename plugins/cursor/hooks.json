@@ -1,7 +1,7 @@
 {
   "version": 1,
   "hooks": {
-    "beforeShellExecution": [
+    "preToolUse": [
       {
         "command": "./.cursor/hooks/pre-xcsift.sh"
       }
