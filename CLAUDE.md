@@ -264,6 +264,12 @@ The codebase follows a modular architecture:
 3. Parsed data → `BuildResult` struct
 4. Output formatting (JSON or TOON) → stdout
 
+### Multi-line Context Pattern
+- `parseLine()` processes each line in isolation (no access to neighboring lines)
+- For multi-line context, use **look-ahead/look-back** in the `parse()` loop (has access to `lines` array by index)
+- Existing examples: look-back for `PhaseScriptExecution` context, look-ahead for Swift Testing `#expect` comments
+- `failedTests` are deduplicated by normalized test name — duplicate names get merged, not appended
+
 ### Key Features
 - **Error/Warning Parsing**: Multiple regex patterns handle various Xcode error formats
 - **Runtime Warning Parsing**: Parses SwiftUI and custom runtime warnings (e.g., from swift-issue-reporting)
@@ -274,6 +280,11 @@ The codebase follows a modular architecture:
   - Included with `--warnings` flag (no separate flag needed)
 - **Linker Error Parsing**: Captures undefined symbols, missing frameworks/libraries, architecture mismatches, and duplicate symbols (with structured conflicting file paths)
 - **Test Failure Detection**: XCUnit assertion failures and general test failures
+  - **Swift Testing console symbols**: SF Symbols from Private Use Area (macOS) with Unicode fallbacks (Linux)
+    - `details` line: `􀄵` U+100135 (macOS) / `↳` U+21B3 (Linux) — carries `#expect` custom comments
+    - `fail` line: `􀢄` U+100884 (macOS) / `✘` U+2718 (Linux)
+    - `default`/started: `􀟈` U+1007C8 (macOS) / `◇` U+25C7 (Linux)
+    - Source: [apple/swift-testing Event.Symbol.swift](https://github.com/apple/swift-testing/blob/main/Sources/Testing/Events/Recorder/Event.Symbol.swift)
   - **Standard format**: `Test Case 'X.test()' passed/failed (0.123 seconds)`
   - **Parallel testing format**: `Test case 'X.test()' passed/failed on 'Device Name' (0.123 seconds)`
   - Parallel format uses lowercase 'case' and includes device name before duration
