@@ -1539,4 +1539,77 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.status, "success")
         XCTAssertEqual(result.summary.passedTests, 1)
     }
+
+    // MARK: - Swift Testing Custom Comment (#61)
+
+    func testSwiftTestingCustomComment() {
+        let parser = OutputParser()
+        let input = """
+            􀢄  Test "Domain stays free" recorded an issue at File.swift:16:17: Expectation failed: !(forbiddenImports.contains(import.name))
+            􀄵  Domain must not import SwiftData
+            􀢄  Test "Domain stays free" failed after 0.986 seconds with 1 issue.
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.failedTests.count, 1)
+        XCTAssertTrue(
+            result.failedTests[0].message.contains("Domain must not import SwiftData"),
+            "Expected message to contain the custom comment, got: \(result.failedTests[0].message)"
+        )
+        XCTAssertEqual(result.failedTests[0].file, "File.swift")
+        XCTAssertEqual(result.failedTests[0].line, 16)
+    }
+
+    func testSwiftTestingCustomCommentLinuxFallback() {
+        let parser = OutputParser()
+        let input = """
+            ✘ Test "Domain stays free" recorded an issue at File.swift:16:17: Expectation failed: !(forbiddenImports.contains(import.name))
+            ↳ Domain must not import SwiftData
+            ✘ Test "Domain stays free" failed after 0.986 seconds with 1 issue.
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.failedTests.count, 1)
+        XCTAssertTrue(
+            result.failedTests[0].message.contains("Domain must not import SwiftData"),
+            "Expected message to contain the custom comment, got: \(result.failedTests[0].message)"
+        )
+    }
+
+    func testSwiftTestingNoComment() {
+        let parser = OutputParser()
+        let input = """
+            􀢄  Test shouldFail() recorded an issue at File.swift:9:5: Expectation failed: Bool(false)
+            􀢄  Test shouldFail() failed after 0.001 seconds with 1 issue.
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.failedTests.count, 1)
+        XCTAssertEqual(result.failedTests[0].message, "Expectation failed: Bool(false)")
+    }
+
+    func testSwiftTestingMultipleIssuesWithComments() {
+        let parser = OutputParser()
+        let input = """
+            􀢄  Test "test A" recorded an issue at File.swift:10:5: Expectation failed: A
+            􀄵  Comment A
+            􀢄  Test "test B" recorded an issue at File.swift:20:5: Expectation failed: B
+            􀄵  Comment B
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.failedTests.count, 2)
+        XCTAssertTrue(
+            result.failedTests[0].message.contains("Comment A"),
+            "First message should contain Comment A, got: \(result.failedTests[0].message)"
+        )
+        XCTAssertTrue(
+            result.failedTests[1].message.contains("Comment B"),
+            "Second message should contain Comment B, got: \(result.failedTests[1].message)"
+        )
+    }
 }
