@@ -358,6 +358,30 @@ class OutputParser {
         for (index, line) in lines.enumerated() {
             parseLine(line)
 
+            // Swift Testing: append custom comment from next line if present
+            // macOS: 􀄵 (U+100135, SF Symbol "arrow.turn.down.right")
+            // Linux:  ↳ (U+21B3, fallback)
+            if line.contains("recorded an issue"),
+                index + 1 < lines.count
+            {
+                let nextLine = lines[index + 1].trimmingCharacters(in: .whitespaces)
+                if nextLine.hasPrefix("􀄵") || nextLine.hasPrefix("↳") {
+                    let comment = String(
+                        nextLine.drop(while: { $0 != " " }).drop(while: { $0 == " " })
+                    )
+                    if !comment.isEmpty, let lastIdx = failedTests.indices.last {
+                        let existing = failedTests[lastIdx]
+                        failedTests[lastIdx] = FailedTest(
+                            test: existing.test,
+                            message: existing.message + ": " + comment,
+                            file: existing.file,
+                            line: existing.line,
+                            duration: existing.duration
+                        )
+                    }
+                }
+            }
+
             // Handle PhaseScriptExecution failures with context from preceding lines
             if line.contains("Command PhaseScriptExecution failed with a nonzero exit") {
                 // Look back for relevant context (skip unrelated warnings and metadata)
