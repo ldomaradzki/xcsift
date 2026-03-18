@@ -270,6 +270,40 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.errors[0].message, "missing argument for parameter 'fragments' in call")
     }
 
+    func testParseAvailabilityErrorWithXPrefix() {
+        let parser = OutputParser()
+        let input = """
+            [x] /path/to/ContentView.swift:93:35: 'wheel' is unavailable in macOS
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.errors, 1)
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertEqual(result.errors[0].file, "/path/to/ContentView.swift")
+        XCTAssertEqual(result.errors[0].line, 93)
+        XCTAssertEqual(result.errors[0].message, "'wheel' is unavailable in macOS")
+    }
+
+    func testParseMultipleAvailabilityErrorsWithXPrefix() {
+        let parser = OutputParser()
+        let input = """
+            [x] /path/to/ContentView.swift:93:35: 'wheel' is unavailable in macOS
+            [x] /path/to/OtherView.swift:10:20: 'navigationDestination' is unavailable in watchOS
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.errors, 2)
+        XCTAssertEqual(result.errors.count, 2)
+        XCTAssertEqual(result.errors[0].file, "/path/to/ContentView.swift")
+        XCTAssertEqual(result.errors[0].line, 93)
+        XCTAssertEqual(result.errors[1].file, "/path/to/OtherView.swift")
+        XCTAssertEqual(result.errors[1].line, 10)
+    }
+
     func testLargeRealWorldBuildOutput() throws {
         let parser = OutputParser()
 

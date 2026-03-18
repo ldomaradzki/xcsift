@@ -742,7 +742,7 @@ class OutputParser {
             || line.contains("BUILD SUCCEEDED") || line.contains("BUILD FAILED") || line.contains("TEST FAILED")
             || line.contains("Build complete!") || line.contains("recorded an issue")
             || line.hasPrefix("RegisterWithLaunchServices")
-            || line.hasPrefix("Validate") || line.contains("Fatal error")
+            || line.hasPrefix("Validate") || line.contains("Fatal error") || line.hasPrefix("[x] ")
             || (line.hasPrefix("/") && line.contains(".swift:"))  // runtime warnings
             || line.contains("' started")  // XCTest: "Test Case '...' started."
             || line.contains("\" started")  // Swift Testing: Test "..." started
@@ -1164,6 +1164,29 @@ class OutputParser {
     }
 
     private func parseError(_ line: String) -> BuildError? {
+        // Pattern: [x] file:line:column: message (availability errors)
+        // Must be checked before isJSONLikeLine since "[x]" starts with "["
+        if line.hasPrefix("[x] ") {
+            let rest = String(line.dropFirst(4))
+            let components = rest.split(separator: ":", omittingEmptySubsequences: false)
+            if components.count >= 4, let lineNum = Int(components[components.count - 3]),
+                let colNum = Int(components[components.count - 2])
+            {
+                let file = components[0 ..< (components.count - 3)].joined(separator: ":")
+                let message = components[(components.count - 1)...].joined(separator: ":").trimmingCharacters(
+                    in: .whitespaces
+                )
+                return BuildError(file: file, line: lineNum, message: message, column: colNum)
+            } else if components.count >= 3, let lineNum = Int(components[components.count - 2]) {
+                let file = components[0 ..< (components.count - 2)].joined(separator: ":")
+                let message = components[(components.count - 1)...].joined(separator: ":").trimmingCharacters(
+                    in: .whitespaces
+                )
+                return BuildError(file: file, line: lineNum, message: message)
+            } else {
+                return BuildError(file: nil, line: nil, message: rest)
+            }
+        }
         // Skip JSON-like lines (e.g., "  \"message\" : \"\\\\(message)\\\"\"")
         if isJSONLikeLine(line) {
             return nil
