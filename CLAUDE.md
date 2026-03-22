@@ -247,6 +247,10 @@ The codebase follows a modular architecture:
    - Defines data structures: `BuildResult`, `BuildSummary`, `BuildError`, `BuildWarning`, `FailedTest`, `SlowTest`, `CodeCoverage`, `FileCoverage`, `BuildInfo`, `TargetBuildInfo`, `Executable`
    - Pattern matching for various Xcode/SPM output formats
    - Extracts file paths, line numbers, and messages from build output
+   - **Parsing Constants** (private enums inside `OutputParser`):
+     - `XcodebuildSymbols`: Named constants for raw xcodebuild/SPM string patterns (`: error: `, `Test Case '`, linker patterns, etc.)
+     - `XCBeautifySymbols`: Markers from [xcbeautify](https://github.com/cpisciotta/xcbeautify/blob/main/Sources/XcbeautifyLib/Constants.swift) (`[x]`, `[!]`, `✔`, `✖`, etc.)
+     - When adding new string patterns, add to the appropriate enum rather than using inline literals
    - Parses build phases and per-target timing information
    - Parses executable targets from `RegisterWithLaunchServices` and `Validate` lines
 
@@ -338,6 +342,10 @@ The codebase follows a modular architecture:
 - **Test Duration Tracking**: Captures execution time for each test
   - Duration included in `FailedTest` struct for failed tests
   - Tracked internally for passed tests (used for slow/flaky detection)
+- **xcbeautify Input Parsing**: Opt-in `--xcbeautify` flag for parsing xcbeautify/Tuist-formatted output
+  - Parses `[x]`/`❌` as errors, `[!]`/`⚠️` as warnings, `✔` as passed, `✖` as failed
+  - Auto-detection: Emits stderr hint when xcbeautify markers detected without flag
+  - Testable via `parser.didEmitXcbeautifyHint` property (`private(set)`)
 
 ## Testing
 
@@ -477,6 +485,12 @@ Test cases cover:
     - Empty coverage path treated as nil
     - Zero flatten depth treated as unlimited
   - ConfigError description tests
+- **xcbeautify parsing** (22 tests in `Tests/XcbeautifyTests.swift`):
+  - ASCII and emoji error/warning markers (`[x]`, `❌`, `[!]`, `⚠️`)
+  - Test status markers (`✔`, `✖`)
+  - Auto-detection hint (shown/not shown/once/clean input)
+  - Flag-gating (markers ignored without `--xcbeautify`)
+  - Integration tests (full output, TOON format, default mode unaffected)
 
 Run individual tests:
 ```bash
