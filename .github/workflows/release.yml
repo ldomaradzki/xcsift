@@ -65,7 +65,7 @@ jobs:
             -C .build/${{ matrix.build-path }} xcsift
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: xcsift-${{ matrix.platform }}
           path: xcsift-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz
@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
