@@ -1713,7 +1713,6 @@ class OutputParser {
         //   - Test name() failed after 0.123 seconds [with N issues]
         if let testStart = line.range(of: "Test ") {
             // Skip "Test run with" (summary line) and "Test Case" (XCTest format)
-            let beforeTest = line[..<testStart.lowerBound]
             let afterTestStr = line[testStart.upperBound...]
 
             if !afterTestStr.hasPrefix("run with ") && !afterTestStr.hasPrefix("Case ") {

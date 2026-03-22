@@ -20,7 +20,7 @@ final class MockInstallShellRunner: InstallShellRunnerProtocol {
 // MARK: - Mock File Manager for Testing
 
 /// Mock file manager for testing file operations
-final class MockInstallFileManager: FileManager {
+final class MockInstallFileManager: FileManager, @unchecked Sendable {
     var existingPaths: Set<String> = []
     var createdDirectories: [String] = []
     var writtenFiles: [String: String] = [:]
