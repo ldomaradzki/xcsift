@@ -247,7 +247,7 @@ The codebase follows a modular architecture:
    - Defines data structures: `BuildResult`, `BuildSummary`, `BuildError`, `BuildWarning`, `FailedTest`, `SlowTest`, `CodeCoverage`, `FileCoverage`, `BuildInfo`, `TargetBuildInfo`, `Executable`
    - Pattern matching for various Xcode/SPM output formats
    - Extracts file paths, line numbers, and messages from build output
-   - **Parsing Constants** (private enums inside `OutputParser`):
+   - **Parsing Constants** (dedicated enum files in `Sources/`):
      - `XcodebuildSymbols`: Named constants for raw xcodebuild/SPM string patterns (`: error: `, `Test Case '`, linker patterns, etc.)
      - `XCBeautifySymbols`: Markers from [xcbeautify](https://github.com/cpisciotta/xcbeautify/blob/main/Sources/XcbeautifyLib/Constants.swift) (`[x]`, `[!]`, `✔`, `✖`, etc.)
      - When adding new string patterns, add to the appropriate enum rather than using inline literals

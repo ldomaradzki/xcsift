@@ -747,6 +747,8 @@ class OutputParser {
         if !shouldParseXcbeautify && !xcbeautifyHintEmitted {
             if line.hasPrefix(XCBeautifySymbols.asciiError + " ")
                 || line.hasPrefix(XCBeautifySymbols.asciiWarning + " ")
+                || line.hasPrefix(XCBeautifySymbols.error + " ")
+                || line.hasPrefix(XCBeautifySymbols.warning + " ")
             {
                 xcbeautifyHintEmitted = true
                 didEmitXcbeautifyHint = true
@@ -1297,10 +1299,13 @@ class OutputParser {
                 let trimmedLine = components[i - 1].trimmingCharacters(in: .whitespaces)
                 if let colNum = Int(trimmedCol), let lineNum = Int(trimmedLine) {
                     let file = components[0 ..< (i - 1)].joined(separator: ":")
-                    let message = components[(i + 1)...].joined(separator: ":").trimmingCharacters(
-                        in: .whitespaces
-                    )
-                    return (file: file, line: lineNum, column: colNum, message: message)
+                    // Validate file looks like a path (not a number from the message)
+                    if !file.isEmpty && (file.contains("/") || file.contains(".")) {
+                        let message = components[(i + 1)...].joined(separator: ":").trimmingCharacters(
+                            in: .whitespaces
+                        )
+                        return (file: file, line: lineNum, column: colNum, message: message)
+                    }
                 }
             }
         }
@@ -1311,10 +1316,12 @@ class OutputParser {
                 let trimmedLine = components[i - 1].trimmingCharacters(in: .whitespaces)
                 if let lineNum = Int(trimmedLine) {
                     let file = components[0 ..< (i - 1)].joined(separator: ":")
-                    let message = components[i...].joined(separator: ":").trimmingCharacters(
-                        in: .whitespaces
-                    )
-                    return (file: file, line: lineNum, column: nil, message: message)
+                    if !file.isEmpty && (file.contains("/") || file.contains(".")) {
+                        let message = components[i...].joined(separator: ":").trimmingCharacters(
+                            in: .whitespaces
+                        )
+                        return (file: file, line: lineNum, column: nil, message: message)
+                    }
                 }
             }
         }

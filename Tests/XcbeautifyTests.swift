@@ -192,6 +192,8 @@ final class XcbeautifyTestStatusTests: XCTestCase {
         XCTAssertEqual(result.summary.failedTests, 1)
         XCTAssertEqual(result.failedTests.count, 1)
         XCTAssertEqual(result.failedTests[0].test, "ContentViewTests.testExample")
+        XCTAssertEqual(result.failedTests[0].duration, 0.456)
+        XCTAssertEqual(result.failedTests[0].message, "Test failed")
     }
 
     func testTestMarkersIgnoredWithoutFlag() {
@@ -261,6 +263,77 @@ final class XcbeautifyAutoDetectTests: XCTestCase {
         _ = parser.parse(input: input, xcbeautify: false)
 
         XCTAssertFalse(parser.didEmitXcbeautifyHint)
+    }
+
+    func testAutoDetectHintShownForEmojiError() {
+        let parser = OutputParser()
+        let input = """
+            ❌ /path/to/File.swift:10:5: error message
+            """
+
+        _ = parser.parse(input: input, xcbeautify: false)
+
+        XCTAssertTrue(parser.didEmitXcbeautifyHint)
+    }
+
+    func testAutoDetectHintShownForEmojiWarning() {
+        let parser = OutputParser()
+        let input = """
+            ⚠️ /path/to/File.swift:20:10: variable 'unused' was never used
+            """
+
+        _ = parser.parse(input: input, xcbeautify: false)
+
+        XCTAssertTrue(parser.didEmitXcbeautifyHint)
+    }
+}
+
+// MARK: - xcbeautify Diagnostic Parsing Tests
+
+final class XcbeautifyDiagnosticTests: XCTestCase {
+
+    func testMessageWithColonsAndNumbers() {
+        let parser = OutputParser()
+        let input = """
+            [x] /path/to/File.swift:10:5: expected 2: got 3
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertEqual(result.errors[0].file, "/path/to/File.swift")
+        XCTAssertEqual(result.errors[0].line, 10)
+        XCTAssertEqual(result.errors[0].column, 5)
+        XCTAssertEqual(result.errors[0].message, "expected 2: got 3")
+    }
+
+    func testMessageWithTypeContainingColon() {
+        let parser = OutputParser()
+        let input = """
+            [x] /path/to/View.swift:42:8: Type 'Foo: Bar' is unavailable
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertEqual(result.errors[0].file, "/path/to/View.swift")
+        XCTAssertEqual(result.errors[0].line, 42)
+        XCTAssertEqual(result.errors[0].column, 8)
+        XCTAssertEqual(result.errors[0].message, "Type 'Foo: Bar' is unavailable")
+    }
+
+    func testPlainMessageWithoutFilePath() {
+        let parser = OutputParser()
+        let input = """
+            [x] Something went wrong: error 42
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertNil(result.errors[0].file)
+        XCTAssertNil(result.errors[0].line)
+        XCTAssertEqual(result.errors[0].message, "Something went wrong: error 42")
     }
 }
 
