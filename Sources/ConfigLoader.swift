@@ -106,6 +106,9 @@ struct ConfigLoader {
             # Exit behavior
             # exit_on_failure = false # Exit with failure code if build does not succeed (-E)
 
+            # Input format
+            # xcbeautify = false     # Parse xcbeautify/Tuist-formatted input (--xcbeautify)
+
             # TOON format configuration
             # [toon]
             # delimiter = "comma"     # "comma", "tab", or "pipe"

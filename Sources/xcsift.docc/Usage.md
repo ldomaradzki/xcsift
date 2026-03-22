@@ -199,6 +199,37 @@ Specify custom path to coverage data (optional, auto-detected by default).
 swift test --enable-code-coverage 2>&1 | xcsift --coverage --coverage-path .build/arm64-apple-macosx/debug/codecov
 ```
 
+## Input Format Options
+
+### `--xcbeautify`
+
+Parse xcbeautify/Tuist-formatted input. Enables recognition of xcbeautify markers that replace standard xcodebuild diagnostic formatting.
+
+```bash
+# Tuist build output piped through xcsift
+tuist build MyScheme --platform macos 2>&1 | xcsift --xcbeautify
+
+# xcbeautify output piped through xcsift
+xcodebuild build 2>&1 | xcbeautify 2>&1 | xcsift --xcbeautify
+
+# Combine with other flags
+tuist build MyScheme 2>&1 | xcsift --xcbeautify -f toon -w
+```
+
+When enabled, xcsift recognizes these xcbeautify markers:
+- `[x]` / `❌` — errors
+- `[!]` / `⚠️` — warnings
+- `✔` — passed tests
+- `✖` — failed tests
+
+**Auto-detection:** If xcsift detects xcbeautify markers without `--xcbeautify`, it prints a hint to stderr suggesting the flag.
+
+**Note:** Without this flag, xcbeautify-formatted lines are silently ignored. The flag can also be set in `.xcsift.toml`:
+
+```toml
+xcbeautify = true
+```
+
 ## TOON Configuration
 
 ### `--toon-delimiter`

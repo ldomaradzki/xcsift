@@ -67,6 +67,9 @@ executable = false       # Include executable targets (-e)
 # Exit behavior
 exit_on_failure = false  # Exit with failure code if build does not succeed (-E)
 
+# Input format
+xcbeautify = false       # Parse xcbeautify/Tuist-formatted input (--xcbeautify)
+
 # TOON format configuration
 [toon]
 delimiter = "comma"      # "comma", "tab", or "pipe"
@@ -121,6 +124,12 @@ flatten_depth = 0        # 0 = unlimited, or positive integer
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `exit_on_failure` | bool | `false` | Exit with failure code if build does not succeed |
+
+### Input Format
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `xcbeautify` | bool | `false` | Parse xcbeautify/Tuist-formatted input |
 
 ### TOON Configuration
 

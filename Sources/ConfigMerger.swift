@@ -16,6 +16,7 @@ struct ResolvedConfig: Sendable {
     let buildInfo: Bool
     let executable: Bool
     let exitOnFailure: Bool
+    let xcbeautify: Bool
     let toonDelimiter: TOONDelimiterType
     let toonKeyFolding: TOONKeyFoldingType
     let toonFlattenDepth: Int?
@@ -60,7 +61,8 @@ enum ConfigMerger {
         cliExitOnFailure: Bool,
         cliToonDelimiter: TOONDelimiterType?,
         cliToonKeyFolding: TOONKeyFoldingType?,
-        cliToonFlattenDepth: Int?
+        cliToonFlattenDepth: Int?,
+        cliXcbeautify: Bool = false
     ) -> ResolvedConfig {
 
         let config = config ?? Configuration()
@@ -86,6 +88,7 @@ enum ConfigMerger {
         let buildInfo = cliBuildInfo || (config.buildInfo ?? false)
         let executable = cliExecutable || (config.executable ?? false)
         let exitOnFailure = cliExitOnFailure || (config.exitOnFailure ?? false)
+        let xcbeautify = cliXcbeautify || (config.xcbeautify ?? false)
 
         // Optional string/numeric values: CLI > config > nil
         let coveragePath = cliCoveragePath ?? nonEmptyString(config.coveragePath)
@@ -131,6 +134,7 @@ enum ConfigMerger {
             buildInfo: buildInfo,
             executable: executable,
             exitOnFailure: exitOnFailure,
+            xcbeautify: xcbeautify,
             toonDelimiter: toonDelimiter,
             toonKeyFolding: toonKeyFolding,
             toonFlattenDepth: toonFlattenDepth

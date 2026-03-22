@@ -44,10 +44,31 @@ class OutputParser {
     private var targetDurations: [String: String] = [:]  // target -> duration
     private var targetOrder: [String] = []  // Tracks order of target appearance
     private var shouldParseBuildInfo: Bool = false  // Performance: skip phase parsing when not needed
+    private var shouldParseXcbeautify: Bool = false  // Parse xcbeautify-formatted input
+    private var xcbeautifyHintEmitted: Bool = false  // Emit auto-detection hint only once
+    /// Testable property: whether the xcbeautify auto-detection hint was emitted
+    private(set) var didEmitXcbeautifyHint: Bool = false
 
     // Dependency graph tracking
     private var targetDependencies: [String: [String]] = [:]  // target -> [dependencies]
     private var currentDependencyTarget: String?  // For multi-line dependency parsing
+
+    // MARK: - xcbeautify Constants
+
+    /// Markers used by xcbeautify (https://github.com/cpisciotta/xcbeautify) for formatted output.
+    /// Used by Tuist and other tools that wrap xcodebuild.
+    private enum XCBeautifySymbols {
+        static let error = "❌"
+        static let asciiError = "[x]"
+        static let warning = "⚠️"
+        static let asciiWarning = "[!]"
+        static let pass = "✔"
+        static let fail = "✖"
+        static let pending = "⧖"
+        static let completion = "▸"
+        static let measure = "◷"
+        static let skipped = "⊘"
+    }
 
     // MARK: - Static Regex Patterns (compiled once)
 
@@ -349,10 +370,12 @@ class OutputParser {
         printCoverageDetails: Bool = false,
         slowThreshold: Double? = nil,
         printBuildInfo: Bool = false,
-        printExecutables: Bool = false
+        printExecutables: Bool = false,
+        xcbeautify: Bool = false
     ) -> BuildResult {
         resetState()
         shouldParseBuildInfo = printBuildInfo
+        shouldParseXcbeautify = xcbeautify
         let lines = input.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
 
         for (index, line) in lines.enumerated() {
@@ -691,6 +714,9 @@ class OutputParser {
         currentDependencyTarget = nil
         lastStartedTestName = nil
         pendingSignalCode = nil
+        shouldParseXcbeautify = false
+        xcbeautifyHintEmitted = false
+        didEmitXcbeautifyHint = false
     }
 
     private func parseLine(_ line: String) {
@@ -734,6 +760,58 @@ class OutputParser {
             }
         }
 
+        // xcbeautify auto-detection: hint if markers found without flag
+        if !shouldParseXcbeautify && !xcbeautifyHintEmitted {
+            if line.hasPrefix(XCBeautifySymbols.asciiError + " ")
+                || line.hasPrefix(XCBeautifySymbols.asciiWarning + " ")
+            {
+                xcbeautifyHintEmitted = true
+                didEmitXcbeautifyHint = true
+                let hint =
+                    "hint: Detected xcbeautify-formatted input. Use --xcbeautify flag for proper parsing.\n"
+                FileHandle.standardError.write(Data(hint.utf8))
+            }
+        }
+
+        // xcbeautify parsing (only when --xcbeautify flag is active)
+        if shouldParseXcbeautify {
+            if let xcbResult = parseXcbeautifyLine(line) {
+                switch xcbResult {
+                case .error(let error):
+                    let key = "\(error.file ?? ""):\(error.line ?? 0):\(error.message)"
+                    if !seenErrors.contains(key) {
+                        seenErrors.insert(key)
+                        errors.append(error)
+                    }
+                    return
+                case .warning(let warning):
+                    let key = "\(warning.file ?? ""):\(warning.line ?? 0):\(warning.message)"
+                    if !seenWarnings.contains(key) {
+                        seenWarnings.insert(key)
+                        warnings.append(warning)
+                    }
+                    return
+                case .passedTest(let name, let duration):
+                    let normalizedName = normalizeTestName(name)
+                    if !seenPassedTestNames.contains(normalizedName) {
+                        seenPassedTestNames.insert(normalizedName)
+                        passedTestsCount += 1
+                        if let duration = duration {
+                            passedTestDurations[name] = duration
+                        }
+                    }
+                    return
+                case .failedTest(let test):
+                    let normalized = normalizeTestName(test.test)
+                    if !hasSeenSimilarTest(normalized) {
+                        failedTests.append(test)
+                        seenTestNames.insert(normalized)
+                    }
+                    return
+                }
+            }
+        }
+
         // Fast path checks before expensive regex
         let containsRelevant =
             line.contains("error:") || line.contains("warning:") || line.contains("failed") || line.contains("passed")
@@ -742,7 +820,7 @@ class OutputParser {
             || line.contains("BUILD SUCCEEDED") || line.contains("BUILD FAILED") || line.contains("TEST FAILED")
             || line.contains("Build complete!") || line.contains("recorded an issue")
             || line.hasPrefix("RegisterWithLaunchServices")
-            || line.hasPrefix("Validate") || line.contains("Fatal error") || line.hasPrefix("[x] ")
+            || line.hasPrefix("Validate") || line.contains("Fatal error")
             || (line.hasPrefix("/") && line.contains(".swift:"))  // runtime warnings
             || line.contains("' started")  // XCTest: "Test Case '...' started."
             || line.contains("\" started")  // Swift Testing: Test "..." started
@@ -1163,30 +1241,141 @@ class OutputParser {
         }
     }
 
-    private func parseError(_ line: String) -> BuildError? {
-        // Pattern: [x] file:line:column: message (availability errors)
-        // Must be checked before isJSONLikeLine since "[x]" starts with "["
-        if line.hasPrefix("[x] ") {
-            let rest = String(line.dropFirst(4))
-            let components = rest.split(separator: ":", omittingEmptySubsequences: false)
-            if components.count >= 4, let lineNum = Int(components[components.count - 3]),
-                let colNum = Int(components[components.count - 2])
-            {
-                let file = components[0 ..< (components.count - 3)].joined(separator: ":")
-                let message = components[(components.count - 1)...].joined(separator: ":").trimmingCharacters(
-                    in: .whitespaces
-                )
-                return BuildError(file: file, line: lineNum, message: message, column: colNum)
-            } else if components.count >= 3, let lineNum = Int(components[components.count - 2]) {
-                let file = components[0 ..< (components.count - 2)].joined(separator: ":")
-                let message = components[(components.count - 1)...].joined(separator: ":").trimmingCharacters(
-                    in: .whitespaces
-                )
-                return BuildError(file: file, line: lineNum, message: message)
-            } else {
-                return BuildError(file: nil, line: nil, message: rest)
+    // MARK: - xcbeautify Parsing
+
+    private enum XcbeautifyParseResult {
+        case error(BuildError)
+        case warning(BuildWarning)
+        case passedTest(name: String, duration: Double?)
+        case failedTest(FailedTest)
+    }
+
+    private func parseXcbeautifyLine(_ line: String) -> XcbeautifyParseResult? {
+        // Error: [x] or ❌ followed by file:line:col: message
+        let errorPrefix = XCBeautifySymbols.asciiError + " "
+        let emojiErrorPrefix = XCBeautifySymbols.error + " "
+        if line.hasPrefix(errorPrefix) {
+            let content = String(line.dropFirst(errorPrefix.count))
+            return .error(parseXcbeautifyDiagnosticAsError(content))
+        }
+        if line.hasPrefix(emojiErrorPrefix) {
+            let content = String(line.dropFirst(emojiErrorPrefix.count))
+            return .error(parseXcbeautifyDiagnosticAsError(content))
+        }
+
+        // Warning: [!] or ⚠️ followed by file:line:col: message
+        let warningPrefix = XCBeautifySymbols.asciiWarning + " "
+        let emojiWarningPrefix = XCBeautifySymbols.warning + " "
+        if line.hasPrefix(warningPrefix) {
+            let content = String(line.dropFirst(warningPrefix.count))
+            return .warning(parseXcbeautifyDiagnosticAsWarning(content))
+        }
+        if line.hasPrefix(emojiWarningPrefix) {
+            let content = String(line.dropFirst(emojiWarningPrefix.count))
+            return .warning(parseXcbeautifyDiagnosticAsWarning(content))
+        }
+
+        // Test passed: ✔ TestName passed (0.123 seconds)
+        let passPrefix = XCBeautifySymbols.pass + " "
+        if line.hasPrefix(passPrefix) {
+            let content = String(line.dropFirst(passPrefix.count))
+            return parseXcbeautifyTestResult(content, passed: true)
+        }
+
+        // Test failed: ✖ TestName failed (0.456 seconds)
+        let failPrefix = XCBeautifySymbols.fail + " "
+        if line.hasPrefix(failPrefix) {
+            let content = String(line.dropFirst(failPrefix.count))
+            return parseXcbeautifyTestResult(content, passed: false)
+        }
+
+        return nil
+    }
+
+    /// Parses "file:line:col: message" or "file:line: message" or plain "message"
+    private func parseXcbeautifyDiagnostic(_ content: String) -> (
+        file: String?, line: Int?, column: Int?, message: String
+    ) {
+        // Try file:line:column: message
+        let components = content.split(separator: ":", maxSplits: .max, omittingEmptySubsequences: false)
+
+        if components.count >= 4 {
+            // Try to find the pattern: file components : lineNum : colNum : message
+            // File path may contain colons (rare on macOS, but possible)
+            // Strategy: scan from the end for two consecutive integer fields
+            for i in stride(from: components.count - 2, through: 1, by: -1) {
+                let trimmedCol = components[i].trimmingCharacters(in: .whitespaces)
+                let trimmedLine = components[i - 1].trimmingCharacters(in: .whitespaces)
+                if let colNum = Int(trimmedCol), let lineNum = Int(trimmedLine) {
+                    let file = components[0 ..< (i - 1)].joined(separator: ":")
+                    let message = components[(i + 1)...].joined(separator: ":").trimmingCharacters(
+                        in: .whitespaces
+                    )
+                    return (file: file, line: lineNum, column: colNum, message: message)
+                }
             }
         }
+
+        if components.count >= 3 {
+            // Try file:line: message (no column)
+            for i in stride(from: components.count - 1, through: 1, by: -1) {
+                let trimmedLine = components[i - 1].trimmingCharacters(in: .whitespaces)
+                if let lineNum = Int(trimmedLine) {
+                    let file = components[0 ..< (i - 1)].joined(separator: ":")
+                    let message = components[i...].joined(separator: ":").trimmingCharacters(
+                        in: .whitespaces
+                    )
+                    return (file: file, line: lineNum, column: nil, message: message)
+                }
+            }
+        }
+
+        // Plain message without file/line
+        return (file: nil, line: nil, column: nil, message: content)
+    }
+
+    private func parseXcbeautifyDiagnosticAsError(_ content: String) -> BuildError {
+        let (file, line, column, message) = parseXcbeautifyDiagnostic(content)
+        return BuildError(file: file, line: line, message: message, column: column)
+    }
+
+    private func parseXcbeautifyDiagnosticAsWarning(_ content: String) -> BuildWarning {
+        let (file, line, _, message) = parseXcbeautifyDiagnostic(content)
+        return BuildWarning(file: file, line: line, message: message)
+    }
+
+    /// Parses xcbeautify test result: "TestName passed/failed (0.123 seconds)"
+    private func parseXcbeautifyTestResult(_ content: String, passed: Bool) -> XcbeautifyParseResult? {
+        // Extract test name (everything before " passed" or " failed")
+        let keyword = passed ? " passed" : " failed"
+        guard let keywordRange = content.range(of: keyword) else { return nil }
+        let testName = String(content[content.startIndex ..< keywordRange.lowerBound])
+        if testName.isEmpty { return nil }
+
+        // Extract duration if present: (0.123 seconds)
+        var duration: Double?
+        let afterKeyword = String(content[keywordRange.upperBound...])
+        if let openParen = afterKeyword.firstIndex(of: "("),
+            let closeParen = afterKeyword.firstIndex(of: ")")
+        {
+            let durationStr = afterKeyword[afterKeyword.index(after: openParen) ..< closeParen]
+                .trimmingCharacters(in: .whitespaces)
+                .replacingOccurrences(of: " seconds", with: "")
+            duration = Double(durationStr)
+        }
+
+        if passed {
+            return .passedTest(name: testName, duration: duration)
+        } else {
+            return .failedTest(
+                FailedTest(test: testName, message: "Test failed", file: nil, line: nil, duration: duration)
+            )
+        }
+    }
+
+    // MARK: - Standard Parsing
+
+    private func parseError(_ line: String) -> BuildError? {
         // Skip JSON-like lines (e.g., "  \"message\" : \"\\\\(message)\\\"\"")
         if isJSONLikeLine(line) {
             return nil

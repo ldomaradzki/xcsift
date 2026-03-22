@@ -210,6 +210,9 @@ struct XCSift: ParsableCommand {
     )
     var slowThreshold: Double?
 
+    @Flag(name: .long, help: "Parse xcbeautify/Tuist-formatted input ([x], [!], ✔, ✖ markers)")
+    var xcbeautify: Bool = false
+
     func run() throws {
         // Handle --version
         if version {
@@ -250,7 +253,8 @@ struct XCSift: ParsableCommand {
             cliExitOnFailure: exitOnFailure,
             cliToonDelimiter: toonDelimiter,
             cliToonKeyFolding: toonKeyFolding,
-            cliToonFlattenDepth: toonFlattenDepth
+            cliToonFlattenDepth: toonFlattenDepth,
+            cliXcbeautify: xcbeautify
         )
 
         // Check if stdin is a terminal (no piped input) before trying to read
@@ -293,7 +297,8 @@ struct XCSift: ParsableCommand {
             printCoverageDetails: resolved.coverageDetails,
             slowThreshold: resolved.slowThreshold,
             printBuildInfo: resolved.buildInfo,
-            printExecutables: resolved.executable
+            printExecutables: resolved.executable,
+            xcbeautify: resolved.xcbeautify
         )
         outputResult(result, resolved: resolved)
 
