@@ -45,6 +45,7 @@ enum ConfigMerger {
     ///   - cliToonDelimiter: TOON delimiter from CLI (nil if not explicitly set)
     ///   - cliToonKeyFolding: TOON key folding from CLI (nil if not explicitly set)
     ///   - cliToonFlattenDepth: TOON flatten depth from CLI (nil if not set)
+    ///   - cliXcbeautify: xcbeautify input parsing flag from CLI
     /// - Returns: Resolved configuration with all values set
     static func merge(
         config: Configuration?,
