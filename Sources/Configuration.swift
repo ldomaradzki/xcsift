@@ -17,6 +17,7 @@ struct Configuration: Codable, Sendable {
     var buildInfo: Bool?
     var executable: Bool?
     var exitOnFailure: Bool?
+    var xcbeautify: Bool?
     var toon: TOONConfiguration?
 
     enum CodingKeys: String, CodingKey {
@@ -31,6 +32,7 @@ struct Configuration: Codable, Sendable {
         case buildInfo = "build_info"
         case executable
         case exitOnFailure = "exit_on_failure"
+        case xcbeautify
         case toon
     }
 

@@ -883,6 +883,128 @@ final class ExitOnFailureTests: XCTestCase {
     }
 }
 
+// MARK: - Xcbeautify Configuration Tests
+
+final class XcbeautifyConfigTests: XCTestCase {
+
+    // MARK: - Decoding
+
+    func testDecodeXcbeautifyEnabled() throws {
+        let toml = """
+            xcbeautify = true
+            """
+
+        let mockFS = MockFileSystem()
+        mockFS.existingPaths.insert("/test/config.toml")
+        mockFS.fileContents["/test/config.toml"] = toml
+
+        let loader = ConfigLoader(fileSystem: mockFS)
+        let config = try loader.loadConfig(explicitPath: "/test/config.toml")
+
+        XCTAssertNotNil(config)
+        XCTAssertEqual(config?.xcbeautify, true)
+    }
+
+    func testDecodeXcbeautifyDefault() throws {
+        let toml = """
+            format = "json"
+            """
+
+        let mockFS = MockFileSystem()
+        mockFS.existingPaths.insert("/test/config.toml")
+        mockFS.fileContents["/test/config.toml"] = toml
+
+        let loader = ConfigLoader(fileSystem: mockFS)
+        let config = try loader.loadConfig(explicitPath: "/test/config.toml")
+
+        XCTAssertNotNil(config)
+        XCTAssertNil(config?.xcbeautify)
+    }
+
+    // MARK: - Merging
+
+    func testMergeXcbeautifyCLITrue() {
+        let resolved = ConfigMerger.merge(
+            config: nil,
+            cliFormat: nil,
+            cliWarnings: false,
+            cliWarningsAsErrors: false,
+            cliQuiet: false,
+            cliCoverage: false,
+            cliCoverageDetails: false,
+            cliCoveragePath: nil,
+            cliSlowThreshold: nil,
+            cliBuildInfo: false,
+            cliExecutable: false,
+            cliExitOnFailure: false,
+            cliToonDelimiter: nil,
+            cliToonKeyFolding: nil,
+            cliToonFlattenDepth: nil,
+            cliXcbeautify: true
+        )
+
+        XCTAssertTrue(resolved.xcbeautify)
+    }
+
+    func testMergeXcbeautifyConfigTrue() {
+        var config = Configuration()
+        config.xcbeautify = true
+
+        let resolved = ConfigMerger.merge(
+            config: config,
+            cliFormat: nil,
+            cliWarnings: false,
+            cliWarningsAsErrors: false,
+            cliQuiet: false,
+            cliCoverage: false,
+            cliCoverageDetails: false,
+            cliCoveragePath: nil,
+            cliSlowThreshold: nil,
+            cliBuildInfo: false,
+            cliExecutable: false,
+            cliExitOnFailure: false,
+            cliToonDelimiter: nil,
+            cliToonKeyFolding: nil,
+            cliToonFlattenDepth: nil,
+            cliXcbeautify: false
+        )
+
+        XCTAssertTrue(resolved.xcbeautify)
+    }
+
+    func testMergeXcbeautifyBothFalse() {
+        let resolved = ConfigMerger.merge(
+            config: nil,
+            cliFormat: nil,
+            cliWarnings: false,
+            cliWarningsAsErrors: false,
+            cliQuiet: false,
+            cliCoverage: false,
+            cliCoverageDetails: false,
+            cliCoveragePath: nil,
+            cliSlowThreshold: nil,
+            cliBuildInfo: false,
+            cliExecutable: false,
+            cliExitOnFailure: false,
+            cliToonDelimiter: nil,
+            cliToonKeyFolding: nil,
+            cliToonFlattenDepth: nil,
+            cliXcbeautify: false
+        )
+
+        XCTAssertFalse(resolved.xcbeautify)
+    }
+
+    // MARK: - Template
+
+    func testGenerateTemplateIncludesXcbeautify() {
+        let loader = ConfigLoader()
+        let template = loader.generateTemplate()
+
+        XCTAssertTrue(template.contains("xcbeautify"))
+    }
+}
+
 // MARK: - ConfigError Description Tests
 
 final class ConfigErrorTests: XCTestCase {

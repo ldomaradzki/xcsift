@@ -44,6 +44,10 @@ class OutputParser {
     private var targetDurations: [String: String] = [:]  // target -> duration
     private var targetOrder: [String] = []  // Tracks order of target appearance
     private var shouldParseBuildInfo: Bool = false  // Performance: skip phase parsing when not needed
+    private var shouldParseXcbeautify: Bool = false  // Parse xcbeautify-formatted input
+    private var xcbeautifyHintEmitted: Bool = false  // Emit auto-detection hint only once
+    /// Testable property: whether the xcbeautify auto-detection hint was emitted
+    private(set) var didEmitXcbeautifyHint: Bool = false
 
     // Dependency graph tracking
     private var targetDependencies: [String: [String]] = [:]  // target -> [dependencies]
@@ -349,10 +353,12 @@ class OutputParser {
         printCoverageDetails: Bool = false,
         slowThreshold: Double? = nil,
         printBuildInfo: Bool = false,
-        printExecutables: Bool = false
+        printExecutables: Bool = false,
+        xcbeautify: Bool = false
     ) -> BuildResult {
         resetState()
         shouldParseBuildInfo = printBuildInfo
+        shouldParseXcbeautify = xcbeautify
         let lines = input.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
 
         for (index, line) in lines.enumerated() {
@@ -361,7 +367,7 @@ class OutputParser {
             // Swift Testing: append custom comment from next line if present
             // macOS: 􀄵 (U+100135, SF Symbol "arrow.turn.down.right")
             // Linux:  ↳ (U+21B3, fallback)
-            if line.contains("recorded an issue"),
+            if line.contains(XcodebuildSymbols.recordedIssue),
                 index + 1 < lines.count
             {
                 let nextLine = lines[index + 1].trimmingCharacters(in: .whitespaces)
@@ -691,6 +697,9 @@ class OutputParser {
         currentDependencyTarget = nil
         lastStartedTestName = nil
         pendingSignalCode = nil
+        shouldParseXcbeautify = false
+        xcbeautifyHintEmitted = false
+        didEmitXcbeautifyHint = false
     }
 
     private func parseLine(_ line: String) {
@@ -734,20 +743,77 @@ class OutputParser {
             }
         }
 
+        // xcbeautify auto-detection: hint if markers found without flag
+        if !shouldParseXcbeautify && !xcbeautifyHintEmitted {
+            if line.hasPrefix(XCBeautifySymbols.asciiError + " ")
+                || line.hasPrefix(XCBeautifySymbols.asciiWarning + " ")
+                || line.hasPrefix(XCBeautifySymbols.error + " ")
+                || line.hasPrefix(XCBeautifySymbols.warning + " ")
+            {
+                xcbeautifyHintEmitted = true
+                didEmitXcbeautifyHint = true
+                let hint =
+                    "hint: Detected xcbeautify-formatted input. Use --xcbeautify flag for proper parsing.\n"
+                FileHandle.standardError.write(Data(hint.utf8))
+            }
+        }
+
+        // xcbeautify parsing (only when --xcbeautify flag is active)
+        if shouldParseXcbeautify {
+            if let xcbResult = parseXcbeautifyLine(line) {
+                switch xcbResult {
+                case .error(let error):
+                    let key = "\(error.file ?? ""):\(error.line ?? 0):\(error.message)"
+                    if !seenErrors.contains(key) {
+                        seenErrors.insert(key)
+                        errors.append(error)
+                    }
+                    return
+                case .warning(let warning):
+                    let key = "\(warning.file ?? ""):\(warning.line ?? 0):\(warning.message)"
+                    if !seenWarnings.contains(key) {
+                        seenWarnings.insert(key)
+                        warnings.append(warning)
+                    }
+                    return
+                case .passedTest(let name, let duration):
+                    let normalizedName = normalizeTestName(name)
+                    if !seenPassedTestNames.contains(normalizedName) {
+                        seenPassedTestNames.insert(normalizedName)
+                        passedTestsCount += 1
+                        if let duration = duration {
+                            passedTestDurations[name] = duration
+                        }
+                    }
+                    return
+                case .failedTest(let test):
+                    let normalized = normalizeTestName(test.test)
+                    if !hasSeenSimilarTest(normalized) {
+                        failedTests.append(test)
+                        seenTestNames.insert(normalized)
+                    }
+                    return
+                }
+            }
+        }
+
         // Fast path checks before expensive regex
         let containsRelevant =
-            line.contains("error:") || line.contains("warning:") || line.contains("failed") || line.contains("passed")
-            || line.contains("✘") || line.contains("✓") || line.contains("❌") || line.contains("Build succeeded")
+            line.contains(XcodebuildSymbols.errorKeyword) || line.contains(XcodebuildSymbols.warningKeyword)
+            || line.contains(XcodebuildSymbols.failedKeyword) || line.contains(XcodebuildSymbols.passedKeyword)
+            || line.contains(XcodebuildSymbols.swiftTestingFail) || line.contains(XcodebuildSymbols.swiftTestingPass)
+            || line.contains(XcodebuildSymbols.emojiError) || line.contains("Build succeeded")
             || line.contains("Build failed") || line.contains("Executed") || line.contains("] Testing ")
-            || line.contains("BUILD SUCCEEDED") || line.contains("BUILD FAILED") || line.contains("TEST FAILED")
-            || line.contains("Build complete!") || line.contains("recorded an issue")
-            || line.hasPrefix("RegisterWithLaunchServices")
-            || line.hasPrefix("Validate") || line.contains("Fatal error")
-            || (line.hasPrefix("/") && line.contains(".swift:"))  // runtime warnings
-            || line.contains("' started")  // XCTest: "Test Case '...' started."
+            || line.contains(XcodebuildSymbols.buildSucceeded) || line.contains(XcodebuildSymbols.buildFailedKeyword)
+            || line.contains(XcodebuildSymbols.testFailed)
+            || line.contains(XcodebuildSymbols.buildComplete) || line.contains(XcodebuildSymbols.recordedIssue)
+            || line.hasPrefix(XcodebuildSymbols.registerWithLaunchServices)
+            || line.hasPrefix(XcodebuildSymbols.validate) || line.contains(XcodebuildSymbols.fatalErrorKeyword)
+            || (line.hasPrefix("/") && line.contains(XcodebuildSymbols.swiftFilePattern))  // runtime warnings
+            || line.contains(XcodebuildSymbols.startedSuffix)  // XCTest: "Test Case '...' started."
             || line.contains("\" started")  // Swift Testing: Test "..." started
-            || line.contains("signal code ")  // "Exited with [unexpected] signal code N"
-            || line.hasPrefix("Restarting after")  // crash confirmation
+            || line.contains(XcodebuildSymbols.signalCode)  // "Exited with [unexpected] signal code N"
+            || line.hasPrefix(XcodebuildSymbols.restartingAfter)  // crash confirmation
 
         if !containsRelevant {
             return
@@ -759,7 +825,7 @@ class OutputParser {
         }
 
         // Signal code: "Exited with [unexpected] signal code N"
-        if line.contains("signal code ") {
+        if line.contains(XcodebuildSymbols.signalCode) {
             if let lastSpace = line.lastIndex(of: " ") {
                 let codeStr = String(line[line.index(after: lastSpace)...])
                 pendingSignalCode = Int(codeStr)
@@ -768,7 +834,7 @@ class OutputParser {
         }
 
         // Crash confirmation: "Restarting after unexpected exit, crash, or test timeout"
-        if line.hasPrefix("Restarting after") {
+        if line.hasPrefix(XcodebuildSymbols.restartingAfter) {
             if let testName = lastStartedTestName {
                 let message: String
                 if let code = pendingSignalCode {
@@ -889,8 +955,8 @@ class OutputParser {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
 
         // Pattern: "Undefined symbols for architecture arm64:"
-        if trimmed.hasPrefix("Undefined symbols for architecture ") {
-            let afterPrefix = trimmed.dropFirst("Undefined symbols for architecture ".count)
+        if trimmed.hasPrefix(XcodebuildSymbols.undefinedSymbols) {
+            let afterPrefix = trimmed.dropFirst(XcodebuildSymbols.undefinedSymbols.count)
             if let colonIndex = afterPrefix.firstIndex(of: ":") {
                 currentLinkerArchitecture = String(afterPrefix[..<colonIndex])
             }
@@ -898,8 +964,8 @@ class OutputParser {
         }
 
         // Pattern: "  \"_symbol\", referenced from:" - symbol name line
-        if trimmed.hasPrefix("\"") && trimmed.contains("\", referenced from:") {
-            if let endQuote = trimmed.range(of: "\", referenced from:") {
+        if trimmed.hasPrefix("\"") && trimmed.contains(XcodebuildSymbols.referencedFrom) {
+            if let endQuote = trimmed.range(of: XcodebuildSymbols.referencedFrom) {
                 let symbol = String(trimmed[trimmed.index(after: trimmed.startIndex) ..< endQuote.lowerBound])
                 pendingLinkerSymbol = symbol
             }
@@ -922,26 +988,29 @@ class OutputParser {
         }
 
         // Pattern: "ld: framework not found SomeFramework"
-        if trimmed.hasPrefix("ld: framework not found ") {
-            let framework = String(trimmed.dropFirst("ld: framework not found ".count))
+        if trimmed.hasPrefix(XcodebuildSymbols.frameworkNotFound) {
+            let framework = String(trimmed.dropFirst(XcodebuildSymbols.frameworkNotFound.count))
             appendLinkerErrorIfNew(LinkerError(message: "framework not found \(framework)"))
             return true
         }
 
         // Pattern: "ld: library not found for -lsomelib"
-        if trimmed.hasPrefix("ld: library not found for ") {
-            let library = String(trimmed.dropFirst("ld: library not found for ".count))
+        if trimmed.hasPrefix(XcodebuildSymbols.libraryNotFound) {
+            let library = String(trimmed.dropFirst(XcodebuildSymbols.libraryNotFound.count))
             appendLinkerErrorIfNew(LinkerError(message: "library not found for \(library)"))
             return true
         }
 
         // Pattern: "duplicate symbol '_symbolName' in:" - start multi-line duplicate symbol parsing
-        if trimmed.hasPrefix("duplicate symbol '") || trimmed.hasPrefix("duplicate symbol \"") {
+        if trimmed.hasPrefix(XcodebuildSymbols.duplicateSymbolSingle)
+            || trimmed.hasPrefix(XcodebuildSymbols.duplicateSymbolDouble)
+        {
             // Extract symbol name from: duplicate symbol '_symbolName' in:
-            let quoteChar: Character = trimmed.hasPrefix("duplicate symbol '") ? "'" : "\""
+            let quoteChar: Character = trimmed.hasPrefix(XcodebuildSymbols.duplicateSymbolSingle) ? "'" : "\""
             let afterPrefix =
-                trimmed.hasPrefix("duplicate symbol '")
-                ? trimmed.dropFirst("duplicate symbol '".count) : trimmed.dropFirst("duplicate symbol \"".count)
+                trimmed.hasPrefix(XcodebuildSymbols.duplicateSymbolSingle)
+                ? trimmed.dropFirst(XcodebuildSymbols.duplicateSymbolSingle.count)
+                : trimmed.dropFirst(XcodebuildSymbols.duplicateSymbolDouble.count)
             if let endQuote = afterPrefix.firstIndex(of: quoteChar) {
                 pendingDuplicateSymbol = String(afterPrefix[..<endQuote])
                 pendingConflictingFiles = []
@@ -1117,12 +1186,12 @@ class OutputParser {
     private func parseStartedTest(_ line: String) -> Bool {
         // XCTest: Test Case '-[Module.Class testMethod]' started.
         // XCTest parallel: Test case '-[Module.Class testMethod]' started.
-        if (line.hasPrefix("Test Case '") || line.hasPrefix("Test case '"))
-            && line.contains("' started")
+        if (line.hasPrefix(XcodebuildSymbols.testCasePrefix) || line.hasPrefix(XcodebuildSymbols.testCaseLowerPrefix))
+            && line.contains(XcodebuildSymbols.startedSuffix)
         {
-            let prefixLength = 11  // "Test Case '" or "Test case '"
+            let prefixLength = XcodebuildSymbols.testCasePrefix.count
             let startIndex = line.index(line.startIndex, offsetBy: prefixLength)
-            if let endQuote = line.range(of: "' started", range: startIndex ..< line.endIndex) {
+            if let endQuote = line.range(of: XcodebuildSymbols.startedSuffix, range: startIndex ..< line.endIndex) {
                 lastStartedTestName = String(line[startIndex ..< endQuote.lowerBound])
             }
             return true
@@ -1163,6 +1232,145 @@ class OutputParser {
         }
     }
 
+    // MARK: - xcbeautify Parsing
+
+    private enum XcbeautifyParseResult {
+        case error(BuildError)
+        case warning(BuildWarning)
+        case passedTest(name: String, duration: Double?)
+        case failedTest(FailedTest)
+    }
+
+    private func parseXcbeautifyLine(_ line: String) -> XcbeautifyParseResult? {
+        // Error: [x] or ❌ followed by file:line:col: message
+        let errorPrefix = XCBeautifySymbols.asciiError + " "
+        let emojiErrorPrefix = XCBeautifySymbols.error + " "
+        if line.hasPrefix(errorPrefix) {
+            let content = String(line.dropFirst(errorPrefix.count))
+            return .error(parseXcbeautifyDiagnosticAsError(content))
+        }
+        if line.hasPrefix(emojiErrorPrefix) {
+            let content = String(line.dropFirst(emojiErrorPrefix.count))
+            return .error(parseXcbeautifyDiagnosticAsError(content))
+        }
+
+        // Warning: [!] or ⚠️ followed by file:line:col: message
+        let warningPrefix = XCBeautifySymbols.asciiWarning + " "
+        let emojiWarningPrefix = XCBeautifySymbols.warning + " "
+        if line.hasPrefix(warningPrefix) {
+            let content = String(line.dropFirst(warningPrefix.count))
+            return .warning(parseXcbeautifyDiagnosticAsWarning(content))
+        }
+        if line.hasPrefix(emojiWarningPrefix) {
+            let content = String(line.dropFirst(emojiWarningPrefix.count))
+            return .warning(parseXcbeautifyDiagnosticAsWarning(content))
+        }
+
+        // Test passed: ✔ TestName passed (0.123 seconds)
+        let passPrefix = XCBeautifySymbols.pass + " "
+        if line.hasPrefix(passPrefix) {
+            let content = String(line.dropFirst(passPrefix.count))
+            return parseXcbeautifyTestResult(content, passed: true)
+        }
+
+        // Test failed: ✖ TestName failed (0.456 seconds)
+        let failPrefix = XCBeautifySymbols.fail + " "
+        if line.hasPrefix(failPrefix) {
+            let content = String(line.dropFirst(failPrefix.count))
+            return parseXcbeautifyTestResult(content, passed: false)
+        }
+
+        return nil
+    }
+
+    /// Parses "file:line:col: message" or "file:line: message" or plain "message"
+    private func parseXcbeautifyDiagnostic(_ content: String) -> (
+        file: String?, line: Int?, column: Int?, message: String
+    ) {
+        // Try file:line:column: message
+        let components = content.split(separator: ":", maxSplits: .max, omittingEmptySubsequences: false)
+
+        if components.count >= 4 {
+            // Try to find the pattern: file components : lineNum : colNum : message
+            // File path may contain colons (rare on macOS, but possible)
+            // Strategy: scan from the end for two consecutive integer fields
+            for i in stride(from: components.count - 2, through: 1, by: -1) {
+                let trimmedCol = components[i].trimmingCharacters(in: .whitespaces)
+                let trimmedLine = components[i - 1].trimmingCharacters(in: .whitespaces)
+                if let colNum = Int(trimmedCol), let lineNum = Int(trimmedLine) {
+                    let file = components[0 ..< (i - 1)].joined(separator: ":")
+                    // Validate file looks like a path (not a number from the message)
+                    if !file.isEmpty && (file.contains("/") || file.contains(".")) {
+                        let message = components[(i + 1)...].joined(separator: ":").trimmingCharacters(
+                            in: .whitespaces
+                        )
+                        return (file: file, line: lineNum, column: colNum, message: message)
+                    }
+                }
+            }
+        }
+
+        if components.count >= 3 {
+            // Try file:line: message (no column)
+            for i in stride(from: components.count - 1, through: 1, by: -1) {
+                let trimmedLine = components[i - 1].trimmingCharacters(in: .whitespaces)
+                if let lineNum = Int(trimmedLine) {
+                    let file = components[0 ..< (i - 1)].joined(separator: ":")
+                    if !file.isEmpty && (file.contains("/") || file.contains(".")) {
+                        let message = components[i...].joined(separator: ":").trimmingCharacters(
+                            in: .whitespaces
+                        )
+                        return (file: file, line: lineNum, column: nil, message: message)
+                    }
+                }
+            }
+        }
+
+        // Plain message without file/line
+        return (file: nil, line: nil, column: nil, message: content)
+    }
+
+    private func parseXcbeautifyDiagnosticAsError(_ content: String) -> BuildError {
+        let (file, line, column, message) = parseXcbeautifyDiagnostic(content)
+        return BuildError(file: file, line: line, message: message, column: column)
+    }
+
+    private func parseXcbeautifyDiagnosticAsWarning(_ content: String) -> BuildWarning {
+        let (file, line, _, message) = parseXcbeautifyDiagnostic(content)
+        return BuildWarning(file: file, line: line, message: message)
+    }
+
+    /// Parses xcbeautify test result: "TestName passed/failed (0.123 seconds)"
+    private func parseXcbeautifyTestResult(_ content: String, passed: Bool) -> XcbeautifyParseResult? {
+        // Extract test name (everything before " passed" or " failed")
+        let keyword = passed ? " passed" : " failed"
+        guard let keywordRange = content.range(of: keyword) else { return nil }
+        let testName = String(content[content.startIndex ..< keywordRange.lowerBound])
+        if testName.isEmpty { return nil }
+
+        // Extract duration if present: (0.123 seconds)
+        var duration: Double?
+        let afterKeyword = String(content[keywordRange.upperBound...])
+        if let openParen = afterKeyword.firstIndex(of: "("),
+            let closeParen = afterKeyword.firstIndex(of: ")")
+        {
+            let durationStr = afterKeyword[afterKeyword.index(after: openParen) ..< closeParen]
+                .trimmingCharacters(in: .whitespaces)
+                .replacingOccurrences(of: " seconds", with: "")
+            duration = Double(durationStr)
+        }
+
+        if passed {
+            return .passedTest(name: testName, duration: duration)
+        } else {
+            return .failedTest(
+                FailedTest(test: testName, message: "Test failed", file: nil, line: nil, duration: duration)
+            )
+        }
+    }
+
+    // MARK: - Standard Parsing
+
     private func parseError(_ line: String) -> BuildError? {
         // Skip JSON-like lines (e.g., "  \"message\" : \"\\\\(message)\\\"\"")
         if isJSONLikeLine(line) {
@@ -1175,7 +1383,7 @@ class OutputParser {
         }
 
         // Fast path: use string parsing instead of regex for common patterns
-        if let errorRange = line.range(of: ": error: ") {
+        if let errorRange = line.range(of: XcodebuildSymbols.errorFormat) {
             let beforeError = String(line[..<errorRange.lowerBound])
             let message = String(line[errorRange.upperBound...])
 
@@ -1198,7 +1406,7 @@ class OutputParser {
         }
 
         // Fast path for Fatal error with message
-        if let fatalRange = line.range(of: ": Fatal error: ") {
+        if let fatalRange = line.range(of: XcodebuildSymbols.fatalErrorFormat) {
             let beforeError = String(line[..<fatalRange.lowerBound])
             let message = String(line[fatalRange.upperBound...])
 
@@ -1212,8 +1420,8 @@ class OutputParser {
         }
 
         // Pattern: file:line: Fatal error (without trailing message)
-        if line.hasSuffix(": Fatal error"), !line.contains(" xctest[") {
-            let beforeFatal = String(line.dropLast(": Fatal error".count))
+        if line.hasSuffix(XcodebuildSymbols.fatalErrorSuffix), !line.contains(" xctest[") {
+            let beforeFatal = String(line.dropLast(XcodebuildSymbols.fatalErrorSuffix.count))
             let components = beforeFatal.split(separator: ":", omittingEmptySubsequences: false)
             if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
                 let file = components[0 ..< (components.count - 1)].joined(separator: ":")
@@ -1222,7 +1430,7 @@ class OutputParser {
         }
 
         // Pattern: ❌ message
-        if line.hasPrefix("❌ ") {
+        if line.hasPrefix(XcodebuildSymbols.emojiError + " ") {
             let message = String(line.dropFirst(2))
             return BuildError(file: nil, line: nil, message: message)
         }
@@ -1253,7 +1461,7 @@ class OutputParser {
         }
 
         // Fast path: use string parsing instead of regex for common patterns
-        if let warningRange = line.range(of: ": warning: ") {
+        if let warningRange = line.range(of: XcodebuildSymbols.warningFormat) {
             let beforeWarning = String(line[..<warningRange.lowerBound])
             let message = String(line[warningRange.upperBound...])
 
@@ -1295,7 +1503,7 @@ class OutputParser {
         }
 
         // Must be absolute path to .swift file
-        guard line.hasPrefix("/"), line.contains(".swift:") else {
+        guard line.hasPrefix("/"), line.contains(XcodebuildSymbols.swiftFilePattern) else {
             return nil
         }
 
@@ -1369,22 +1577,25 @@ class OutputParser {
     private func parsePassedTest(_ line: String) -> Bool {
         // Standard: Test Case 'TestName' passed (0.123 seconds).
         // Parallel: Test case 'TestName' passed on 'Device Name' (0.123 seconds)
-        let isStandardPassed = line.hasPrefix("Test Case '") && line.contains("' passed (")
-        let isParallelPassed = line.hasPrefix("Test case '") && line.contains("' passed on '")
+        let isStandardPassed =
+            line.hasPrefix(XcodebuildSymbols.testCasePrefix) && line.contains(XcodebuildSymbols.testPassedSuffix)
+        let isParallelPassed =
+            line.hasPrefix(XcodebuildSymbols.testCaseLowerPrefix) && line.contains(XcodebuildSymbols.testPassedOnSuffix)
 
         if isStandardPassed || isParallelPassed {
-            let prefixLength = 11  // "Test Case '" or "Test case '"
+            let prefixLength = XcodebuildSymbols.testCasePrefix.count
             let startIndex = line.index(line.startIndex, offsetBy: prefixLength)
 
             // Find end of test name
-            let passedPattern = isParallelPassed ? "' passed on '" : "' passed ("
+            let passedPattern =
+                isParallelPassed ? XcodebuildSymbols.testPassedOnSuffix : XcodebuildSymbols.testPassedSuffix
             guard let endQuote = line.range(of: passedPattern) else { return false }
             let testName = String(line[startIndex ..< endQuote.lowerBound])
 
             // Extract duration - find last "(" before "seconds)"
             var duration: Double? = nil
             if let lastParen = line.range(of: "(", options: .backwards),
-                let secondsEnd = line.range(of: " seconds", options: .backwards)
+                let secondsEnd = line.range(of: XcodebuildSymbols.secondsKeyword, options: .backwards)
             {
                 let durationStr = String(line[lastParen.upperBound ..< secondsEnd.lowerBound])
                 duration = Double(durationStr)
@@ -1459,22 +1670,25 @@ class OutputParser {
 
         // Standard: Test Case 'TestName' failed (0.123 seconds).
         // Parallel: Test case 'TestName' failed on 'Device Name' (0.123 seconds)
-        let isStandardFailed = line.hasPrefix("Test Case '") && line.contains("' failed (")
-        let isParallelFailed = line.hasPrefix("Test case '") && line.contains("' failed on '")
+        let isStandardFailed =
+            line.hasPrefix(XcodebuildSymbols.testCasePrefix) && line.contains(XcodebuildSymbols.testFailedSuffix)
+        let isParallelFailed =
+            line.hasPrefix(XcodebuildSymbols.testCaseLowerPrefix) && line.contains(XcodebuildSymbols.testFailedOnSuffix)
 
         if isStandardFailed || isParallelFailed {
-            let prefixLength = 11  // "Test Case '" or "Test case '"
+            let prefixLength = XcodebuildSymbols.testCasePrefix.count
             let startIndex = line.index(line.startIndex, offsetBy: prefixLength)
 
             // Find end of test name
-            let failedPattern = isParallelFailed ? "' failed on '" : "' failed ("
+            let failedPattern =
+                isParallelFailed ? XcodebuildSymbols.testFailedOnSuffix : XcodebuildSymbols.testFailedSuffix
             guard let endQuote = line.range(of: failedPattern) else { return nil }
             let test = String(line[startIndex ..< endQuote.lowerBound])
 
             // Extract duration - find last "(" before "seconds)"
             var duration: Double? = nil
             if let lastParen = line.range(of: "(", options: .backwards),
-                let secondsEnd = line.range(of: " seconds", options: .backwards)
+                let secondsEnd = line.range(of: XcodebuildSymbols.secondsKeyword, options: .backwards)
             {
                 let durationStr = String(line[lastParen.upperBound ..< secondsEnd.lowerBound])
                 duration = Double(durationStr)
@@ -1572,7 +1786,7 @@ class OutputParser {
     private func parseBuildAndTestTime(_ line: String) {
         // Pattern: ** BUILD SUCCEEDED ** [45.2s] or ** BUILD FAILED ** [15.3s]
         // xcodebuild format with bracket timing - BUILD time
-        if line.contains("** BUILD SUCCEEDED **") || line.contains("** BUILD FAILED **") {
+        if line.contains(XcodebuildSymbols.buildSucceeded) || line.contains(XcodebuildSymbols.buildFailed) {
             if let bracketStart = line.range(of: "[", options: .backwards),
                 let bracketEnd = line.range(of: "]", options: .backwards),
                 bracketStart.lowerBound < bracketEnd.lowerBound
@@ -1583,13 +1797,13 @@ class OutputParser {
         }
 
         // Pattern: ** TEST FAILED **
-        if line.contains("** TEST FAILED **") {
+        if line.contains(XcodebuildSymbols.testFailed) {
             testRunFailed = true
             return
         }
 
         // Pattern: Build complete! (12.34s) - SPM format - BUILD time
-        if line.hasPrefix("Build complete!") {
+        if line.hasPrefix(XcodebuildSymbols.buildComplete) {
             if let parenStart = line.range(of: "("),
                 let parenEnd = line.range(of: ")"),
                 parenStart.lowerBound < parenEnd.lowerBound
@@ -1765,7 +1979,7 @@ class OutputParser {
 
     /// Extract target name from "(in target 'TargetName' from project 'ProjectName')"
     private func extractTarget(from line: String) -> String? {
-        if let inTargetRange = line.range(of: "(in target '") {
+        if let inTargetRange = line.range(of: XcodebuildSymbols.inTarget) {
             let afterTarget = line[inTargetRange.upperBound...]
             if let endQuote = afterTarget.range(of: "'") {
                 return String(afterTarget[..<endQuote.lowerBound])
@@ -1811,9 +2025,9 @@ class OutputParser {
     private func parseSPMPhase(_ line: String) -> (String, String)? {
         // Pattern: [1/5] Compiling xcsift main.swift
         // or [1/5] Compiling plugin GenerateManual
-        if line.contains("] Compiling ") {
+        if line.contains(XcodebuildSymbols.spmCompiling) {
             // Find the start of target name (after "] Compiling ")
-            if let compilingRange = line.range(of: "] Compiling ") {
+            if let compilingRange = line.range(of: XcodebuildSymbols.spmCompiling) {
                 let afterCompiling = line[compilingRange.upperBound...]
                 // Target name is the first word after "Compiling"
                 // For SPM: "[1/5] Compiling xcsift main.swift" -> target is "xcsift"
@@ -1831,8 +2045,8 @@ class OutputParser {
         }
 
         // Pattern: [3/5] Linking xcsift
-        if line.contains("] Linking ") {
-            if let linkingRange = line.range(of: "] Linking ") {
+        if line.contains(XcodebuildSymbols.spmLinking) {
+            if let linkingRange = line.range(of: XcodebuildSymbols.spmLinking) {
                 let afterLinking = line[linkingRange.upperBound...]
                 // Target name is everything after "Linking" (may have path)
                 let targetName = afterLinking.trimmingCharacters(in: .whitespaces)
@@ -1856,9 +2070,9 @@ class OutputParser {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
 
         // Pattern: "Target 'TargetName' in project 'ProjectName'"
-        if trimmed.hasPrefix("Target '") && trimmed.contains("' in project '") {
+        if trimmed.hasPrefix(XcodebuildSymbols.targetPrefix) && trimmed.contains("' in project '") {
             // Extract target name
-            let afterTarget = trimmed.dropFirst("Target '".count)
+            let afterTarget = trimmed.dropFirst(XcodebuildSymbols.targetPrefix.count)
             if let endQuote = afterTarget.range(of: "'") {
                 let targetName = String(afterTarget[..<endQuote.lowerBound])
                 currentDependencyTarget = targetName
@@ -1877,8 +2091,8 @@ class OutputParser {
         }
 
         // Pattern: "➜ Explicit dependency on target 'DependencyName' in project 'ProjectName'"
-        if trimmed.contains("dependency on target '"), let currentTarget = currentDependencyTarget {
-            if let startQuote = trimmed.range(of: "dependency on target '") {
+        if trimmed.contains(XcodebuildSymbols.dependencyOnTarget), let currentTarget = currentDependencyTarget {
+            if let startQuote = trimmed.range(of: XcodebuildSymbols.dependencyOnTarget) {
                 let afterStartQuote = trimmed[startQuote.upperBound...]
                 if let endQuote = afterStartQuote.range(of: "'") {
                     let dependencyName = String(afterStartQuote[..<endQuote.lowerBound])
@@ -1945,21 +2159,21 @@ class OutputParser {
     private func parseExecutable(_ line: String) -> Executable? {
         // Pattern 1: RegisterWithLaunchServices /path/to/Executable.app (in target 'TargetName' from project 'ProjectName')
         // Pattern 2: Validate /path/to/Executable.app (in target 'TargetName' from project 'ProjectName')
-        let prefixes = ["RegisterWithLaunchServices ", "Validate "]
+        let prefixes = [XcodebuildSymbols.registerWithLaunchServices + " ", XcodebuildSymbols.validate + " "]
         guard let prefix = prefixes.first(where: { line.hasPrefix($0) }) else {
             return nil
         }
         let afterPrefix = line.dropFirst(prefix.count)
 
         // Find the path (between prefix and " (in target")
-        guard let targetRange = afterPrefix.range(of: " (in target '") else {
+        guard let targetRange = afterPrefix.range(of: " " + XcodebuildSymbols.inTarget) else {
             return nil
         }
 
         let path = String(afterPrefix[..<targetRange.lowerBound])
 
         // Only capture .app bundles (not other validated artifacts)
-        if !path.hasSuffix(".app") {
+        if !path.hasSuffix(XcodebuildSymbols.appBundleExt) {
             return nil
         }
 
