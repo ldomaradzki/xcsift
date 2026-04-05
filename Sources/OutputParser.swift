@@ -14,13 +14,18 @@ class OutputParser {
     private var seenWarnings: Set<String> = []
     private var seenErrors: Set<String> = []
     private var seenLinkerErrors: Set<String> = []
-    private var xctestExecutedCount: Int?
-    private var xctestFailedCount: Int?
+    private var xctestBundleExecutedCount: Int = 0
+    private var xctestBundleFailedCount: Int = 0
+    private var xctestFallbackExecutedCount: Int?
+    private var xctestFallbackFailedCount: Int?
+    private var lastCompletedXCTestSuiteName: String?
+    private var sawBundleLevelXCTestSummary: Bool = false
     private var swiftTestingExecutedCount: Int?
     private var swiftTestingFailedCount: Int?
     private var passedTestsCount: Int = 0
     private var seenPassedTestNames: Set<String> = []
     private var parallelTestsTotalCount: Int?
+    private var lastParallelTestSchedulingIndex: Int?
     private var testRunFailed: Bool = false
 
     // Linker error parsing state
@@ -450,14 +455,14 @@ class OutputParser {
             // Priority 1: Use parallel test total count if available (Swift Testing parallel mode)
             if let parallelTotal = parallelTestsTotalCount {
                 // Add XCTest count if available
-                if let xctest = xctestExecutedCount {
+                if let xctest = resolvedXCTestExecutedCount() {
                     return parallelTotal + xctest
                 }
                 return parallelTotal
             }
 
             // Priority 2: Sum XCTest and Swift Testing counts from summary lines
-            let xctest = xctestExecutedCount ?? 0
+            let xctest = resolvedXCTestExecutedCount() ?? 0
             let swiftTesting = swiftTestingExecutedCount ?? 0
             if xctest > 0 || swiftTesting > 0 {
                 return xctest + swiftTesting
@@ -466,7 +471,7 @@ class OutputParser {
         }()
 
         let totalFailed: Int = {
-            let xctestFailed = xctestFailedCount ?? 0
+            let xctestFailed = resolvedXCTestFailedCount() ?? 0
             let swiftTestingFailed = swiftTestingFailedCount ?? 0
             let aggregated = xctestFailed + swiftTestingFailed
             // Fall back to parsed failed tests if no summary counts
@@ -675,8 +680,12 @@ class OutputParser {
         buildTime = nil
         testTimeAccumulator = 0
         seenTestNames = []
-        xctestExecutedCount = nil
-        xctestFailedCount = nil
+        xctestBundleExecutedCount = 0
+        xctestBundleFailedCount = 0
+        xctestFallbackExecutedCount = nil
+        xctestFallbackFailedCount = nil
+        lastCompletedXCTestSuiteName = nil
+        sawBundleLevelXCTestSummary = false
         swiftTestingExecutedCount = nil
         swiftTestingFailedCount = nil
         passedTestsCount = 0
@@ -686,6 +695,7 @@ class OutputParser {
         pendingDuplicateSymbol = nil
         pendingConflictingFiles = []
         parallelTestsTotalCount = nil
+        lastParallelTestSchedulingIndex = nil
         testRunFailed = false
         passedTestDurations = [:]
         failedTestDurations = [:]
@@ -706,6 +716,10 @@ class OutputParser {
         // Quick filters to avoid regex on irrelevant lines
         if line.isEmpty || line.count > 5000 {
             return
+        }
+
+        if let suiteName = parseCompletedXCTestSuiteName(line) {
+            lastCompletedXCTestSuiteName = suiteName
         }
 
         // Check for linker-related lines first (multi-line parsing)
@@ -855,11 +869,18 @@ class OutputParser {
 
         // Parse parallel test scheduling lines: [N/TOTAL] Testing Module.Class/method
         if line.contains("] Testing "), let match = line.firstMatch(of: Self.parallelTestSchedulingRegex) {
-            if let _ = Int(match.1), let total = Int(match.2) {
-                // Only set on first match (total should be consistent across all lines)
-                if parallelTestsTotalCount == nil {
-                    parallelTestsTotalCount = total
+            if let currentIndex = Int(match.1), let total = Int(match.2) {
+                // Swift Testing can emit multiple parallel runs in one xcodebuild transcript.
+                // Count a new run when scheduling restarts or the first observed index is not part of a prior run.
+                if let previousIndex = lastParallelTestSchedulingIndex {
+                    if currentIndex <= previousIndex {
+                        parallelTestsTotalCount = (parallelTestsTotalCount ?? 0) + total
+                    }
+                } else {
+                    parallelTestsTotalCount = (parallelTestsTotalCount ?? 0) + total
                 }
+
+                lastParallelTestSchedulingIndex = currentIndex
             }
             return
         }
@@ -1230,6 +1251,55 @@ class OutputParser {
         if let dur = duration {
             passedTestDurations[normalizedTestName] = dur
         }
+    }
+
+    private func resolvedXCTestExecutedCount() -> Int? {
+        if sawBundleLevelXCTestSummary {
+            return xctestBundleExecutedCount
+        }
+        return xctestFallbackExecutedCount
+    }
+
+    private func resolvedXCTestFailedCount() -> Int? {
+        if sawBundleLevelXCTestSummary {
+            return xctestBundleFailedCount
+        }
+        return xctestFallbackFailedCount
+    }
+
+    private func parseCompletedXCTestSuiteName(_ line: String) -> String? {
+        guard
+            line.contains(XcodebuildSymbols.testSuitePassedMarker)
+                || line.contains(XcodebuildSymbols.testSuiteFailedMarker)
+        else {
+            return nil
+        }
+
+        for prefix in [XcodebuildSymbols.testSuitePrefix, XcodebuildSymbols.testSuiteLowerPrefix] {
+            guard let prefixRange = line.range(of: prefix) else {
+                continue
+            }
+
+            let suiteStart = prefixRange.upperBound
+            if let suiteEnd = line[suiteStart...].firstIndex(of: "'") {
+                return String(line[suiteStart ..< suiteEnd])
+            }
+        }
+
+        return nil
+    }
+
+    private func shouldAccumulateXCTestSummary(for suiteName: String?) -> Bool {
+        guard let suiteName else {
+            return false
+        }
+
+        return suiteName.hasSuffix(".xctest") || suiteName == XcodebuildSymbols.selectedTestsSuite
+    }
+
+    private func accumulateSwiftTestingSummary(total: Int, failed: Int) {
+        swiftTestingExecutedCount = (swiftTestingExecutedCount ?? 0) + total
+        swiftTestingFailedCount = (swiftTestingFailedCount ?? 0) + failed
     }
 
     // MARK: - xcbeautify Parsing
@@ -1828,23 +1898,39 @@ class OutputParser {
         // This is XCTest output format (may have leading whitespace/tab) - TEST time
         let trimmedLine = line.trimmingCharacters(in: .whitespaces)
         if trimmedLine.hasPrefix("Executed "), let withRange = trimmedLine.range(of: ", with ") {
+            var executedCount: Int?
             let afterExecuted = trimmedLine[
                 trimmedLine.index(trimmedLine.startIndex, offsetBy: 9) ..< withRange.lowerBound
             ]
             let testCountStr = afterExecuted.split(separator: " ").first
             if let testCountStr = testCountStr, let total = Int(testCountStr) {
-                xctestExecutedCount = total
+                executedCount = total
             }
 
             // Extract failures count
+            var failureCount: Int?
             let afterWith = String(trimmedLine[withRange.upperBound...])
             if let failureRange = afterWith.range(of: " failure") {
                 let beforeFailure = afterWith[..<failureRange.lowerBound]
                 let words = beforeFailure.split(separator: " ")
                 if let lastWord = words.last, let failures = Int(lastWord) {
-                    xctestFailedCount = failures
+                    failureCount = failures
                 }
             }
+
+            if let executedCount {
+                let failures = failureCount ?? 0
+                if shouldAccumulateXCTestSummary(for: lastCompletedXCTestSuiteName) {
+                    xctestBundleExecutedCount += executedCount
+                    xctestBundleFailedCount += failures
+                    sawBundleLevelXCTestSummary = true
+                } else {
+                    xctestFallbackExecutedCount = executedCount
+                    xctestFallbackFailedCount = failures
+                }
+            }
+
+            lastCompletedXCTestSuiteName = nil
 
             // Extract TEST time and accumulate
             if let inRange = trimmedLine.range(of: " in ", range: withRange.upperBound ..< trimmedLine.endIndex) {
@@ -1866,16 +1952,17 @@ class OutputParser {
         {
             let beforeFailed = line[testRunRange.upperBound ..< failedRange.lowerBound]
             let failedCountStr = beforeFailed.split(separator: " ").first
-            if let failedCountStr = failedCountStr, let failedCount = Int(failedCountStr) {
-                swiftTestingFailedCount = failedCount
+            var parsedFailureCount: Int?
+            if let failedCountStr = failedCountStr, let parsedFailedCount = Int(failedCountStr) {
+                parsedFailureCount = parsedFailedCount
             }
 
             let beforePassed = line[failedRange.upperBound ..< passedRange.lowerBound]
             let passedCountStr = beforePassed.split(separator: " ").first
             if let passedCountStr = passedCountStr, let passedCount = Int(passedCountStr),
-                let failedCount = swiftTestingFailedCount
+                let parsedFailureCount
             {
-                swiftTestingExecutedCount = passedCount + failedCount
+                accumulateSwiftTestingSummary(total: passedCount + parsedFailureCount, failed: parsedFailureCount)
             }
 
             // Extract TEST time and accumulate
@@ -1895,8 +1982,10 @@ class OutputParser {
         {
             let beforeFailed = line[testRunRange.upperBound ..< failedAfterRange.lowerBound]
             let totalCountStr = beforeFailed.split(separator: " ").first
-            if let totalCountStr = totalCountStr, let totalCount = Int(totalCountStr) {
-                swiftTestingExecutedCount = totalCount
+            var totalCount: Int?
+            if let totalCountStr = totalCountStr, let parsedTotalCount = Int(totalCountStr) {
+                totalCount = parsedTotalCount
+                accumulateSwiftTestingSummary(total: parsedTotalCount, failed: 0)
             }
 
             // Extract TEST time and accumulate
@@ -1913,12 +2002,11 @@ class OutputParser {
                     )
                 {
                     let issueCountStr = afterSeconds[withRange.upperBound ..< issueRange.lowerBound]
-                    if let issueCount = Int(issueCountStr.trimmingCharacters(in: .whitespaces)) {
-                        if let totalCount = swiftTestingExecutedCount {
-                            swiftTestingFailedCount = min(issueCount, totalCount)
-                        } else {
-                            swiftTestingFailedCount = issueCount
-                        }
+                    if let issueCount = Int(issueCountStr.trimmingCharacters(in: .whitespaces)),
+                        let parsedTotalCount = totalCount
+                    {
+                        let clampedIssueCount = min(issueCount, parsedTotalCount)
+                        swiftTestingFailedCount = (swiftTestingFailedCount ?? 0) + clampedIssueCount
                     }
                 }
             } else {
@@ -1935,8 +2023,7 @@ class OutputParser {
             let afterPrefix = line[testRunRange.upperBound ..< passedAfter.lowerBound]
             let testCountStr = afterPrefix.split(separator: " ").first
             if let testCountStr = testCountStr, let total = Int(testCountStr) {
-                swiftTestingExecutedCount = total
-                swiftTestingFailedCount = 0
+                accumulateSwiftTestingSummary(total: total, failed: 0)
 
                 // Only accumulate test time if there were actual tests
                 if total > 0 {

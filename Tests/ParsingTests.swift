@@ -226,6 +226,64 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.failedTests, 0)
     }
 
+    func testSwiftTestingPassedTestsAreAccumulatedAcrossMultipleRuns() {
+        let parser = OutputParser()
+        let input = #"""
+            Test Suite 'All tests' started at 2026-04-05 21:46:30.868.
+            Test Suite 'All tests' passed at 2026-04-05 21:46:30.869.
+                 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+            􁁛 Test run with 20 tests in 8 suites passed after 0.064 seconds.
+            Test Suite 'All tests' started at 2026-04-05 21:46:31.452.
+            Test Suite 'All tests' passed at 2026-04-05 21:46:31.452.
+                 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+            􁁛 Test run with 2 tests in 1 suite passed after 0.241 seconds.
+            Test Suite 'All tests' started at 2026-04-05 21:46:32.179.
+            Test Suite 'All tests' passed at 2026-04-05 21:46:32.179.
+                 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+            􁁛 Test run with 14 tests in 8 suites passed after 0.016 seconds.
+            ** TEST SUCCEEDED **
+            """#
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.summary.passedTests, 36)
+        XCTAssertEqual(result.summary.failedTests, 0)
+        XCTAssertEqual(result.status, "success")
+    }
+
+    func testXCTestPassedTestsAreAccumulatedAcrossBundles() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'UnitTests.xctest' passed at 2026-01-15 12:00:00.001.
+            Executed 2 tests, with 0 failures in 0.100 seconds
+            Test Suite 'UITests.xctest' passed at 2026-01-15 12:00:00.002.
+            Executed 3 tests, with 0 failures in 0.200 seconds
+            ** TEST SUCCEEDED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.summary.passedTests, 5)
+        XCTAssertEqual(result.summary.failedTests, 0)
+        XCTAssertEqual(result.status, "success")
+    }
+
+    func testNestedXCTestSuiteSummaryDoesNotDoubleCountBundleTotals() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'FeatureTests' passed at 2026-01-15 12:00:00.001.
+            Executed 2 tests, with 0 failures in 0.100 seconds
+            Test Suite 'MyPackageTests.xctest' passed at 2026-01-15 12:00:00.002.
+            Executed 2 tests, with 0 failures in 0.100 seconds
+            ** TEST SUCCEEDED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.summary.passedTests, 2)
+        XCTAssertEqual(result.summary.failedTests, 0)
+    }
+
     /// Tests that test_time is accumulated correctly when both XCTest and Swift Testing are present
     /// Regression test for fix where test times are summed across multiple test bundles
     func testCombinedTestTimeAccumulation() {
@@ -760,6 +818,25 @@ final class ParsingTests: XCTestCase {
 
         // Should use 100 from [N/TOTAL], not 5 from summary
         XCTAssertEqual(result.summary.passedTests, 100)
+    }
+
+    func testSwiftTestParallelAccumulatesAcrossMultipleRuns() {
+        let parser = OutputParser()
+        let input = """
+            [1/20] Testing ModuleA.TestClass/testMethod1
+            [20/20] Testing ModuleA.TestClass/testMethod20
+            ◇ Test run started.
+            ✔ Test run with 4 tests passed after 0.015 seconds.
+            [1/5] Testing ModuleB.TestClass/testMethod1
+            [5/5] Testing ModuleB.TestClass/testMethod5
+            ◇ Test run started.
+            ✔ Test run with 2 tests passed after 0.010 seconds.
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.summary.passedTests, 25)
+        XCTAssertEqual(result.summary.failedTests, 0)
     }
 
     func testSwiftTestingFailureSummaryParsing() {
