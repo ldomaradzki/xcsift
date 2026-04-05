@@ -27,6 +27,12 @@ enum XcodebuildSymbols {
     static let testFailedSuffix = "' failed ("
     static let testPassedOnSuffix = "' passed on '"
     static let testFailedOnSuffix = "' failed on '"
+    static let testSuitePrefix = "Test Suite '"
+    static let testSuiteLowerPrefix = "Test suite '"
+    static let testSuiteStartedSuffix = "' started"
+    static let testSuitePassedMarker = " passed"
+    static let testSuiteFailedMarker = " failed"
+    static let selectedTestsSuite = "Selected tests"
 
     // Swift Testing symbols (macOS Private Use Area + Linux fallback)
     static let swiftTestingPass = "✓"
