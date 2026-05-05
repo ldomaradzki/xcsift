@@ -518,8 +518,11 @@ swift test --filter OutputParserTests.testParseError
 When modifying code, ensure Linux compatibility:
 - Use conditional imports: `#if canImport(Darwin)` / `#elseif canImport(Glibc)` / `#elseif canImport(Musl)`
 - Avoid `fputs(..., stderr)` — use `FileHandle.standardError.write()` for Swift 6 concurrency safety
-- For shared mutable state across `@Sendable` closures (e.g. `Pipe.readabilityHandler`, `DispatchQueue.async`), use a `final class … @unchecked Sendable` with `NSLock` — captured `var` mutations fail under Swift 6 strict concurrency
 - CI runs on both macOS and Linux (see `.github/workflows/ci.yml`)
+
+### Swift 6 Concurrency
+
+- Capturing a mutable `var` in a `@Sendable` closure is rejected by strict concurrency. For shared mutable state across `@Sendable` closures (e.g. `Pipe.readabilityHandler`, `DispatchQueue.async`, `DispatchSourceTimer` event handlers), wrap the state in a `final class … @unchecked Sendable` and gate every read/write with an `NSLock`.
 
 ## Output Formats
 

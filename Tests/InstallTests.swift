@@ -196,7 +196,7 @@ final class ClaudeCodeInstallerTests: XCTestCase {
         XCTAssertNoThrow(try installer.install())
     }
 
-    // MARK: - Marketplace Add Hardening (issue #67)
+    // MARK: - Marketplace Add Timeout Behavior
 
     func testInstallTimesOutOnMarketplaceAdd() {
         let mockRunner = MockInstallShellRunner()
@@ -221,11 +221,37 @@ final class ClaudeCodeInstallerTests: XCTestCase {
                 return
             }
             if case .marketplaceAddTimedOut(let seconds) = installerError {
-                XCTAssertEqual(seconds, ClaudeCodeInstaller.marketplaceAddTimeoutSeconds)
+                XCTAssertEqual(seconds, ClaudeCodeInstaller.claudeCommandTimeoutSeconds)
             } else {
                 XCTFail("Expected marketplaceAddTimedOut error, got \(installerError)")
             }
         }
+    }
+
+    func testInstallDoesNotCallPluginInstallAfterTimeout() {
+        let mockRunner = MockInstallShellRunner()
+        mockRunner.mockResults["which claude"] = InstallShellResult(
+            exitCode: 0,
+            stdout: "/usr/local/bin/claude",
+            stderr: ""
+        )
+        mockRunner.mockResults[
+            "claude plugin marketplace add \(ClaudeCodeInstaller.marketplaceRepo)"
+        ] = InstallShellResult(
+            exitCode: installShellTimeoutExitCode,
+            stdout: "",
+            stderr: ""
+        )
+
+        let installer = ClaudeCodeInstaller(shellRunner: mockRunner)
+
+        XCTAssertThrowsError(try installer.install())
+        XCTAssertFalse(
+            mockRunner.commandHistory.contains(
+                "claude plugin install \(ClaudeCodeInstaller.pluginName)"
+            ),
+            "Plugin install must not run after marketplace add timed out"
+        )
     }
 
     func testInstallPassesNoPromptEnvAndTimeoutToMarketplaceAdd() throws {
@@ -260,12 +286,131 @@ final class ClaudeCodeInstallerTests: XCTestCase {
             return
         }
 
-        XCTAssertEqual(options.timeout, TimeInterval(ClaudeCodeInstaller.marketplaceAddTimeoutSeconds))
+        XCTAssertEqual(
+            options.timeout,
+            TimeInterval(ClaudeCodeInstaller.claudeCommandTimeoutSeconds)
+        )
         XCTAssertTrue(options.streamOutput)
 
         let env = options.environment ?? [:]
         XCTAssertEqual(env["GIT_TERMINAL_PROMPT"], "0")
         XCTAssertEqual(env["GIT_ASKPASS"], "/bin/true")
+    }
+
+    func testInstallPassesTimeoutToPluginInstall() throws {
+        let mockRunner = MockInstallShellRunner()
+        mockRunner.mockResults["which claude"] = InstallShellResult(
+            exitCode: 0,
+            stdout: "/usr/local/bin/claude",
+            stderr: ""
+        )
+        mockRunner.mockResults[
+            "claude plugin marketplace add \(ClaudeCodeInstaller.marketplaceRepo)"
+        ] = InstallShellResult(exitCode: 0, stdout: "Marketplace added", stderr: "")
+        mockRunner.mockResults[
+            "claude plugin install \(ClaudeCodeInstaller.pluginName)"
+        ] = InstallShellResult(exitCode: 0, stdout: "Plugin installed", stderr: "")
+
+        let installer = ClaudeCodeInstaller(shellRunner: mockRunner)
+        try installer.install()
+
+        let installCommand = "claude plugin install \(ClaudeCodeInstaller.pluginName)"
+        guard let options = mockRunner.optionsHistory[installCommand] else {
+            XCTFail("Expected options to be captured for plugin install command")
+            return
+        }
+        XCTAssertEqual(
+            options.timeout,
+            TimeInterval(ClaudeCodeInstaller.claudeCommandTimeoutSeconds)
+        )
+        XCTAssertEqual(options.environment?["GIT_TERMINAL_PROMPT"], "0")
+    }
+
+    func testIsClaudeCLIAvailableUsesShortTimeout() {
+        let mockRunner = MockInstallShellRunner()
+        mockRunner.mockResults["which claude"] = InstallShellResult(
+            exitCode: 0,
+            stdout: "/usr/local/bin/claude",
+            stderr: ""
+        )
+        let installer = ClaudeCodeInstaller(shellRunner: mockRunner)
+        _ = installer.isClaudeCLIAvailable()
+
+        guard let options = mockRunner.optionsHistory["which claude"] else {
+            XCTFail("Expected options to be captured for which claude")
+            return
+        }
+        XCTAssertEqual(options.timeout, ClaudeCodeInstaller.claudeLookupTimeoutSeconds)
+    }
+
+    func testInstallSurfacesNonAlreadyMarketplaceFailure() {
+        let mockRunner = MockInstallShellRunner()
+        mockRunner.mockResults["which claude"] = InstallShellResult(
+            exitCode: 0,
+            stdout: "/usr/local/bin/claude",
+            stderr: ""
+        )
+        mockRunner.mockResults[
+            "claude plugin marketplace add \(ClaudeCodeInstaller.marketplaceRepo)"
+        ] = InstallShellResult(
+            exitCode: 1,
+            stdout: "",
+            stderr: "fatal: repository not found"
+        )
+
+        let installer = ClaudeCodeInstaller(shellRunner: mockRunner)
+
+        XCTAssertThrowsError(try installer.install()) { error in
+            guard case .marketplaceAddFailed(let stderr, _) = error as? ClaudeCodeInstallerError
+            else {
+                XCTFail("Expected marketplaceAddFailed, got \(error)")
+                return
+            }
+            XCTAssertTrue(stderr.contains("repository not found"))
+        }
+    }
+
+    func testInstallDoesNotFalseMatchAlreadyInUnrelatedError() {
+        let mockRunner = MockInstallShellRunner()
+        mockRunner.mockResults["which claude"] = InstallShellResult(
+            exitCode: 0,
+            stdout: "/usr/local/bin/claude",
+            stderr: ""
+        )
+        // Stderr contains the literal word "already" but is a real failure,
+        // not an idempotent no-op. Loose substring matching would swallow it.
+        mockRunner.mockResults[
+            "claude plugin marketplace add \(ClaudeCodeInstaller.marketplaceRepo)"
+        ] = InstallShellResult(
+            exitCode: 1,
+            stdout: "",
+            stderr: "Repository already deleted on remote"
+        )
+
+        let installer = ClaudeCodeInstaller(shellRunner: mockRunner)
+        XCTAssertThrowsError(try installer.install())
+    }
+
+    func testMarketplaceAddEnvironmentPreservesUserAskpass() {
+        let original = ProcessInfo.processInfo.environment["GIT_ASKPASS"]
+        setenv("GIT_ASKPASS", "/usr/local/bin/my-credential-helper", 1)
+        defer {
+            if let original {
+                setenv("GIT_ASKPASS", original, 1)
+            } else {
+                unsetenv("GIT_ASKPASS")
+            }
+        }
+
+        let env = ClaudeCodeInstaller.marketplaceAddEnvironment()
+        XCTAssertEqual(env["GIT_ASKPASS"], "/usr/local/bin/my-credential-helper")
+        XCTAssertEqual(env["GIT_TERMINAL_PROMPT"], "0")
+    }
+
+    func testMarketplaceAddEnvironmentInheritsParentPath() {
+        let env = ClaudeCodeInstaller.marketplaceAddEnvironment()
+        XCTAssertNotNil(env["PATH"], "PATH must survive — losing it breaks subprocess launch")
+        XCTAssertEqual(env["GIT_TERMINAL_PROMPT"], "0")
     }
 
     // MARK: - Uninstall
@@ -466,8 +611,19 @@ final class InstallErrorTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            ClaudeCodeInstallerError.marketplaceAddFailed(stderr: "error message").description,
+            ClaudeCodeInstallerError.marketplaceAddFailed(
+                stderr: "error message",
+                alreadyStreamed: false
+            ).description,
             "Failed to add marketplace: error message"
+        )
+
+        XCTAssertEqual(
+            ClaudeCodeInstallerError.marketplaceAddFailed(
+                stderr: "error message",
+                alreadyStreamed: true
+            ).description,
+            "Failed to add marketplace (see output above)."
         )
 
         XCTAssertEqual(
@@ -484,7 +640,8 @@ final class InstallErrorTests: XCTestCase {
             ClaudeCodeInstallerError.marketplaceAddTimedOut(seconds: 120).description
         XCTAssertTrue(timeoutDescription.contains("timed out after 120 seconds"))
         XCTAssertTrue(timeoutDescription.contains("ldomaradzki/xcsift"))
-        XCTAssertTrue(timeoutDescription.contains("issues/67"))
+        XCTAssertTrue(timeoutDescription.contains("Common fixes"))
+        XCTAssertTrue(timeoutDescription.contains("credential helper"))
     }
 
     // MARK: - CodexInstallerError
@@ -513,5 +670,103 @@ final class InstallErrorTests: XCTestCase {
             CursorInstallerError.notInstalled(path: "/path/to/hooks.json").description,
             "xcsift hooks not installed at /path/to/hooks.json"
         )
+    }
+}
+
+// MARK: - DefaultInstallShellRunner Integration Tests
+
+/// Real subprocess tests — exercise the actual `Process` machinery that
+/// MockInstallShellRunner can never cover (timeout firing, SIGKILL escalation,
+/// pipe drain, environment propagation).
+final class DefaultInstallShellRunnerTests: XCTestCase {
+
+    func testReturnsRealExitCodeWhenProcessCompletesBeforeTimeout() {
+        let runner = DefaultInstallShellRunner()
+        let result = runner.run(
+            command: "echo hello && echo world >&2",
+            options: InstallShellOptions(timeout: 5.0)
+        )
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(result.stdout.contains("hello"))
+        XCTAssertTrue(result.stderr.contains("world"))
+    }
+
+    func testReturnsNonZeroExitCodeOnFailure() {
+        let runner = DefaultInstallShellRunner()
+        let result = runner.run(
+            command: "exit 42",
+            options: InstallShellOptions(timeout: 5.0)
+        )
+        XCTAssertEqual(result.exitCode, 42)
+        XCTAssertNotEqual(result.exitCode, installShellTimeoutExitCode)
+    }
+
+    func testKillsProcessThatExceedsTimeout() {
+        let runner = DefaultInstallShellRunner()
+        let start = Date()
+        let result = runner.run(
+            command: "sleep 30",
+            options: InstallShellOptions(timeout: 1.0)
+        )
+        let elapsed = Date().timeIntervalSince(start)
+        XCTAssertEqual(result.exitCode, installShellTimeoutExitCode)
+        XCTAssertLessThan(
+            elapsed,
+            10.0,
+            "Process should have been terminated near the 1s timeout (with 5s SIGKILL grace)"
+        )
+    }
+
+    func testKillsProcessThatIgnoresSIGTERM() {
+        // `trap '' TERM` makes the shell ignore SIGTERM. Without SIGKILL
+        // escalation, the process would survive past the timeout and the
+        // call would hang for the full 30 seconds.
+        let runner = DefaultInstallShellRunner()
+        let start = Date()
+        let result = runner.run(
+            command: "trap '' TERM; sleep 30",
+            options: InstallShellOptions(timeout: 1.0)
+        )
+        let elapsed = Date().timeIntervalSince(start)
+        XCTAssertEqual(result.exitCode, installShellTimeoutExitCode)
+        XCTAssertLessThan(
+            elapsed,
+            15.0,
+            "SIGKILL escalation must terminate a SIGTERM-ignoring process within ~6s"
+        )
+    }
+
+    func testPropagatesEnvironmentToSubprocess() {
+        let runner = DefaultInstallShellRunner()
+        let result = runner.run(
+            command: "printf %s \"$XCSIFT_TEST_VAR\"",
+            options: InstallShellOptions(environment: [
+                "PATH": ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin",
+                "XCSIFT_TEST_VAR": "sentinel-value",
+            ])
+        )
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(result.stdout, "sentinel-value")
+    }
+
+    func testCapturesOutputThatArrivesNearProcessExit() {
+        let runner = DefaultInstallShellRunner()
+        let result = runner.run(
+            command: "for i in $(seq 1 500); do echo line$i; done",
+            options: InstallShellOptions()
+        )
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(result.stdout.contains("line1\n"))
+        XCTAssertTrue(result.stdout.contains("line500"))
+    }
+
+    func testReturnsLaunchFailureExitCodeForBrokenExecutable() {
+        // Bash executes `command` via /bin/bash, so this still goes through
+        // launch. The launch-failed path is hit only when /bin/bash itself is
+        // missing — hard to simulate cross-platform — so we instead verify the
+        // invariant that the sentinel is distinct from real exit codes.
+        XCTAssertNotEqual(installShellTimeoutExitCode, installShellLaunchFailedExitCode)
+        XCTAssertLessThan(installShellTimeoutExitCode, 0)
+        XCTAssertLessThan(installShellLaunchFailedExitCode, 0)
     }
 }
