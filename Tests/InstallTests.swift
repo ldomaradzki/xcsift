@@ -8,12 +8,18 @@ import XCTest
 /// Mock shell runner for testing ClaudeCodeInstaller
 final class MockInstallShellRunner: InstallShellRunnerProtocol {
     var commandHistory: [String] = []
+    var optionsHistory: [String: InstallShellOptions] = [:]
     var mockResults: [String: InstallShellResult] = [:]
     var defaultResult = InstallShellResult(exitCode: 0, stdout: "", stderr: "")
 
     func run(command: String) -> InstallShellResult {
         commandHistory.append(command)
         return mockResults[command] ?? defaultResult
+    }
+
+    func run(command: String, options: InstallShellOptions) -> InstallShellResult {
+        optionsHistory[command] = options
+        return run(command: command)
     }
 }
 
@@ -188,6 +194,78 @@ final class ClaudeCodeInstallerTests: XCTestCase {
         let installer = ClaudeCodeInstaller(shellRunner: mockRunner)
 
         XCTAssertNoThrow(try installer.install())
+    }
+
+    // MARK: - Marketplace Add Hardening (issue #67)
+
+    func testInstallTimesOutOnMarketplaceAdd() {
+        let mockRunner = MockInstallShellRunner()
+        mockRunner.mockResults["which claude"] = InstallShellResult(
+            exitCode: 0,
+            stdout: "/usr/local/bin/claude",
+            stderr: ""
+        )
+        mockRunner.mockResults[
+            "claude plugin marketplace add \(ClaudeCodeInstaller.marketplaceRepo)"
+        ] = InstallShellResult(
+            exitCode: installShellTimeoutExitCode,
+            stdout: "",
+            stderr: ""
+        )
+
+        let installer = ClaudeCodeInstaller(shellRunner: mockRunner)
+
+        XCTAssertThrowsError(try installer.install()) { error in
+            guard let installerError = error as? ClaudeCodeInstallerError else {
+                XCTFail("Expected ClaudeCodeInstallerError")
+                return
+            }
+            if case .marketplaceAddTimedOut(let seconds) = installerError {
+                XCTAssertEqual(seconds, ClaudeCodeInstaller.marketplaceAddTimeoutSeconds)
+            } else {
+                XCTFail("Expected marketplaceAddTimedOut error, got \(installerError)")
+            }
+        }
+    }
+
+    func testInstallPassesNoPromptEnvAndTimeoutToMarketplaceAdd() throws {
+        let mockRunner = MockInstallShellRunner()
+        mockRunner.mockResults["which claude"] = InstallShellResult(
+            exitCode: 0,
+            stdout: "/usr/local/bin/claude",
+            stderr: ""
+        )
+        mockRunner.mockResults[
+            "claude plugin marketplace add \(ClaudeCodeInstaller.marketplaceRepo)"
+        ] = InstallShellResult(
+            exitCode: 0,
+            stdout: "Marketplace added",
+            stderr: ""
+        )
+        mockRunner.mockResults[
+            "claude plugin install \(ClaudeCodeInstaller.pluginName)"
+        ] = InstallShellResult(
+            exitCode: 0,
+            stdout: "Plugin installed",
+            stderr: ""
+        )
+
+        let installer = ClaudeCodeInstaller(shellRunner: mockRunner)
+        try installer.install()
+
+        let marketplaceCommand =
+            "claude plugin marketplace add \(ClaudeCodeInstaller.marketplaceRepo)"
+        guard let options = mockRunner.optionsHistory[marketplaceCommand] else {
+            XCTFail("Expected options to be captured for marketplace add command")
+            return
+        }
+
+        XCTAssertEqual(options.timeout, TimeInterval(ClaudeCodeInstaller.marketplaceAddTimeoutSeconds))
+        XCTAssertTrue(options.streamOutput)
+
+        let env = options.environment ?? [:]
+        XCTAssertEqual(env["GIT_TERMINAL_PROMPT"], "0")
+        XCTAssertEqual(env["GIT_ASKPASS"], "/bin/true")
     }
 
     // MARK: - Uninstall
@@ -401,6 +479,12 @@ final class InstallErrorTests: XCTestCase {
             ClaudeCodeInstallerError.pluginUninstallFailed(stderr: "uninstall error").description,
             "Failed to uninstall plugin: uninstall error"
         )
+
+        let timeoutDescription =
+            ClaudeCodeInstallerError.marketplaceAddTimedOut(seconds: 120).description
+        XCTAssertTrue(timeoutDescription.contains("timed out after 120 seconds"))
+        XCTAssertTrue(timeoutDescription.contains("ldomaradzki/xcsift"))
+        XCTAssertTrue(timeoutDescription.contains("issues/67"))
     }
 
     // MARK: - CodexInstallerError
