@@ -763,7 +763,7 @@ final class DefaultInstallShellRunnerTests: XCTestCase {
         )
     }
 
-    func testHandlesOrphanedGrandchildHoldingPipeWriteEnd() {
+    func testHandlesOrphanedGrandchildHoldingPipeWriteEnd() throws {
         // Regression test for issue #67. The bash parent backgrounds a child,
         // then exits cleanly. The grandchild inherits the stdout pipe write
         // end and outlives the parent — without the timeout-and-drain
@@ -772,6 +772,23 @@ final class DefaultInstallShellRunnerTests: XCTestCase {
         //
         // The whole call must return well before the grandchild's natural
         // 30-second sleep completes.
+        //
+        // Skipped on Linux: swift-corelibs-foundation leaks an internal
+        // socketpair FD into the child via `posix_spawn` (it manually emulates
+        // `POSIX_SPAWN_CLOEXEC_DEFAULT` but explicitly excludes
+        // `taskSocketPair[1]` from the close set). The orphaned grandchild
+        // inherits that FD, so `Process.waitUntilExit()` blocks until the
+        // grandchild itself dies — independent of any drain logic in the
+        // runner. Tracked upstream:
+        // https://github.com/swiftlang/swift-corelibs-foundation/issues/4795
+        #if os(Linux)
+            throw XCTSkip(
+                "swift-corelibs-foundation #4795: orphan grandchild inherits "
+                    + "Foundation's task socketpair, so Process.waitUntilExit() "
+                    + "cannot detect parent exit. Runner drain logic is fine; "
+                    + "the hang is entirely inside Foundation."
+            )
+        #endif
         let runner = DefaultInstallShellRunner()
         let start = Date()
         let outcome = runner.run(
