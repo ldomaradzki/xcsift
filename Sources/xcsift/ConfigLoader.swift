@@ -1,5 +1,6 @@
 import Foundation
 import TOML
+import XCSiftCore
 
 // MARK: - Config Loader Errors
 

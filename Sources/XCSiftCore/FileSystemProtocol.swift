@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for file system operations, enabling dependency injection for testing
-protocol FileSystemProtocol {
+public protocol FileSystemProtocol {
     func fileExists(atPath path: String) -> Bool
     func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<ObjCBool>?) -> Bool
     func contentsOfDirectory(atPath path: String) throws -> [String]
@@ -13,7 +13,7 @@ protocol FileSystemProtocol {
 }
 
 extension FileManager: FileSystemProtocol {
-    func contentsOfFile(atPath path: String) throws -> String {
+    public func contentsOfFile(atPath path: String) throws -> String {
         try String(contentsOfFile: path, encoding: .utf8)
     }
 }

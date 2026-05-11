@@ -1,7 +1,7 @@
 import Foundation
 import RegexBuilder
 
-class OutputParser {
+public class OutputParser {
     private var errors: [BuildError] = []
     private var warnings: [BuildWarning] = []
     private var failedTests: [FailedTest] = []
@@ -52,11 +52,13 @@ class OutputParser {
     private var shouldParseXcbeautify: Bool = false  // Parse xcbeautify-formatted input
     private var xcbeautifyHintEmitted: Bool = false  // Emit auto-detection hint only once
     /// Testable property: whether the xcbeautify auto-detection hint was emitted
-    private(set) var didEmitXcbeautifyHint: Bool = false
+    public private(set) var didEmitXcbeautifyHint: Bool = false
 
     // Dependency graph tracking
     private var targetDependencies: [String: [String]] = [:]  // target -> [dependencies]
     private var currentDependencyTarget: String?  // For multi-line dependency parsing
+
+    public init() {}
 
     // MARK: - Static Regex Patterns (compiled once)
 
@@ -350,7 +352,7 @@ class OutputParser {
         Anchor.endOfSubject
     }
 
-    func parse(
+    public func parse(
         input: String,
         printWarnings: Bool = false,
         warningsAsErrors: Bool = false,
@@ -426,7 +428,8 @@ class OutputParser {
                     errors[lastIndex] = BuildError(
                         file: nil,
                         line: nil,
-                        message: combinedMessage
+                        message: combinedMessage,
+                        column: nil
                     )
                 }
             }
@@ -443,7 +446,8 @@ class OutputParser {
                     BuildError(
                         file: warning.file,
                         line: warning.line,
-                        message: warning.message
+                        message: warning.message,
+                        column: nil
                     )
                 )
             }
@@ -646,7 +650,7 @@ class OutputParser {
         return Array(sorted.prefix(limit).map { $0.name })
     }
 
-    func extractTestedTarget(from input: String) -> String? {
+    public func extractTestedTarget(from input: String) -> String? {
         let lines = input.split(separator: "\n")
 
         for line in lines {
@@ -1468,10 +1472,10 @@ class OutputParser {
             } else if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
                 // file:line: error: message
                 let file = components[0 ..< (components.count - 1)].joined(separator: ":")
-                return BuildError(file: file, line: lineNum, message: message)
+                return BuildError(file: file, line: lineNum, message: message, column: nil)
             } else {
                 // file: error: message
-                return BuildError(file: beforeError, line: nil, message: message)
+                return BuildError(file: beforeError, line: nil, message: message, column: nil)
             }
         }
 
@@ -1483,9 +1487,9 @@ class OutputParser {
             let components = beforeError.split(separator: ":", omittingEmptySubsequences: false)
             if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
                 let file = components[0 ..< (components.count - 1)].joined(separator: ":")
-                return BuildError(file: file, line: lineNum, message: message)
+                return BuildError(file: file, line: lineNum, message: message, column: nil)
             } else {
-                return BuildError(file: beforeError, line: nil, message: message)
+                return BuildError(file: beforeError, line: nil, message: message, column: nil)
             }
         }
 
@@ -1495,25 +1499,25 @@ class OutputParser {
             let components = beforeFatal.split(separator: ":", omittingEmptySubsequences: false)
             if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
                 let file = components[0 ..< (components.count - 1)].joined(separator: ":")
-                return BuildError(file: file, line: lineNum, message: "Fatal error")
+                return BuildError(file: file, line: lineNum, message: "Fatal error", column: nil)
             }
         }
 
         // Pattern: ❌ message
         if line.hasPrefix(XcodebuildSymbols.emojiError + " ") {
             let message = String(line.dropFirst(2))
-            return BuildError(file: nil, line: nil, message: message)
+            return BuildError(file: nil, line: nil, message: message, column: nil)
         }
 
         // Pattern: error: message (simple)
         if line.hasPrefix("error: ") {
             let message = String(line.dropFirst(7))
-            return BuildError(file: nil, line: nil, message: message)
+            return BuildError(file: nil, line: nil, message: message, column: nil)
         }
 
         // Pattern: Command PhaseScriptExecution failed with a nonzero exit code
         if line.contains("Command PhaseScriptExecution failed with a nonzero exit") {
-            return BuildError(file: nil, line: nil, message: line)
+            return BuildError(file: nil, line: nil, message: line, column: nil)
         }
 
         return nil
