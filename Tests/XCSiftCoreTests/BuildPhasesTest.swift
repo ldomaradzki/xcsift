@@ -1,5 +1,5 @@
 import XCTest
-@testable import xcsift
+import XCSiftCore
 
 class BuildPhasesTest: XCTestCase {
     let parser = OutputParser()

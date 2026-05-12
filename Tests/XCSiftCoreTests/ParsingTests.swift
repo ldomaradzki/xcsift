@@ -1,5 +1,5 @@
-@testable import xcsift
 import XCTest
+import XCSiftCore
 
 /// Tests for basic parsing functionality: errors, warnings, tests, and build output
 final class ParsingTests: XCTestCase {

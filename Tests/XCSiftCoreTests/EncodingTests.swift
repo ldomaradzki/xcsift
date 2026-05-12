@@ -1,6 +1,6 @@
 import XCTest
 import ToonFormat
-@testable import xcsift
+import XCSiftCore
 
 /// Tests for JSON/TOON encoding and optional fields handling
 final class EncodingTests: XCTestCase {

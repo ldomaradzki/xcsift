@@ -1,6 +1,5 @@
 import XCTest
-
-@testable import xcsift
+import XCSiftCore
 
 /// Tests for linker error parsing functionality
 final class LinkerErrorTests: XCTestCase {

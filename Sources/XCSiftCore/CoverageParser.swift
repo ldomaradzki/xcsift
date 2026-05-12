@@ -1,10 +1,10 @@
 import Foundation
 
-struct CoverageParser {
+public struct CoverageParser {
     let fileSystem: FileSystemProtocol
     let shellRunner: ShellRunnerProtocol
 
-    init(
+    public init(
         fileSystem: FileSystemProtocol = FileManager.default,
         shellRunner: ShellRunnerProtocol = DefaultShellRunner()
     ) {
@@ -14,7 +14,7 @@ struct CoverageParser {
 
     // MARK: - Main Entry Point
 
-    func parseCoverageFromPath(_ path: String, targetFilter: String? = nil) -> CodeCoverage? {
+    public func parseCoverageFromPath(_ path: String, targetFilter: String? = nil) -> CodeCoverage? {
         let coveragePath: String
 
         // If explicit path provided and exists, use it
@@ -436,7 +436,7 @@ struct CoverageParser {
 // MARK: - Static API for backward compatibility
 
 extension CoverageParser {
-    static func parseCoverageFromPath(_ path: String, targetFilter: String? = nil) -> CodeCoverage? {
+    public static func parseCoverageFromPath(_ path: String, targetFilter: String? = nil) -> CodeCoverage? {
         CoverageParser().parseCoverageFromPath(path, targetFilter: targetFilter)
     }
 }

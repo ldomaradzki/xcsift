@@ -1,13 +1,15 @@
 import Foundation
 
 /// Protocol for shell command execution, enabling dependency injection for testing
-protocol ShellRunnerProtocol {
+public protocol ShellRunnerProtocol {
     func run(_ command: String, args: [String]) -> String?
 }
 
 /// Default implementation that executes real shell commands
-struct DefaultShellRunner: ShellRunnerProtocol {
-    func run(_ command: String, args: [String]) -> String? {
+public struct DefaultShellRunner: ShellRunnerProtocol {
+    public init() {}
+
+    public func run(_ command: String, args: [String]) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = [command] + args
