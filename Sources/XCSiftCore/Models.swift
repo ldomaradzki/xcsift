@@ -1,23 +1,23 @@
 import Foundation
 
-struct BuildResult: Codable {
-    let status: String
-    let summary: BuildSummary
-    let errors: [BuildError]
-    let warnings: [BuildWarning]
-    let failedTests: [FailedTest]
-    let linkerErrors: [LinkerError]
-    let coverage: CodeCoverage?
-    let slowTests: [SlowTest]
-    let flakyTests: [String]
-    let buildInfo: BuildInfo?
-    let executables: [Executable]
-    let printWarnings: Bool
-    let printCoverageDetails: Bool
-    let printBuildInfo: Bool
-    let printExecutables: Bool
+public struct BuildResult: Codable {
+    public let status: String
+    public let summary: BuildSummary
+    public let errors: [BuildError]
+    public let warnings: [BuildWarning]
+    public let failedTests: [FailedTest]
+    public let linkerErrors: [LinkerError]
+    public let coverage: CodeCoverage?
+    public let slowTests: [SlowTest]
+    public let flakyTests: [String]
+    public let buildInfo: BuildInfo?
+    public let executables: [Executable]
+    public let printWarnings: Bool
+    public let printCoverageDetails: Bool
+    public let printBuildInfo: Bool
+    public let printExecutables: Bool
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case status, summary, errors, warnings, coverage, executables
         case failedTests = "failed_tests"
         case linkerErrors = "linker_errors"
@@ -26,7 +26,7 @@ struct BuildResult: Codable {
         case buildInfo = "build_info"
     }
 
-    init(
+    public init(
         status: String,
         summary: BuildSummary,
         errors: [BuildError],
@@ -60,7 +60,7 @@ struct BuildResult: Codable {
         self.printExecutables = printExecutables
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         status = try container.decode(String.self, forKey: .status)
         summary = try container.decode(BuildSummary.self, forKey: .summary)
@@ -79,7 +79,7 @@ struct BuildResult: Codable {
         printExecutables = false
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(status, forKey: .status)
         try container.encode(summary, forKey: .summary)
@@ -127,7 +127,7 @@ struct BuildResult: Codable {
     // MARK: - GitHub Actions Output
 
     /// Formats the build result as GitHub Actions workflow commands
-    func formatGitHubActions() -> String {
+    public func formatGitHubActions() -> String {
         var output: [String] = []
 
         // Format errors as ::error commands
@@ -254,20 +254,20 @@ struct BuildResult: Codable {
     }
 }
 
-struct BuildSummary: Codable {
-    let errors: Int
-    let warnings: Int
-    let failedTests: Int
-    let linkerErrors: Int
-    let passedTests: Int?
-    let buildTime: String?
-    let testTime: String?
-    let coveragePercent: Double?
-    let slowTests: Int?
-    let flakyTests: Int?
-    let executables: Int?
+public struct BuildSummary: Codable {
+    public let errors: Int
+    public let warnings: Int
+    public let failedTests: Int
+    public let linkerErrors: Int
+    public let passedTests: Int?
+    public let buildTime: String?
+    public let testTime: String?
+    public let coveragePercent: Double?
+    public let slowTests: Int?
+    public let flakyTests: Int?
+    public let executables: Int?
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case errors
         case warnings
         case failedTests = "failed_tests"
@@ -281,7 +281,7 @@ struct BuildSummary: Codable {
         case executables
     }
 
-    init(
+    public init(
         errors: Int,
         warnings: Int,
         failedTests: Int,
@@ -307,7 +307,7 @@ struct BuildSummary: Codable {
         self.executables = executables
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(errors, forKey: .errors)
         try container.encode(warnings, forKey: .warnings)
@@ -339,39 +339,46 @@ struct BuildSummary: Codable {
     }
 }
 
-struct BuildError: Codable {
-    let file: String?
-    let line: Int?
-    let message: String
+public struct BuildError: Codable {
+    public let file: String?
+    public let line: Int?
+    public let message: String
 
     // Internal only - used for GitHub Actions format, not encoded to JSON/TOON
-    var column: Int? = nil
+    public var column: Int? = nil
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case file, line, message
+    }
+
+    public init(file: String?, line: Int?, message: String, column: Int?) {
+        self.file = file
+        self.line = line
+        self.message = message
+        self.column = column
     }
 }
 
-enum WarningType: String, Codable {
+public enum WarningType: String, Codable {
     case compile
     case runtime
     case swiftui
 }
 
-struct BuildWarning: Codable {
-    let file: String?
-    let line: Int?
-    let message: String
-    let type: WarningType
+public struct BuildWarning: Codable {
+    public let file: String?
+    public let line: Int?
+    public let message: String
+    public let type: WarningType
 
     // Internal only - used for GitHub Actions format, not encoded to JSON/TOON
-    var column: Int? = nil
+    public var column: Int? = nil
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case file, line, message, type
     }
 
-    init(file: String?, line: Int?, message: String, type: WarningType = .compile, column: Int? = nil) {
+    public init(file: String?, line: Int?, message: String, type: WarningType = .compile, column: Int? = nil) {
         self.file = file
         self.line = line
         self.message = message
@@ -380,21 +387,21 @@ struct BuildWarning: Codable {
     }
 }
 
-struct FailedTest: Codable {
-    let test: String
-    let message: String
-    let file: String?
-    let line: Int?
-    let duration: Double?
+public struct FailedTest: Codable {
+    public let test: String
+    public let message: String
+    public let file: String?
+    public let line: Int?
+    public let duration: Double?
 
     // Internal only - used for GitHub Actions format, not encoded to JSON/TOON
-    var column: Int? = nil
+    public var column: Int? = nil
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case test, message, file, line, duration
     }
 
-    init(test: String, message: String, file: String?, line: Int?, duration: Double? = nil) {
+    public init(test: String, message: String, file: String?, line: Int?, duration: Double? = nil) {
         self.test = test
         self.message = message
         self.file = file
@@ -404,24 +411,37 @@ struct FailedTest: Codable {
     }
 }
 
-struct CodeCoverage: Codable {
-    let lineCoverage: Double
-    let files: [FileCoverage]
+public struct CodeCoverage: Codable {
+    public let lineCoverage: Double
+    public let files: [FileCoverage]
 
-    enum CodingKeys: String, CodingKey {
+    public init(lineCoverage: Double, files: [FileCoverage]) {
+        self.lineCoverage = lineCoverage
+        self.files = files
+    }
+
+    public enum CodingKeys: String, CodingKey {
         case lineCoverage = "line_coverage"
         case files
     }
 }
 
-struct FileCoverage: Codable {
-    let path: String
-    let name: String
-    let lineCoverage: Double
-    let coveredLines: Int
-    let executableLines: Int
+public struct FileCoverage: Codable {
+    public let path: String
+    public let name: String
+    public let lineCoverage: Double
+    public let coveredLines: Int
+    public let executableLines: Int
 
-    enum CodingKeys: String, CodingKey {
+    public init(path: String, name: String, lineCoverage: Double, coveredLines: Int, executableLines: Int) {
+        self.path = path
+        self.name = name
+        self.lineCoverage = lineCoverage
+        self.coveredLines = coveredLines
+        self.executableLines = executableLines
+    }
+
+    public enum CodingKeys: String, CodingKey {
         case path
         case name
         case lineCoverage = "line_coverage"
@@ -430,14 +450,14 @@ struct FileCoverage: Codable {
     }
 }
 
-struct LinkerError: Codable {
-    let symbol: String
-    let architecture: String
-    let referencedFrom: String
-    let message: String
-    let conflictingFiles: [String]
+public struct LinkerError: Codable {
+    public let symbol: String
+    public let architecture: String
+    public let referencedFrom: String
+    public let message: String
+    public let conflictingFiles: [String]
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case symbol
         case architecture
         case referencedFrom = "referenced_from"
@@ -445,7 +465,7 @@ struct LinkerError: Codable {
         case conflictingFiles = "conflicting_files"
     }
 
-    init(symbol: String, architecture: String, referencedFrom: String, message: String = "") {
+    public init(symbol: String, architecture: String, referencedFrom: String, message: String = "") {
         self.symbol = symbol
         self.architecture = architecture
         self.referencedFrom = referencedFrom
@@ -453,7 +473,7 @@ struct LinkerError: Codable {
         self.conflictingFiles = []
     }
 
-    init(message: String) {
+    public init(message: String) {
         self.symbol = ""
         self.architecture = ""
         self.referencedFrom = ""
@@ -461,7 +481,7 @@ struct LinkerError: Codable {
         self.conflictingFiles = []
     }
 
-    init(symbol: String, architecture: String, conflictingFiles: [String]) {
+    public init(symbol: String, architecture: String, conflictingFiles: [String]) {
         self.symbol = symbol
         self.architecture = architecture
         self.referencedFrom = ""
@@ -470,35 +490,35 @@ struct LinkerError: Codable {
     }
 }
 
-struct SlowTest: Codable {
-    let test: String
-    let duration: Double
+public struct SlowTest: Codable {
+    public let test: String
+    public let duration: Double
 }
 
 // MARK: - Build Info (Phases + Timing per target)
 // Note: Total build time is already in BuildSummary.buildTime, so not duplicated here
 
-struct BuildInfo: Codable {
-    let targets: [TargetBuildInfo]
-    let slowestTargets: [String]
+public struct BuildInfo: Codable {
+    public let targets: [TargetBuildInfo]
+    public let slowestTargets: [String]
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case targets
         case slowestTargets = "slowest_targets"
     }
 
-    init(targets: [TargetBuildInfo] = [], slowestTargets: [String] = []) {
+    public init(targets: [TargetBuildInfo] = [], slowestTargets: [String] = []) {
         self.targets = targets
         self.slowestTargets = slowestTargets
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         targets = try container.decodeIfPresent([TargetBuildInfo].self, forKey: .targets) ?? []
         slowestTargets = try container.decodeIfPresent([String].self, forKey: .slowestTargets) ?? []
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         if !targets.isEmpty {
             try container.encode(targets, forKey: .targets)
@@ -509,25 +529,25 @@ struct BuildInfo: Codable {
     }
 }
 
-struct TargetBuildInfo: Codable {
-    let name: String
-    let duration: String?
-    let phases: [String]
-    let dependsOn: [String]
+public struct TargetBuildInfo: Codable {
+    public let name: String
+    public let duration: String?
+    public let phases: [String]
+    public let dependsOn: [String]
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case name, duration, phases
         case dependsOn = "depends_on"
     }
 
-    init(name: String, duration: String? = nil, phases: [String] = [], dependsOn: [String] = []) {
+    public init(name: String, duration: String? = nil, phases: [String] = [], dependsOn: [String] = []) {
         self.name = name
         self.duration = duration
         self.phases = phases
         self.dependsOn = dependsOn
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         name = try container.decode(String.self, forKey: .name)
         duration = try container.decodeIfPresent(String.self, forKey: .duration)
@@ -535,7 +555,7 @@ struct TargetBuildInfo: Codable {
         dependsOn = try container.decodeIfPresent([String].self, forKey: .dependsOn) ?? []
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(name, forKey: .name)
         if let duration = duration {
@@ -550,8 +570,8 @@ struct TargetBuildInfo: Codable {
     }
 }
 
-struct Executable: Codable {
-    let path: String
-    let name: String
-    let target: String
+public struct Executable: Codable {
+    public let path: String
+    public let name: String
+    public let target: String
 }

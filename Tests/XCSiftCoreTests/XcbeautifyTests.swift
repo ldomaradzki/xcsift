@@ -1,7 +1,6 @@
 import Foundation
 import XCTest
-
-@testable import xcsift
+import XCSiftCore
 
 // MARK: - xcbeautify Error Parsing Tests
 

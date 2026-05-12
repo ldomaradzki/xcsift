@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import XCSiftCore
 #if canImport(Darwin)
     import Darwin
 #elseif canImport(Glibc)

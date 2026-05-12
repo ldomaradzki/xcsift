@@ -1,5 +1,5 @@
 import XCTest
-@testable import xcsift
+import XCSiftCore
 
 /// Tests for GitHub Actions format output
 ///

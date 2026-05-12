@@ -1,5 +1,7 @@
 import Foundation
 import XCTest
+import XCSiftCore
+import TestUtils
 
 @testable import xcsift
 

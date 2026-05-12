@@ -1,7 +1,6 @@
 import ToonFormat
 import XCTest
-
-@testable import xcsift
+import XCSiftCore
 
 /// Tests for unified build info (phases + timing) extraction
 final class BuildInfoTests: XCTestCase {

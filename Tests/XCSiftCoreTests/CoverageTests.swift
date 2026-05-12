@@ -1,5 +1,6 @@
 import XCTest
-@testable import xcsift
+import XCSiftCore
+import TestUtils
 
 /// Tests for code coverage functionality
 final class CoverageTests: XCTestCase {
