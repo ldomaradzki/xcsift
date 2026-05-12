@@ -25,6 +25,9 @@ swift test
 swift format --recursive --in-place .
 ```
 
+### Commit Style
+Use [Conventional Commits](https://www.conventionalcommits.org/): `fix:`, `feat:`, `docs:`, `chore:`, `refactor:`, `test:`. See `git log --oneline` for examples.
+
 ### Installation
 
 **Homebrew (Recommended):**
@@ -516,6 +519,10 @@ When modifying code, ensure Linux compatibility:
 - Use conditional imports: `#if canImport(Darwin)` / `#elseif canImport(Glibc)` / `#elseif canImport(Musl)`
 - Avoid `fputs(..., stderr)` — use `FileHandle.standardError.write()` for Swift 6 concurrency safety
 - CI runs on both macOS and Linux (see `.github/workflows/ci.yml`)
+
+### Swift 6 Concurrency
+
+- Capturing a mutable `var` in a `@Sendable` closure is rejected by strict concurrency. For shared mutable state across `@Sendable` closures (e.g. `Pipe.readabilityHandler`, `DispatchQueue.async`, `DispatchSourceTimer` event handlers), wrap the state in a `final class … @unchecked Sendable` and gate every read/write with an `NSLock`.
 
 ## Output Formats
 

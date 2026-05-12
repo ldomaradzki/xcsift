@@ -24,6 +24,15 @@ struct InstallClaudeCode: ParsableCommand {
             Requirements:
               - Claude Code CLI must be installed
               - Internet connection to access GitHub marketplace
+              - Working git authentication for github.com (HTTPS credential
+                helper or SSH key). If git would prompt for credentials, the
+                install fails fast with guidance instead of hanging.
+
+            Troubleshooting:
+              If `claude plugin marketplace add` hangs or asks for
+              credentials, run it manually to see git's actual prompt:
+                  claude plugin marketplace add ldomaradzki/xcsift
+                  claude plugin install xcsift
 
             After installation, xcodebuild and swift build commands will
             automatically be piped through xcsift for structured output.
