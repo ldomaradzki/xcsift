@@ -1,6 +1,16 @@
 import Foundation
 import RegexBuilder
 
+/// Parses a complete xcodebuild or SPM output string and returns a structured ``BuildResult``.
+///
+/// `OutputParser` drives ``LineParser`` internally, accumulating and deduplicating events across
+/// all lines before producing a single ``BuildResult``. Use this when you have the full build
+/// output in memory rather than streaming it line-by-line.
+///
+/// ```swift
+/// let result = OutputParser().parse(input: rawOutput, printWarnings: true)
+/// let json = try JSONEncoder().encode(result)
+/// ```
 public class OutputParser {
 
     private struct ParseState {
@@ -38,7 +48,7 @@ public class OutputParser {
 
     private var state = ParseState()
 
-    // Forwarded from the most recent LineParser run
+    /// `true` if the most recent ``parse(input:printWarnings:warningsAsErrors:coverage:printCoverageDetails:slowThreshold:printBuildInfo:printExecutables:xcbeautify:)`` call caused an xcbeautify auto-detection hint to be written to stderr.
     public private(set) var didEmitXcbeautifyHint: Bool = false
 
     // Target regex for extractTestedTarget (used externally)
@@ -50,6 +60,28 @@ public class OutputParser {
 
     public init() {}
 
+    /// Parses raw xcodebuild or SPM output and returns a structured ``BuildResult``.
+    ///
+    /// The method is stateless across calls — each invocation resets internal accumulators —
+    /// so a single `OutputParser` instance can be reused for multiple runs.
+    ///
+    /// - Parameters:
+    ///   - input: The complete build output as a single string (typically captured from stderr).
+    ///   - printWarnings: When `true`, the returned `BuildResult` includes the full warnings list;
+    ///     when `false` (default), only the warning count appears in the summary.
+    ///   - warningsAsErrors: When `true`, every warning is converted to an error and the warnings
+    ///     list is cleared, mirroring `-Werror` behavior.
+    ///   - coverage: Pre-parsed ``CodeCoverage`` data to embed in the result. Pass `nil` (default)
+    ///     when coverage is not needed.
+    ///   - printCoverageDetails: When `true`, per-file coverage details are included in the result;
+    ///     when `false` (default), only the summary percentage is included.
+    ///   - slowThreshold: Tests whose duration exceeds this value (in seconds) are reported as slow.
+    ///     Pass `nil` (default) to disable slow-test detection.
+    ///   - printBuildInfo: When `true`, per-target phases, durations, and dependency graph data are
+    ///     included in the result.
+    ///   - printExecutables: When `true`, the executables list is populated in the result.
+    ///   - xcbeautify: Pass `true` when the input was pre-processed by xcbeautify or Tuist.
+    /// - Returns: A ``BuildResult`` representing the parsed build state.
     public func parse(
         input: String,
         printWarnings: Bool = false,
@@ -363,6 +395,15 @@ public class OutputParser {
         return Array(sorted.prefix(limit).map { $0.name })
     }
 
+    /// Extracts the name of the tested target from xcodebuild output.
+    ///
+    /// Scans for a `Test Suite '*.xctest' started` line and derives the target name by stripping
+    /// the `.xctest` suffix and an optional `Tests` suffix (e.g. `MyAppTests.xctest` → `MyApp`).
+    ///
+    /// This is used internally by ``CoverageParser`` to filter coverage data to the relevant target.
+    ///
+    /// - Parameter input: Raw xcodebuild or SPM output.
+    /// - Returns: The inferred target name, or `nil` if no `.xctest` suite line was found.
     public func extractTestedTarget(from input: String) -> String? {
         let lines = input.split(separator: "\n")
         for line in lines {

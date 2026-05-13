@@ -3,42 +3,77 @@ import RegexBuilder
 
 // MARK: - Public API
 
+/// An event emitted by ``LineParser`` when a line of build output is recognized.
 public enum ParseEvent {
     // Compile / link
+    /// A compiler or tool error was detected.
     case error(BuildError)
+    /// A compiler warning was detected.
     case warning(BuildWarning)
+    /// A linker error was detected (undefined symbol, duplicate symbol, or missing framework/library).
     case linkerError(LinkerError)
 
     // Test lifecycle
+    /// A test case began execution.
     case testStarted(name: String)
+    /// A test case passed.
     case testPassed(name: String, duration: Double?)
+    /// A test case failed.
     case testFailed(FailedTest)
 
     // Test run summaries
+    /// An XCTest bundle completed; carries executed/failed totals and duration for that bundle.
     case testSuiteCompleted(suiteName: String, executed: Int, failed: Int, duration: Double)
+    /// A Swift Testing run completed; carries aggregate totals across all suites.
     case swiftTestingCompleted(executed: Int, failed: Int, duration: Double)
+    /// A parallel test slot was scheduled.
     case parallelTestScheduled(index: Int, total: Int)
 
     // Build timing / status
+    /// The overall build duration string extracted from the build output (e.g. `"1.234 seconds"`).
     case buildTime(String)
+    /// The test runner exited with a non-zero status without an explicit per-test failure line.
     case testRunFailed
 
     // Build info
+    /// A build phase was observed for a named target.
     case buildPhase(target: String, phase: String)
+    /// A target finished building and reported its duration.
     case targetCompleted(name: String, duration: String)
+    /// A dependency edge was parsed from the xcodebuild dependency graph.
     case targetDependency(target: String, dependsOn: String)
-    case targetDiscovered(name: String)  // target appeared in dependency graph header
+    /// A target name appeared as a header in the xcodebuild dependency graph.
+    case targetDiscovered(name: String)
 
     // Executables
+    /// An executable app bundle was registered or validated during the build.
     case executable(Executable)
 }
 
+/// The outcome of feeding a single line to ``LineParser/feed(_:)``.
 public enum LineResult {
+    /// The line (or a previously buffered line) produced a ``ParseEvent``.
     case consumed(ParseEvent)
+    /// The line is being held pending a look-ahead; no event is available yet.
     case buffering
+    /// The line did not match any recognized pattern and was discarded.
     case ignored
 }
 
+/// Parses raw xcodebuild/SPM output lines one at a time, emitting structured ``ParseEvent`` values.
+///
+/// `LineParser` is a streaming state machine. Feed lines via ``feed(_:)`` and call ``flush()``
+/// after the last line to drain buffered state (look-ahead windows, in-flight crash detection).
+///
+/// ```swift
+/// let parser = LineParser()
+/// for line in output.split(separator: "\n") {
+///     if case .consumed(let event) = parser.feed(String(line)) {
+///         handle(event)
+///     }
+/// }
+/// for event in parser.flush() { handle(event) }
+/// ```
 public class LineParser {
 
     // MARK: - Multi-line linker state
@@ -65,17 +100,40 @@ public class LineParser {
     // MARK: - xcbeautify
     private let shouldParseXcbeautify: Bool
     private var xcbeautifyHintEmitted: Bool = false
+
+    /// `true` if the parser wrote an xcbeautify auto-detection hint to stderr during parsing.
+    ///
+    /// Set when xcbeautify-formatted markers are encountered while `xcbeautify` mode is off.
+    /// Useful in tests to assert that the hint was (or was not) emitted.
     public private(set) var didEmitXcbeautifyHint: Bool = false
 
     // MARK: - Event queue (events waiting to be delivered one per feed() call)
     private var eventQueue: [ParseEvent] = []
 
+    /// Creates a new `LineParser`.
+    ///
+    /// - Parameter xcbeautify: Pass `true` when the input was pre-processed by xcbeautify or Tuist.
+    ///   Enables parsing of `[x]`/`❌` error markers, `[!]`/`⚠️` warning markers, and `✔`/`✖` test markers.
     public init(xcbeautify: Bool = false) {
         self.shouldParseXcbeautify = xcbeautify
     }
 
     // MARK: - Public interface
 
+    /// Feeds one line of build output to the parser and returns the result.
+    ///
+    /// Most callers process each line in a loop:
+    /// ```swift
+    /// if case .consumed(let event) = parser.feed(line) { ... }
+    /// ```
+    ///
+    /// The method may return `.buffering` when look-ahead is needed (e.g. Swift Testing
+    /// `#expect` comments that span two consecutive lines). Call ``flush()`` after the
+    /// final line to retrieve any events still in the buffer.
+    ///
+    /// - Parameter line: A single line of raw build output (no trailing newline required).
+    /// - Returns: `.consumed(event)` when a ``ParseEvent`` was produced, `.buffering` when
+    ///   the line was held for look-ahead, or `.ignored` when no pattern matched.
     public func feed(_ line: String) -> LineResult {
         if !eventQueue.isEmpty {
             // Drain one queued event; schedule current line for next call.
@@ -166,6 +224,14 @@ public class LineParser {
         return event.map { .consumed($0) } ?? .ignored
     }
 
+    /// Flushes all buffered state and returns any remaining events.
+    ///
+    /// Call this once after ``feed(_:)`` has been called for every line. The method drains:
+    /// - The internal event queue
+    /// - Any look-ahead–buffered line that hasn't been emitted yet
+    /// - A synthetic `testFailed` crash event when a test was in flight at process exit
+    ///
+    /// - Returns: Zero or more ``ParseEvent`` values representing buffered output.
     public func flush() -> [ParseEvent] {
         var result: [ParseEvent] = eventQueue
         eventQueue = []
