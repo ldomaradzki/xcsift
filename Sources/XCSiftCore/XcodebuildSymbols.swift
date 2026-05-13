@@ -38,6 +38,9 @@ enum XcodebuildSymbols {
     static let swiftTestingPass = "✓"
     static let swiftTestingFail = "✘"
     static let emojiError = "❌"
+    // U+100135 (macOS PUA) / U+21B3 (Linux) — carries #expect custom comment on the line after recorded-issue
+    static let swiftTestingDetailsPrefix = "􀄵"
+    static let swiftTestingDetailsPrefixFallback = "↳"
 
     // Build status
     static let buildSucceeded = "** BUILD SUCCEEDED **"
