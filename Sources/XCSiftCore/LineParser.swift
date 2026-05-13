@@ -137,9 +137,9 @@ public class LineParser {
     public func feed(_ line: String) -> LineResult {
         if !eventQueue.isEmpty {
             // Drain one queued event; schedule current line for next call.
-            let e = eventQueue.removeFirst()
+            let queued = eventQueue.removeFirst()
             enqueueFromLine(line)
-            return .consumed(e)
+            return .consumed(queued)
         }
         if pendingRecordedIssueLine != nil { return flushRecordedIssue(currentLine: line) }
         return normalFeed(line)
@@ -150,8 +150,8 @@ public class LineParser {
         updateLookBackBuffer(line)
         if line.contains(XcodebuildSymbols.recordedIssue) {
             pendingRecordedIssueLine = line
-        } else if let e = processLine(line) {
-            eventQueue.append(e)
+        } else if let event = processLine(line) {
+            eventQueue.append(event)
         }
     }
 
@@ -166,23 +166,23 @@ public class LineParser {
             trimmed.hasPrefix(XcodebuildSymbols.swiftTestingDetailsPrefix)
             || trimmed.hasPrefix(XcodebuildSymbols.swiftTestingDetailsPrefixFallback)
         if isCommentContinuation {
-            if let event = buffered, case .testFailed(let t) = event {
+            if let event = buffered, case .testFailed(let failed) = event {
                 let comment = String(
                     trimmed.drop(while: { $0 != " " }).drop(while: { $0 == " " })
                 )
                 let amended = FailedTest(
-                    test: t.test,
-                    message: comment.isEmpty ? t.message : t.message + ": " + comment,
-                    file: t.file,
-                    line: t.line,
-                    duration: t.duration
+                    test: failed.test,
+                    message: comment.isEmpty ? failed.message : failed.message + ": " + comment,
+                    file: failed.file,
+                    line: failed.line,
+                    duration: failed.duration
                 )
                 return .consumed(.testFailed(amended))
             }
             return buffered.map { .consumed($0) } ?? .ignored
         } else {
             // Current line is unrelated — enqueue its result, emit buffered now.
-            if let e = processLine(line) { eventQueue.append(e) }
+            if let overflow = processLine(line) { eventQueue.append(overflow) }
             return buffered.map { .consumed($0) } ?? .ignored
         }
     }
@@ -199,7 +199,7 @@ public class LineParser {
 
         // PhaseScriptExecution look-back: enrich the error message with preceding context.
         if line.contains("Command PhaseScriptExecution failed with a nonzero exit"),
-            case .error(let e) = event, e.message == line
+            case .error(let error) = event, error.message == line
         {
             var contextLines: [String] = []
             for contextLine in lookBackBuffer {
@@ -236,7 +236,7 @@ public class LineParser {
         var result: [ParseEvent] = eventQueue
         eventQueue = []
         if let pending = pendingRecordedIssueLine {
-            if let e = processLine(pending) { result.append(e) }
+            if let event = processLine(pending) { result.append(event) }
             pendingRecordedIssueLine = nil
         }
         // If a test was in-flight when the run ended without a crash-confirmation line,
@@ -363,10 +363,10 @@ public class LineParser {
         if let exec = parseExecutable(line) { return .executable(exec) }
 
         // Failed test
-        if let t = parseFailedTest(line) { return .testFailed(t) }
+        if let failed = parseFailedTest(line) { return .testFailed(failed) }
 
         // Error
-        if let e = parseError(line) {
+        if let error = parseError(line) {
             // Fatal error + lastStartedTestName → also emit a synthetic testFailed (matches original)
             if line.contains("Fatal error"), let testName = lastStartedTestName {
                 lastStartedTestName = nil
@@ -375,18 +375,18 @@ public class LineParser {
                         FailedTest(
                             test: testName,
                             message: "Crashed (Fatal error): last test started before crash",
-                            file: e.file,
-                            line: e.line
+                            file: error.file,
+                            line: error.line
                         )
                     )
                 )
             }
-            return .error(e)
+            return .error(error)
         }
 
         // Warning
-        if let w = parseWarning(line) { return .warning(w) }
-        if let w = parseRuntimeWarning(line) { return .warning(w) }
+        if let warning = parseWarning(line) { return .warning(warning) }
+        if let warning = parseRuntimeWarning(line) { return .warning(warning) }
 
         // Passed test
         if let (name, duration) = parsePassedTest(line) { return .testPassed(name: name, duration: duration) }

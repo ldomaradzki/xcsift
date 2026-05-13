@@ -16,12 +16,12 @@ final class LineParserTests: XCTestCase {
     func testError() {
         let parser = LineParser()
         let result = parser.feed("main.swift:10:5: error: use of undeclared identifier 'foo'")
-        guard case .consumed(let event) = result, case .error(let e) = event else {
+        guard case .consumed(let event) = result, case .error(let error) = event else {
             return XCTFail("Expected .consumed(.error), got \(result)")
         }
-        XCTAssertEqual(e.file, "main.swift")
-        XCTAssertEqual(e.line, 10)
-        XCTAssertEqual(e.message, "use of undeclared identifier 'foo'")
+        XCTAssertEqual(error.file, "main.swift")
+        XCTAssertEqual(error.line, 10)
+        XCTAssertEqual(error.message, "use of undeclared identifier 'foo'")
     }
 
     // MARK: - Warning
@@ -29,12 +29,12 @@ final class LineParserTests: XCTestCase {
     func testWarning() {
         let parser = LineParser()
         let result = parser.feed("Foo.swift:3:1: warning: unused variable 'x'")
-        guard case .consumed(let event) = result, case .warning(let w) = event else {
+        guard case .consumed(let event) = result, case .warning(let warning) = event else {
             return XCTFail("Expected .consumed(.warning), got \(result)")
         }
-        XCTAssertEqual(w.file, "Foo.swift")
-        XCTAssertEqual(w.line, 3)
-        XCTAssertEqual(w.message, "unused variable 'x'")
+        XCTAssertEqual(warning.file, "Foo.swift")
+        XCTAssertEqual(warning.line, 3)
+        XCTAssertEqual(warning.message, "unused variable 'x'")
     }
 
     // MARK: - Failed test
@@ -44,10 +44,10 @@ final class LineParserTests: XCTestCase {
         let result = parser.feed(
             "Test Case '-[MyModule.MyTests testFoo]' failed (0.123 seconds)."
         )
-        guard case .consumed(let event) = result, case .testFailed(let t) = event else {
+        guard case .consumed(let event) = result, case .testFailed(let failed) = event else {
             return XCTFail("Expected .consumed(.testFailed), got \(result)")
         }
-        XCTAssertEqual(t.test, "-[MyModule.MyTests testFoo]")
+        XCTAssertEqual(failed.test, "-[MyModule.MyTests testFoo]")
     }
 
     // MARK: - Passed test
@@ -89,12 +89,12 @@ final class LineParserTests: XCTestCase {
             .ignored
         )
         let result = parser.feed("      objc-class-ref in SomeFile.o")
-        guard case .consumed(let event) = result, case .linkerError(let e) = event else {
+        guard case .consumed(let event) = result, case .linkerError(let linkerError) = event else {
             return XCTFail("Expected .consumed(.linkerError), got \(result)")
         }
-        XCTAssertEqual(e.symbol, "_MissingSymbol")
-        XCTAssertEqual(e.architecture, "arm64")
-        XCTAssertEqual(e.referencedFrom, "SomeFile.o")
+        XCTAssertEqual(linkerError.symbol, "_MissingSymbol")
+        XCTAssertEqual(linkerError.architecture, "arm64")
+        XCTAssertEqual(linkerError.referencedFrom, "SomeFile.o")
     }
 
     // MARK: - Linker: duplicate symbol (multi-line)
@@ -105,11 +105,11 @@ final class LineParserTests: XCTestCase {
         XCTAssertEqual(parser.feed("    /path/to/FileA.o"), .ignored)
         XCTAssertEqual(parser.feed("    /path/to/FileB.o"), .ignored)
         let result = parser.feed("ld: 1 duplicate symbol for architecture arm64")
-        guard case .consumed(let event) = result, case .linkerError(let e) = event else {
+        guard case .consumed(let event) = result, case .linkerError(let linkerError) = event else {
             return XCTFail("Expected .consumed(.linkerError), got \(result)")
         }
-        XCTAssertEqual(e.symbol, "_dupVar")
-        XCTAssertEqual(e.conflictingFiles.count, 2)
+        XCTAssertEqual(linkerError.symbol, "_dupVar")
+        XCTAssertEqual(linkerError.conflictingFiles.count, 2)
     }
 
     // MARK: - Swift Testing look-ahead: buffering
@@ -130,10 +130,10 @@ final class LineParserTests: XCTestCase {
             "✘ Test \"myTest()\" recorded an issue at Foo.swift:10:1: Expectation failed"
         )
         let result = parser.feed("↳ Custom failure reason")
-        guard case .consumed(let event) = result, case .testFailed(let t) = event else {
+        guard case .consumed(let event) = result, case .testFailed(let failed) = event else {
             return XCTFail("Expected .consumed(.testFailed), got \(result)")
         }
-        XCTAssert(t.message.contains("Custom failure reason"), "Expected comment in message, got: \(t.message)")
+        XCTAssert(failed.message.contains("Custom failure reason"), "Expected comment in message, got: \(failed.message)")
     }
 
     // MARK: - Swift Testing look-ahead: no comment, unrelated line
@@ -168,10 +168,10 @@ final class LineParserTests: XCTestCase {
         )
         let events = parser.flush()
         XCTAssertEqual(events.count, 1)
-        guard case .testFailed(let t) = events[0] else {
+        guard case .testFailed(let failed) = events[0] else {
             return XCTFail("Expected .testFailed, got \(events[0])")
         }
-        XCTAssertFalse(t.message.contains(":"), "No comment should be in message")
+        XCTAssertFalse(failed.message.contains(":"), "No comment should be in message")
     }
 
     // MARK: - Build time
@@ -179,10 +179,10 @@ final class LineParserTests: XCTestCase {
     func testBuildTime() {
         let parser = LineParser()
         let result = parser.feed("** BUILD SUCCEEDED ** [12.345 seconds]")
-        guard case .consumed(let event) = result, case .buildTime(let t) = event else {
+        guard case .consumed(let event) = result, case .buildTime(let buildTime) = event else {
             return XCTFail("Expected .consumed(.buildTime), got \(result)")
         }
-        XCTAssertEqual(t, "12.345 seconds")
+        XCTAssertEqual(buildTime, "12.345 seconds")
     }
 
     // MARK: - Test run failed
@@ -217,11 +217,11 @@ final class LineParserTests: XCTestCase {
         let result = parser.feed(
             "RegisterWithLaunchServices /path/to/MyApp.app (in target 'MyApp' from project 'MyProject')"
         )
-        guard case .consumed(let event) = result, case .executable(let e) = event else {
+        guard case .consumed(let event) = result, case .executable(let executable) = event else {
             return XCTFail("Expected .consumed(.executable), got \(result)")
         }
-        XCTAssertEqual(e.name, "MyApp.app")
-        XCTAssertEqual(e.target, "MyApp")
+        XCTAssertEqual(executable.name, "MyApp.app")
+        XCTAssertEqual(executable.target, "MyApp")
     }
 
     // MARK: - Crash detection
@@ -231,10 +231,10 @@ final class LineParserTests: XCTestCase {
         _ = parser.feed("Test Case '-[MyModule.MyTests testCrashing]' started.")
         _ = parser.feed("Exited with signal code 11")
         let result = parser.feed("Restarting after unexpected exit, crash, or test timeout in")
-        guard case .consumed(let event) = result, case .testFailed(let t) = event else {
+        guard case .consumed(let event) = result, case .testFailed(let failed) = event else {
             return XCTFail("Expected .consumed(.testFailed) on crash confirmation, got \(result)")
         }
-        XCTAssert(t.message.contains("signal 11"), "Expected signal code in message, got: \(t.message)")
+        XCTAssert(failed.message.contains("signal 11"), "Expected signal code in message, got: \(failed.message)")
     }
 
     // MARK: - flush emits synthetic testFailed for in-flight test on TEST FAILED without crash confirmation
@@ -244,8 +244,8 @@ final class LineParserTests: XCTestCase {
         _ = parser.feed("Test Case '-[MyModule.MyTests testCrashing]' started.")
         _ = parser.feed("** TEST FAILED **")
         let events = parser.flush()
-        let failedEvents = events.compactMap { e -> FailedTest? in
-            if case .testFailed(let t) = e { return t }
+        let failedEvents = events.compactMap { event -> FailedTest? in
+            if case .testFailed(let failed) = event { return failed }
             return nil
         }
         XCTAssertEqual(failedEvents.count, 1)
@@ -333,25 +333,25 @@ extension Executable: Equatable {
 extension ParseEvent: Equatable {
     public static func == (lhs: ParseEvent, rhs: ParseEvent) -> Bool {
         switch (lhs, rhs) {
-        case (.error(let a), .error(let b)): return a == b
-        case (.warning(let a), .warning(let b)): return a == b
-        case (.linkerError(let a), .linkerError(let b)): return a == b
-        case (.testStarted(let a), .testStarted(let b)): return a == b
+        case (.error(let lhsVal), .error(let rhsVal)): return lhsVal == rhsVal
+        case (.warning(let lhsVal), .warning(let rhsVal)): return lhsVal == rhsVal
+        case (.linkerError(let lhsVal), .linkerError(let rhsVal)): return lhsVal == rhsVal
+        case (.testStarted(let lhsVal), .testStarted(let rhsVal)): return lhsVal == rhsVal
         case (.testPassed(let an, let ad), .testPassed(let bn, let bd)): return an == bn && ad == bd
-        case (.testFailed(let a), .testFailed(let b)): return a == b
+        case (.testFailed(let lhsVal), .testFailed(let rhsVal)): return lhsVal == rhsVal
         case (.testSuiteCompleted(let an, let ae, let af, let ad), .testSuiteCompleted(let bn, let be, let bf, let bd)):
             return an == bn && ae == be && af == bf && ad == bd
         case (.swiftTestingCompleted(let ae, let af, let ad), .swiftTestingCompleted(let be, let bf, let bd)):
             return ae == be && af == bf && ad == bd
         case (.parallelTestScheduled(let ai, let at), .parallelTestScheduled(let bi, let bt)):
             return ai == bi && at == bt
-        case (.buildTime(let a), .buildTime(let b)): return a == b
+        case (.buildTime(let lhsVal), .buildTime(let rhsVal)): return lhsVal == rhsVal
         case (.testRunFailed, .testRunFailed): return true
         case (.buildPhase(let at, let ap), .buildPhase(let bt, let bp)): return at == bt && ap == bp
         case (.targetCompleted(let an, let ad), .targetCompleted(let bn, let bd)): return an == bn && ad == bd
         case (.targetDependency(let at, let ad), .targetDependency(let bt, let bd)): return at == bt && ad == bd
-        case (.targetDiscovered(let a), .targetDiscovered(let b)): return a == b
-        case (.executable(let a), .executable(let b)): return a == b
+        case (.targetDiscovered(let lhsVal), .targetDiscovered(let rhsVal)): return lhsVal == rhsVal
+        case (.executable(let lhsVal), .executable(let rhsVal)): return lhsVal == rhsVal
         default: return false
         }
     }
@@ -362,7 +362,7 @@ extension LineResult: Equatable {
         switch (lhs, rhs) {
         case (.buffering, .buffering): return true
         case (.ignored, .ignored): return true
-        case (.consumed(let a), .consumed(let b)): return a == b
+        case (.consumed(let lhsVal), .consumed(let rhsVal)): return lhsVal == rhsVal
         default: return false
         }
     }
