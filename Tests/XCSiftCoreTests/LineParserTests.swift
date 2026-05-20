@@ -133,7 +133,10 @@ final class LineParserTests: XCTestCase {
         guard case .consumed(let event) = result, case .testFailed(let failed) = event else {
             return XCTFail("Expected .consumed(.testFailed), got \(result)")
         }
-        XCTAssert(failed.message.contains("Custom failure reason"), "Expected comment in message, got: \(failed.message)")
+        XCTAssert(
+            failed.message.contains("Custom failure reason"),
+            "Expected comment in message, got: \(failed.message)"
+        )
     }
 
     // MARK: - Swift Testing look-ahead: no comment, unrelated line
