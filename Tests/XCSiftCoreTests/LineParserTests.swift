@@ -7,14 +7,14 @@ final class LineParserTests: XCTestCase {
     // MARK: - Ignored line
 
     func testIgnoredLine() {
-        let parser = LineParser()
+        var parser = LineParser()
         XCTAssertEqual(parser.feed("note: some note message"), .ignored)
     }
 
     // MARK: - Error
 
     func testError() {
-        let parser = LineParser()
+        var parser = LineParser()
         let result = parser.feed("main.swift:10:5: error: use of undeclared identifier 'foo'")
         guard case .consumed(let event) = result, case .error(let error) = event else {
             return XCTFail("Expected .consumed(.error), got \(result)")
@@ -27,7 +27,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Warning
 
     func testWarning() {
-        let parser = LineParser()
+        var parser = LineParser()
         let result = parser.feed("Foo.swift:3:1: warning: unused variable 'x'")
         guard case .consumed(let event) = result, case .warning(let warning) = event else {
             return XCTFail("Expected .consumed(.warning), got \(result)")
@@ -40,7 +40,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Failed test
 
     func testFailedTest() {
-        let parser = LineParser()
+        var parser = LineParser()
         let result = parser.feed(
             "Test Case '-[MyModule.MyTests testFoo]' failed (0.123 seconds)."
         )
@@ -53,7 +53,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Passed test
 
     func testPassedTest() {
-        let parser = LineParser()
+        var parser = LineParser()
         let result = parser.feed(
             "Test Case '-[MyModule.MyTests testBar]' passed (0.001 seconds)."
         )
@@ -68,7 +68,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Test started
 
     func testTestStarted() {
-        let parser = LineParser()
+        var parser = LineParser()
         let result = parser.feed("Test Case '-[MyModule.MyTests testBaz]' started.")
         guard case .consumed(let event) = result, case .testStarted(let name) = event else {
             return XCTFail("Expected .consumed(.testStarted), got \(result)")
@@ -79,7 +79,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Linker: undefined symbol (3-line sequence)
 
     func testLinkerUndefinedSymbol() {
-        let parser = LineParser()
+        var parser = LineParser()
         XCTAssertEqual(
             parser.feed("Undefined symbols for architecture arm64:"),
             .ignored
@@ -100,7 +100,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Linker: duplicate symbol (multi-line)
 
     func testLinkerDuplicateSymbol() {
-        let parser = LineParser()
+        var parser = LineParser()
         XCTAssertEqual(parser.feed("duplicate symbol '_dupVar' in:"), .ignored)
         XCTAssertEqual(parser.feed("    /path/to/FileA.o"), .ignored)
         XCTAssertEqual(parser.feed("    /path/to/FileB.o"), .ignored)
@@ -115,7 +115,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Swift Testing look-ahead: buffering
 
     func testSwiftTestingBuffering() {
-        let parser = LineParser()
+        var parser = LineParser()
         let result = parser.feed(
             "✘ Test \"myTest()\" recorded an issue at Foo.swift:10:1: Expectation failed"
         )
@@ -125,7 +125,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Swift Testing look-ahead: comment appended
 
     func testSwiftTestingCommentAppended() {
-        let parser = LineParser()
+        var parser = LineParser()
         _ = parser.feed(
             "✘ Test \"myTest()\" recorded an issue at Foo.swift:10:1: Expectation failed"
         )
@@ -139,7 +139,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Swift Testing look-ahead: no comment, unrelated line
 
     func testSwiftTestingNoComment() {
-        let parser = LineParser()
+        var parser = LineParser()
         // First feed: buffering
         let r1 = parser.feed(
             "✘ Test \"myTest()\" recorded an issue at Foo.swift:10:1: Expectation failed"
@@ -162,7 +162,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - flush drains pending buffer
 
     func testFlushDrainsBuffer() {
-        let parser = LineParser()
+        var parser = LineParser()
         _ = parser.feed(
             "✘ Test \"myTest()\" recorded an issue at Foo.swift:10:1: Expectation failed"
         )
@@ -177,7 +177,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Build time
 
     func testBuildTime() {
-        let parser = LineParser()
+        var parser = LineParser()
         let result = parser.feed("** BUILD SUCCEEDED ** [12.345 seconds]")
         guard case .consumed(let event) = result, case .buildTime(let buildTime) = event else {
             return XCTFail("Expected .consumed(.buildTime), got \(result)")
@@ -188,7 +188,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Test run failed
 
     func testTestRunFailed() {
-        let parser = LineParser()
+        var parser = LineParser()
         let result = parser.feed("** TEST FAILED **")
         guard case .consumed(let event) = result, case .testRunFailed = event else {
             return XCTFail("Expected .consumed(.testRunFailed), got \(result)")
@@ -198,7 +198,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Build phase
 
     func testBuildPhase() {
-        let parser = LineParser()
+        var parser = LineParser()
         let result = parser.feed(
             "CompileSwiftSources /some/path (in target 'MyApp' from project 'MyProject')"
         )
@@ -213,7 +213,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Executable
 
     func testExecutable() {
-        let parser = LineParser()
+        var parser = LineParser()
         let result = parser.feed(
             "RegisterWithLaunchServices /path/to/MyApp.app (in target 'MyApp' from project 'MyProject')"
         )
@@ -227,7 +227,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Crash detection
 
     func testCrashDetection() {
-        let parser = LineParser()
+        var parser = LineParser()
         _ = parser.feed("Test Case '-[MyModule.MyTests testCrashing]' started.")
         _ = parser.feed("Exited with signal code 11")
         let result = parser.feed("Restarting after unexpected exit, crash, or test timeout in")
@@ -240,7 +240,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - flush emits synthetic testFailed for in-flight test on TEST FAILED without crash confirmation
 
     func testFlushEmitsCrashForInFlightTestOnTestRunFailed() {
-        let parser = LineParser()
+        var parser = LineParser()
         _ = parser.feed("Test Case '-[MyModule.MyTests testCrashing]' started.")
         _ = parser.feed("** TEST FAILED **")
         let events = parser.flush()
@@ -259,7 +259,7 @@ final class LineParserTests: XCTestCase {
     // MARK: - Consecutive recordedIssue lines do not drop the second event
 
     func testConsecutiveRecordedIssueLines() {
-        let parser = LineParser()
+        var parser = LineParser()
         let issue1 = "✘ Test \"testA()\" recorded an issue at Foo.swift:10:1: Expectation failed"
         let issue2 = "✘ Test \"testB()\" recorded an issue at Bar.swift:20:1: Expectation failed"
 

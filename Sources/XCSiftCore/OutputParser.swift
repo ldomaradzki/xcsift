@@ -94,7 +94,7 @@ public class OutputParser {
         xcbeautify: Bool = false
     ) -> BuildResult {
         state = ParseState()
-        let lineParser = LineParser(xcbeautify: xcbeautify)
+        var lineParser = LineParser(xcbeautify: xcbeautify)
         let lines = input.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
 
         for line in lines {

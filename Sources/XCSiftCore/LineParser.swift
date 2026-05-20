@@ -4,7 +4,7 @@ import RegexBuilder
 // MARK: - Public API
 
 /// An event emitted by ``LineParser`` when a line of build output is recognized.
-public enum ParseEvent {
+public enum ParseEvent: Codable, Sendable {
     // Compile / link
     /// A compiler or tool error was detected.
     case error(BuildError)
@@ -74,7 +74,7 @@ public enum LineResult {
 /// }
 /// for event in parser.flush() { handle(event) }
 /// ```
-public class LineParser {
+public struct LineParser: Sendable {
 
     // MARK: - Multi-line linker state
     private var currentLinkerArchitecture: String?
@@ -134,7 +134,7 @@ public class LineParser {
     /// - Parameter line: A single line of raw build output (no trailing newline required).
     /// - Returns: `.consumed(event)` when a ``ParseEvent`` was produced, `.buffering` when
     ///   the line was held for look-ahead, or `.ignored` when no pattern matched.
-    public func feed(_ line: String) -> LineResult {
+    public mutating func feed(_ line: String) -> LineResult {
         if !eventQueue.isEmpty {
             // Drain one queued event; schedule current line for next call.
             let queued = eventQueue.removeFirst()
@@ -146,7 +146,7 @@ public class LineParser {
     }
 
     // Called when a queued event is being returned; current line must still be processed.
-    private func enqueueFromLine(_ line: String) {
+    private mutating func enqueueFromLine(_ line: String) {
         updateLookBackBuffer(line)
         if line.contains(XcodebuildSymbols.recordedIssue) {
             pendingRecordedIssueLine = line
@@ -156,7 +156,7 @@ public class LineParser {
     }
 
     // Path B: holding a buffered recordedIssue line — flush it, possibly amending with comment.
-    private func flushRecordedIssue(currentLine line: String) -> LineResult {
+    private mutating func flushRecordedIssue(currentLine line: String) -> LineResult {
         let pending = pendingRecordedIssueLine!
         let buffered = processLine(pending)
         pendingRecordedIssueLine = nil
@@ -188,7 +188,7 @@ public class LineParser {
     }
 
     // Path C: normal processing with look-back enrichment.
-    private func normalFeed(_ line: String) -> LineResult {
+    private mutating func normalFeed(_ line: String) -> LineResult {
         if line.contains(XcodebuildSymbols.recordedIssue) {
             pendingRecordedIssueLine = line
             updateLookBackBuffer(line)
@@ -232,7 +232,7 @@ public class LineParser {
     /// - A synthetic `testFailed` crash event when a test was in flight at process exit
     ///
     /// - Returns: Zero or more ``ParseEvent`` values representing buffered output.
-    public func flush() -> [ParseEvent] {
+    public mutating func flush() -> [ParseEvent] {
         var result: [ParseEvent] = eventQueue
         eventQueue = []
         if let pending = pendingRecordedIssueLine {
@@ -259,7 +259,7 @@ public class LineParser {
 
     // MARK: - Look-back buffer
 
-    private func updateLookBackBuffer(_ line: String) {
+    private mutating func updateLookBackBuffer(_ line: String) {
         lookBackBuffer.append(line)
         if lookBackBuffer.count > 3 {
             lookBackBuffer.removeFirst()
@@ -269,7 +269,7 @@ public class LineParser {
     // MARK: - Core dispatch
 
     /// Returns at most one ParseEvent for a line. Uses if/else if so only one branch fires.
-    private func processLine(_ line: String) -> ParseEvent? {
+    private mutating func processLine(_ line: String) -> ParseEvent? {
         if line.isEmpty || line.count > 5000 { return nil }
 
         // Suite name tracking (state only, no event emitted)
@@ -427,7 +427,7 @@ public class LineParser {
 
     // MARK: - Linker Parsing
 
-    private func parseLinkerLine(_ line: String) -> ParseEvent? {
+    private mutating func parseLinkerLine(_ line: String) -> ParseEvent? {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
 
         if trimmed.hasPrefix(XcodebuildSymbols.undefinedSymbols) {
@@ -521,7 +521,7 @@ public class LineParser {
 
     // MARK: - Crash Detection
 
-    private func parseCrashLine(_ line: String) -> ParseEvent? {
+    private mutating func parseCrashLine(_ line: String) -> ParseEvent? {
         // Track "Test Case '...' started." for crash association
         if let name = parseStartedTestName(line) {
             lastStartedTestName = name
@@ -1090,7 +1090,7 @@ public class LineParser {
 
     // MARK: - Build / Test Time
 
-    private func parseBuildAndTestTime(_ line: String) -> ParseEvent? {
+    private mutating func parseBuildAndTestTime(_ line: String) -> ParseEvent? {
         if line.contains(XcodebuildSymbols.buildSucceeded) || line.contains(XcodebuildSymbols.buildFailed) {
             if let bracketStart = line.range(of: "[", options: .backwards),
                 let bracketEnd = line.range(of: "]", options: .backwards),
@@ -1366,7 +1366,7 @@ public class LineParser {
 
     // MARK: - Dependency Graph
 
-    private func parseDependencyGraph(_ line: String) -> ParseEvent? {
+    private mutating func parseDependencyGraph(_ line: String) -> ParseEvent? {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
 
         if trimmed.hasPrefix(XcodebuildSymbols.targetPrefix) && trimmed.contains("' in project '") {

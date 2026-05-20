@@ -1,6 +1,6 @@
 import Foundation
 
-public struct BuildResult: Codable {
+public struct BuildResult: Codable, Sendable {
     public let status: String
     public let summary: BuildSummary
     public let errors: [BuildError]
@@ -254,7 +254,7 @@ public struct BuildResult: Codable {
     }
 }
 
-public struct BuildSummary: Codable {
+public struct BuildSummary: Codable, Sendable {
     public let errors: Int
     public let warnings: Int
     public let failedTests: Int
@@ -339,7 +339,7 @@ public struct BuildSummary: Codable {
     }
 }
 
-public struct BuildError: Codable {
+public struct BuildError: Codable, Sendable {
     public let file: String?
     public let line: Int?
     public let message: String
@@ -359,13 +359,13 @@ public struct BuildError: Codable {
     }
 }
 
-public enum WarningType: String, Codable {
+public enum WarningType: String, Codable, Sendable {
     case compile
     case runtime
     case swiftui
 }
 
-public struct BuildWarning: Codable {
+public struct BuildWarning: Codable, Sendable {
     public let file: String?
     public let line: Int?
     public let message: String
@@ -387,7 +387,7 @@ public struct BuildWarning: Codable {
     }
 }
 
-public struct FailedTest: Codable {
+public struct FailedTest: Codable, Sendable {
     public let test: String
     public let message: String
     public let file: String?
@@ -411,7 +411,7 @@ public struct FailedTest: Codable {
     }
 }
 
-public struct CodeCoverage: Codable {
+public struct CodeCoverage: Codable, Sendable {
     public let lineCoverage: Double
     public let files: [FileCoverage]
 
@@ -426,7 +426,7 @@ public struct CodeCoverage: Codable {
     }
 }
 
-public struct FileCoverage: Codable {
+public struct FileCoverage: Codable, Sendable {
     public let path: String
     public let name: String
     public let lineCoverage: Double
@@ -450,7 +450,7 @@ public struct FileCoverage: Codable {
     }
 }
 
-public struct LinkerError: Codable {
+public struct LinkerError: Codable, Sendable {
     public let symbol: String
     public let architecture: String
     public let referencedFrom: String
@@ -490,7 +490,7 @@ public struct LinkerError: Codable {
     }
 }
 
-public struct SlowTest: Codable {
+public struct SlowTest: Codable, Sendable {
     public let test: String
     public let duration: Double
 }
@@ -498,7 +498,7 @@ public struct SlowTest: Codable {
 // MARK: - Build Info (Phases + Timing per target)
 // Note: Total build time is already in BuildSummary.buildTime, so not duplicated here
 
-public struct BuildInfo: Codable {
+public struct BuildInfo: Codable, Sendable {
     public let targets: [TargetBuildInfo]
     public let slowestTargets: [String]
 
@@ -529,7 +529,7 @@ public struct BuildInfo: Codable {
     }
 }
 
-public struct TargetBuildInfo: Codable {
+public struct TargetBuildInfo: Codable, Sendable {
     public let name: String
     public let duration: String?
     public let phases: [String]
@@ -570,7 +570,7 @@ public struct TargetBuildInfo: Codable {
     }
 }
 
-public struct Executable: Codable {
+public struct Executable: Codable, Sendable {
     public let path: String
     public let name: String
     public let target: String
