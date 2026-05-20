@@ -242,11 +242,14 @@ public struct LineParser: Sendable {
         // If a test was in-flight when the run ended without a crash-confirmation line,
         // emit a synthetic testFailed so callers don't need to read internal state.
         if sawTestRunFailed, let testName = lastStartedTestName {
+            let message =
+                pendingSignalCode.map { "Crashed (signal \($0)): last test started before crash" }
+                ?? "Test did not complete (possible crash or timeout)"
             result.append(
                 .testFailed(
                     FailedTest(
                         test: testName,
-                        message: "Crashed: last test started before crash",
+                        message: message,
                         file: nil,
                         line: nil
                     )

@@ -250,10 +250,7 @@ final class LineParserTests: XCTestCase {
         }
         XCTAssertEqual(failedEvents.count, 1)
         XCTAssertEqual(failedEvents[0].test, "-[MyModule.MyTests testCrashing]")
-        XCTAssert(
-            failedEvents[0].message.contains("Crashed"),
-            "Expected crash message, got: \(failedEvents[0].message)"
-        )
+        XCTAssertEqual(failedEvents[0].message, "Test did not complete (possible crash or timeout)")
     }
 
     // MARK: - Consecutive recordedIssue lines do not drop the second event
