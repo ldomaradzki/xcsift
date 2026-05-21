@@ -256,6 +256,24 @@ final class LineParserTests: XCTestCase {
         XCTAssertEqual(failedEvents[0].message, "Test did not complete (possible crash or timeout)")
     }
 
+    // MARK: - No phantom testFailed after last test passes then TEST FAILED fires (issue #52 variant)
+
+    func testNoPhantomFailureAfterPassedLastTest() {
+        var parser = LineParser()
+        _ = parser.feed("Test Case '-[MyModule.MyTests testLast]' started.")
+        _ = parser.feed("Test Case '-[MyModule.MyTests testLast]' passed (0.001 seconds).")
+        _ = parser.feed("** TEST FAILED **")
+        let events = parser.flush()
+        let failed = events.compactMap { event -> FailedTest? in
+            if case .testFailed(let f) = event { return f }
+            return nil
+        }
+        XCTAssertTrue(
+            failed.isEmpty,
+            "Expected no phantom testFailed, got: \(failed.map(\.test))"
+        )
+    }
+
     // MARK: - Consecutive recordedIssue lines do not drop the second event
 
     func testConsecutiveRecordedIssueLines() {

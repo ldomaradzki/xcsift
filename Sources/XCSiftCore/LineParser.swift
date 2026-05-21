@@ -366,7 +366,10 @@ public struct LineParser: Sendable {
         if let exec = parseExecutable(line) { return .executable(exec) }
 
         // Failed test
-        if let failed = parseFailedTest(line) { return .testFailed(failed) }
+        if let failed = parseFailedTest(line) {
+            if lastStartedTestName == failed.test { lastStartedTestName = nil }
+            return .testFailed(failed)
+        }
 
         // Error
         if let error = parseError(line) {
@@ -392,7 +395,10 @@ public struct LineParser: Sendable {
         if let warning = parseRuntimeWarning(line) { return .warning(warning) }
 
         // Passed test
-        if let (name, duration) = parsePassedTest(line) { return .testPassed(name: name, duration: duration) }
+        if let (name, duration) = parsePassedTest(line) {
+            if lastStartedTestName == name { lastStartedTestName = nil }
+            return .testPassed(name: name, duration: duration)
+        }
 
         // Build / test time, XCTest summaries, Swift Testing summaries
         if let event = parseBuildAndTestTime(line) { return event }
@@ -420,12 +426,6 @@ public struct LineParser: Sendable {
         "] Testing "
         Capture(OneOrMore(.any, .reluctant))
         Anchor.endOfSubject
-    }
-
-    private nonisolated(unsafe) static let testSuiteRegex = Regex {
-        /[Tt]est [Ss]uite '/
-        Capture(OneOrMore(.any, .reluctant))
-        ".xctest'"
     }
 
     // MARK: - Linker Parsing
