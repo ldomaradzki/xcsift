@@ -43,7 +43,7 @@ The default format outputs structured JSON with build status, summary, and detai
 
 | Field | Description |
 |-------|-------------|
-| `status` | `"succeeded"` or `"failed"` |
+| `status` | `"success"`, `"failed"`, or `"incomplete"` (stream ended without a terminal `** … SUCCEEDED/FAILED **` marker — e.g. a killed/truncated build) |
 | `summary.errors` | Count of compiler errors |
 | `summary.warnings` | Count of warnings |
 | `summary.failed_tests` | Count of failed tests |
@@ -55,6 +55,12 @@ The default format outputs structured JSON with build status, summary, and detai
 | `summary.slow_tests` | Count of slow tests (with `--slow-threshold`) |
 | `summary.flaky_tests` | Count of flaky tests (auto-detected) |
 | `summary.executables` | Count of executable targets (with `--executable`) |
+
+### Status Values
+
+- `success` — the build/test run completed with no errors, no failed tests, and produced positive evidence of completion (a terminal `** BUILD SUCCEEDED **` / `** TEST SUCCEEDED **` / `Build complete!` marker, or passed tests).
+- `failed` — errors, failed tests, linker errors, or a terminal `** … FAILED **` marker were detected.
+- `incomplete` — the stream ended without any terminal marker and without recognizable results. This typically means the build was truncated or killed (e.g. `Killed: 9` on memory pressure) before reporting an outcome. xcsift never reports a truncated run as `success`; combine with `--exit-on-failure` to fail the pipeline on `incomplete`.
 
 ### Optional Arrays
 

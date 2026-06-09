@@ -333,6 +333,7 @@ swift test 2>&1 | xcsift -W -E -f toon
 
 - `0` — Build succeeded (or xcsift completed normally without `--exit-on-failure`)
 - `1` — Build failed (errors, linker errors, or test failures) when `--exit-on-failure` is used
+- `1` — Build is `incomplete` (stream ended without a terminal marker, e.g. a killed/truncated build) when `--exit-on-failure` is used
 - `1` — Build has warnings when both `--Werror` and `--exit-on-failure` are used
 
 **Note:** Without `--exit-on-failure`, xcsift always exits with `0` regardless of build status. The exit code reflects xcsift's own execution, not the build result. Use `--exit-on-failure` (`-E`) when you want xcsift's exit code to reflect the build status for CI integration.

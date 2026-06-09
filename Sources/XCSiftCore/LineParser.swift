@@ -107,6 +107,14 @@ public struct LineParser: Sendable {
     /// Useful in tests to assert that the hint was (or was not) emitted.
     public private(set) var didEmitXcbeautifyHint: Bool = false
 
+    /// `true` if a positive terminal success marker was seen
+    /// (`** BUILD SUCCEEDED **`, `** TEST SUCCEEDED **`, `Build complete!`, `Build succeeded in …`).
+    public private(set) var sawSuccessMarker: Bool = false
+
+    /// `true` if a terminal failure marker was seen
+    /// (`** BUILD FAILED **`, `** TEST FAILED **`, `Build failed after …`).
+    public private(set) var sawFailureMarker: Bool = false
+
     // MARK: - Event queue (events waiting to be delivered one per feed() call)
     private var eventQueue: [ParseEvent] = []
 
@@ -301,6 +309,14 @@ public struct LineParser: Sendable {
             }
         }
 
+        // xcbeautify rewrites the terminal `** … SUCCEEDED **` markers to title-case status lines.
+        if shouldParseXcbeautify
+            && (line.contains(XCBeautifySymbols.buildSucceeded)
+                || line.contains(XCBeautifySymbols.testSucceeded))
+        {
+            sawSuccessMarker = true
+        }
+
         // xcbeautify parsing
         if shouldParseXcbeautify, let event = parseXcbeautifyLine(line) {
             return event
@@ -320,6 +336,7 @@ public struct LineParser: Sendable {
             || line.contains("Executed")
             || line.contains("] Testing ")
             || line.contains(XcodebuildSymbols.buildSucceeded)
+            || line.contains("SUCCEEDED")
             || line.contains(XcodebuildSymbols.buildFailedKeyword)
             || line.contains(XcodebuildSymbols.testFailed)
             || line.contains(XcodebuildSymbols.buildComplete)
@@ -1125,23 +1142,38 @@ public struct LineParser: Sendable {
 
     // MARK: - Build / Test Time
 
+    private func bracketedTime(_ line: String) -> ParseEvent? {
+        if let bracketStart = line.range(of: "[", options: .backwards),
+            let bracketEnd = line.range(of: "]", options: .backwards),
+            bracketStart.lowerBound < bracketEnd.lowerBound
+        {
+            return .buildTime(String(line[bracketStart.upperBound ..< bracketEnd.lowerBound]))
+        }
+        return nil
+    }
+
     private mutating func parseBuildAndTestTime(_ line: String) -> ParseEvent? {
-        if line.contains(XcodebuildSymbols.buildSucceeded) || line.contains(XcodebuildSymbols.buildFailed) {
-            if let bracketStart = line.range(of: "[", options: .backwards),
-                let bracketEnd = line.range(of: "]", options: .backwards),
-                bracketStart.lowerBound < bracketEnd.lowerBound
-            {
-                return .buildTime(String(line[bracketStart.upperBound ..< bracketEnd.lowerBound]))
-            }
-            return nil
+        if line.contains(XcodebuildSymbols.buildSucceeded)
+            || line.contains(XcodebuildSymbols.testSucceeded)
+            || line.contains(XcodebuildSymbols.testExecuteSucceeded)
+        {
+            sawSuccessMarker = true
+            return bracketedTime(line)
+        }
+
+        if line.contains(XcodebuildSymbols.buildFailed) {
+            sawFailureMarker = true
+            return bracketedTime(line)
         }
 
         if line.contains(XcodebuildSymbols.testFailed) {
             sawTestRunFailed = true
+            sawFailureMarker = true
             return .testRunFailed
         }
 
         if line.hasPrefix(XcodebuildSymbols.buildComplete) {
+            sawSuccessMarker = true
             if let parenStart = line.range(of: "("),
                 let parenEnd = line.range(of: ")"),
                 parenStart.lowerBound < parenEnd.lowerBound
@@ -1151,11 +1183,13 @@ public struct LineParser: Sendable {
             return nil
         }
 
-        if line.hasPrefix("Build succeeded in ") {
+        if line.hasPrefix(XcodebuildSymbols.buildSucceededInPrefix) {
+            sawSuccessMarker = true
             return .buildTime(String(line.dropFirst(19)))
         }
 
-        if line.hasPrefix("Build failed after ") {
+        if line.hasPrefix(XcodebuildSymbols.buildFailedAfterPrefix) {
+            sawFailureMarker = true
             return .buildTime(String(line.dropFirst(19)))
         }
 

@@ -50,7 +50,11 @@ enum XcodebuildSymbols {
     static let buildFailed = "** BUILD FAILED **"
     static let buildFailedKeyword = "BUILD FAILED"
     static let testFailed = "TEST FAILED"
+    static let testSucceeded = "** TEST SUCCEEDED **"
+    static let testExecuteSucceeded = "** TEST EXECUTE SUCCEEDED **"
     static let buildComplete = "Build complete!"
+    static let buildSucceededInPrefix = "Build succeeded in "
+    static let buildFailedAfterPrefix = "Build failed after "
     static let secondsKeyword = " seconds"
 
     // File extensions

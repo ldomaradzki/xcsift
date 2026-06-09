@@ -303,6 +303,13 @@ struct XCSift: ParsableCommand {
         )
         outputResult(result, resolved: resolved)
 
+        if result.status == "incomplete" {
+            writeToStderr(
+                "hint: build output ended without a success or failure marker "
+                    + "(truncated or killed?); status reported as \"incomplete\"\n"
+            )
+        }
+
         // Exit with failure if requested and build did not succeed
         if resolved.exitOnFailure && result.status != "success" {
             throw ExitCode.failure

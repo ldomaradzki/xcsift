@@ -343,10 +343,30 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.failedTests, 0)
     }
 
+    func testTruncatedRealWorldBuildIsIncomplete() throws {
+        // Real successful build output truncated before its terminal "** BUILD SUCCEEDED **"
+        // marker — the OOM / Killed: 9 case. Must not read as success.
+        let fixtureURL = Bundle.module.url(forResource: "build", withExtension: "txt")!
+        let full = try String(contentsOf: fixtureURL, encoding: .utf8)
+
+        let marker = "** BUILD SUCCEEDED **"
+        let markerRange = try XCTUnwrap(full.range(of: marker), "fixture must contain a terminal marker")
+        let truncated = String(full[..<markerRange.lowerBound])
+
+        XCTAssertFalse(truncated.contains(marker), "truncated input must drop the success marker")
+
+        let result = OutputParser().parse(input: truncated)
+
+        XCTAssertEqual(result.status, "incomplete")
+        XCTAssertEqual(result.summary.errors, 0)
+        XCTAssertEqual(result.summary.failedTests, 0)
+    }
+
     func testParseWarning() {
         let parser = OutputParser()
         let input = """
             AppDelegate.swift:67:8: warning: unused variable 'config'
+            Build complete!
             """
 
         let result = parser.parse(input: input)
@@ -365,6 +385,7 @@ final class ParsingTests: XCTestCase {
             UserService.swift:45:12: warning: variable 'temp' was never used
             NetworkManager.swift:23:5: warning: initialization of immutable value 'data' was never used
             AppDelegate.swift:67:8: warning: unused variable 'config'
+            Build complete!
             """
 
         let result = parser.parse(input: input)
@@ -678,6 +699,7 @@ final class ParsingTests: XCTestCase {
                                             ^~~~~~~
 
                                                     ?? <#default value#>
+            Build complete!
             """
 
         let result = parser.parse(input: input)
@@ -1099,6 +1121,7 @@ final class ParsingTests: XCTestCase {
         let parser = OutputParser()
         let input = """
             RegisterWithLaunchServices /Users/gustavoambrozio/Library/Developer/Xcode/DerivedData/ClaudeSettings-adehczsnoaxfyihgllrkwplhsetn/Build/Products/Debug/ClaudeSettings.app (in target 'ClaudeSettings' from project 'ClaudeSettings')
+            ** BUILD SUCCEEDED **
             """
 
         let result = parser.parse(input: input, printExecutables: true)
@@ -1120,6 +1143,7 @@ final class ParsingTests: XCTestCase {
             RegisterWithLaunchServices /path/to/App1.app (in target 'App1' from project 'MyProject')
             Building for debugging...
             RegisterWithLaunchServices /path/to/App2.app (in target 'App2' from project 'MyProject')
+            ** BUILD SUCCEEDED **
             """
 
         let result = parser.parse(input: input, printExecutables: true)
@@ -1208,6 +1232,7 @@ final class ParsingTests: XCTestCase {
         let parser = OutputParser()
         let input = """
             Validate /path/to/MyiOSApp.app (in target 'MyiOSApp' from project 'MyProject')
+            ** BUILD SUCCEEDED **
             """
 
         let result = parser.parse(input: input, printExecutables: true)
@@ -1746,5 +1771,78 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.errors[0].file, "main.swift")
         XCTAssertEqual(result.errors[0].line, 15)
         XCTAssertEqual(result.status, "failed")
+    }
+
+    // MARK: - Status / Terminal Marker Tests
+
+    func testIncompleteOnTruncatedTestStream() {
+        // xcodebuild Killed: 9 mid-run — test launched, no terminal marker, no results.
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'All tests' started at 2026-06-09 10:00:00.000.
+            Test Suite 'KIFUITests.xctest' started at 2026-06-09 10:00:00.000.
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "incomplete")
+        XCTAssertEqual(result.summary.failedTests, 0)
+    }
+
+    func testIncompleteOnMarkerlessStream() {
+        let parser = OutputParser()
+        let input = """
+            Build settings from command line:
+                FOO = bar
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "incomplete")
+    }
+
+    func testStatusFailedWhenOnlyAggregateFailureCount() {
+        // Failure reported only in the suite summary line, no individual "Test Case … failed"
+        // line and no ** TEST FAILED ** — status must still reconcile with the count.
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'KIFUITests.xctest' started at 2026-06-09 10:00:00.000.
+            Test Suite 'KIFUITests.xctest' failed at 2026-06-09 10:00:30.000.
+            \t Executed 10 tests, with 1 failure (0 unexpected) in 25.000 (25.100) seconds
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.failedTests, 1)
+        XCTAssertEqual(result.summary.passedTests, 9)
+    }
+
+    func testBuildSucceededMarkerIsSuccess() {
+        let parser = OutputParser()
+        let result = parser.parse(input: "** BUILD SUCCEEDED ** [12.3 seconds]")
+
+        XCTAssertEqual(result.status, "success")
+    }
+
+    func testBuildFailedMarkerWithoutErrorsIsFailed() {
+        // ** BUILD FAILED ** with no attributable error must not read as success.
+        let parser = OutputParser()
+        let result = parser.parse(input: "Some output\n** BUILD FAILED **")
+
+        XCTAssertEqual(result.status, "failed")
+    }
+
+    func testPassedTestsWithoutTerminalMarkerIsSuccess() {
+        // Passed tests are positive evidence even without a ** TEST SUCCEEDED ** marker.
+        let parser = OutputParser()
+        let input = """
+            Test Case 'MyTests.testExample' passed (0.001 seconds).
+            Executed 1 test, with 0 failures in 0.001 seconds
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
     }
 }

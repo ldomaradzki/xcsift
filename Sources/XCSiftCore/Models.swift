@@ -208,9 +208,12 @@ public struct BuildResult: Codable, Sendable {
     private func buildSummaryMessage() -> String {
         var parts: [String] = []
 
-        if status == "success" {
+        switch status {
+        case "success":
             parts.append("Build succeeded")
-        } else {
+        case "incomplete":
+            parts.append("Build incomplete")
+        default:
             parts.append("Build failed")
         }
 

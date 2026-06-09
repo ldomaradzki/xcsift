@@ -31,6 +31,7 @@ final class TOONFormatTests: XCTestCase {
         let input = """
             Parser.swift:20:10: warning: immutable value 'result' was never used
             Parser.swift:25:10: warning: variable 'foo' was never mutated
+            ** BUILD SUCCEEDED **
             """
         let result = parser.parse(input: input, printWarnings: true)
 

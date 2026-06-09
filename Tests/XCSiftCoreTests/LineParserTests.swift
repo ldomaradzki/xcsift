@@ -198,6 +198,33 @@ final class LineParserTests: XCTestCase {
         }
     }
 
+    // MARK: - Terminal markers
+
+    func testSawSuccessMarker() {
+        for marker in ["** BUILD SUCCEEDED **", "** TEST SUCCEEDED **", "Build complete!", "Build succeeded in 1.2s"] {
+            var parser = LineParser()
+            _ = parser.feed(marker)
+            XCTAssertTrue(parser.sawSuccessMarker, "Expected success marker for \(marker)")
+            XCTAssertFalse(parser.sawFailureMarker, "Unexpected failure marker for \(marker)")
+        }
+    }
+
+    func testSawFailureMarker() {
+        for marker in ["** BUILD FAILED **", "** TEST FAILED **", "Build failed after 1.2s"] {
+            var parser = LineParser()
+            _ = parser.feed(marker)
+            XCTAssertTrue(parser.sawFailureMarker, "Expected failure marker for \(marker)")
+            XCTAssertFalse(parser.sawSuccessMarker, "Unexpected success marker for \(marker)")
+        }
+    }
+
+    func testNoTerminalMarker() {
+        var parser = LineParser()
+        _ = parser.feed("CompileSwiftSources normal arm64")
+        XCTAssertFalse(parser.sawSuccessMarker)
+        XCTAssertFalse(parser.sawFailureMarker)
+    }
+
     // MARK: - Build phase
 
     func testBuildPhase() {

@@ -106,6 +106,8 @@ public class OutputParser {
             handleEvent(event, printBuildInfo: printBuildInfo)
         }
         didEmitXcbeautifyHint = lineParser.didEmitXcbeautifyHint
+        let sawSuccessMarker = lineParser.sawSuccessMarker
+        let sawFailureMarker = lineParser.sawFailureMarker || state.testRunFailed
 
         // If warnings-as-errors is enabled, convert warnings to errors
         var finalErrors = state.errors
@@ -159,19 +161,27 @@ public class OutputParser {
         }()
 
         let status: String = {
-            let hasActualFailures = !finalErrors.isEmpty || !state.failedTests.isEmpty || !state.linkerErrors.isEmpty
+            let hasActualFailures =
+                !finalErrors.isEmpty || !state.failedTests.isEmpty
+                || !state.linkerErrors.isEmpty || totalFailed > 0
+            if hasActualFailures { return "failed" }
+
             let hasPassedTests = (computedPassedTests ?? 0) > 0
 
-            switch (hasActualFailures, state.testRunFailed, hasPassedTests) {
-            case (true, _, _):
-                return "failed"
-            case (false, true, true):
-                return "success"
-            case (false, true, false):
-                return "failed"
-            case (false, false, _):
+            // A terminal failure marker means the run failed even when no specific failure was
+            // attributed — unless tests actually passed (guards a stray "TEST FAILED" substring).
+            if sawFailureMarker {
+                return hasPassedTests ? "success" : "failed"
+            }
+
+            // Success requires positive evidence: a terminal success marker or passed tests.
+            if sawSuccessMarker || hasPassedTests {
                 return "success"
             }
+
+            // No failures and no positive terminal marker: the stream ended before reporting an
+            // outcome (e.g. xcodebuild Killed: 9). Never report a truncated run as success.
+            return "incomplete"
         }()
 
         let slowTests: [SlowTest] = {

@@ -95,6 +95,7 @@ final class XcbeautifyErrorTests: XCTestCase {
         let parser = OutputParser()
         let input = """
             [x] /path/to/ContentView.swift:93:35: 'wheel' is unavailable in macOS
+            ** BUILD SUCCEEDED **
             """
 
         let result = parser.parse(input: input, xcbeautify: false)
@@ -361,6 +362,20 @@ final class XcbeautifyIntegrationTests: XCTestCase {
         XCTAssertEqual(result.errors[0].file, "/path/to/ContentView.swift")
         XCTAssertEqual(result.warnings[0].file, "/path/to/Parser.swift")
         XCTAssertEqual(result.failedTests[0].test, "TestAppTests.testFailure")
+    }
+
+    func testBuildOnlySuccessMarker() {
+        // xcbeautify rewrites ** BUILD SUCCEEDED ** to "Build Succeeded"; a build with no tests
+        // must still report success (not incomplete) on this terminal marker.
+        let parser = OutputParser()
+        let input = """
+            [TestApp] Compiling ContentView.swift
+            Build Succeeded
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.status, "success")
     }
 
     func testDefaultModeUnaffected() {
