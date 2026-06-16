@@ -49,6 +49,7 @@ enum XcodebuildSymbols {
     static let buildSucceeded = "** BUILD SUCCEEDED **"
     static let buildFailed = "** BUILD FAILED **"
     static let buildFailedKeyword = "BUILD FAILED"
+    static let succeededKeyword = "SUCCEEDED"
     static let testFailed = "TEST FAILED"
     static let testSucceeded = "** TEST SUCCEEDED **"
     static let testExecuteSucceeded = "** TEST EXECUTE SUCCEEDED **"

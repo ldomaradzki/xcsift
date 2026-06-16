@@ -335,8 +335,7 @@ public struct LineParser: Sendable {
             || line.contains("Build failed")
             || line.contains("Executed")
             || line.contains("] Testing ")
-            || line.contains(XcodebuildSymbols.buildSucceeded)
-            || line.contains("SUCCEEDED")
+            || line.contains(XcodebuildSymbols.succeededKeyword)
             || line.contains(XcodebuildSymbols.buildFailedKeyword)
             || line.contains(XcodebuildSymbols.testFailed)
             || line.contains(XcodebuildSymbols.buildComplete)
@@ -1185,12 +1184,12 @@ public struct LineParser: Sendable {
 
         if line.hasPrefix(XcodebuildSymbols.buildSucceededInPrefix) {
             sawSuccessMarker = true
-            return .buildTime(String(line.dropFirst(19)))
+            return .buildTime(String(line.dropFirst(XcodebuildSymbols.buildSucceededInPrefix.count)))
         }
 
         if line.hasPrefix(XcodebuildSymbols.buildFailedAfterPrefix) {
             sawFailureMarker = true
-            return .buildTime(String(line.dropFirst(19)))
+            return .buildTime(String(line.dropFirst(XcodebuildSymbols.buildFailedAfterPrefix.count)))
         }
 
         // XCTest "Executed N tests" summary
