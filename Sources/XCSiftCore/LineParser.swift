@@ -118,6 +118,37 @@ public struct LineParser: Sendable {
     // MARK: - Event queue (events waiting to be delivered one per feed() call)
     private var eventQueue: [ParseEvent] = []
 
+    /// The number of events currently held in internal buffers, waiting to be delivered
+    /// by future ``feed(_:)`` or ``flush()`` calls.
+    ///
+    /// Used by ``TrackingLineParser`` to compute exact source-line attribution without
+    /// observing private state directly.
+    var pendingEventCount: Int {
+        // Events produced by earlier lines but not yet returned, because feed() can only
+        // deliver one result per call. They will be returned on future feed() calls (Path A).
+        let queued = eventQueue.count
+        // A recorded-issue line held for look-ahead will produce exactly one future event.
+        let bufferedLookAhead = pendingRecordedIssueLine != nil ? 1 : 0
+        return queued + bufferedLookAhead
+    }
+
+    /// `true` if the line most recently passed to ``feed(_:)`` had its text folded into the
+    /// delivered event's content (currently: `↳`/details comment-continuation lines).
+    ///
+    /// Used by ``TrackingLineParser`` to distinguish a true content merge (the current line's
+    /// range must extend to cover the merged line) from a mere drain trigger (an unrelated line
+    /// that only caused an already-buffered event to be delivered, and must not be folded into
+    /// that event's range).
+    private(set) var didMergeCurrentLine: Bool = false
+
+    /// `true` if the buffered ``pendingRecordedIssueLine`` resolved this call without producing
+    /// any event (its text didn't match ``parseFailedTest``'s expected format).
+    ///
+    /// Used by ``TrackingLineParser`` to discard the guaranteed-future-event slot it reserved
+    /// when the line first started buffering — that slot will never be delivered, so leaving it
+    /// in the pending queue would misattribute a later, unrelated event to the dead line.
+    private(set) var droppedDeadBufferedLine: Bool = false
+
     /// Creates a new `LineParser`.
     ///
     /// - Parameter xcbeautify: Pass `true` when the input was pre-processed by xcbeautify or Tuist.
@@ -143,6 +174,8 @@ public struct LineParser: Sendable {
     /// - Returns: `.consumed(event)` when a ``ParseEvent`` was produced, `.buffering` when
     ///   the line was held for look-ahead, or `.ignored` when no pattern matched.
     public mutating func feed(_ line: String) -> LineResult {
+        didMergeCurrentLine = false
+        droppedDeadBufferedLine = false
         if !eventQueue.isEmpty {
             // Drain one queued event; schedule current line for next call.
             let queued = eventQueue.removeFirst()
@@ -175,6 +208,7 @@ public struct LineParser: Sendable {
             || trimmed.hasPrefix(XcodebuildSymbols.swiftTestingDetailsPrefixFallback)
         if isCommentContinuation {
             if let event = buffered, case .testFailed(let failed) = event {
+                didMergeCurrentLine = true
                 let comment = String(
                     trimmed.drop(while: { $0 != " " }).drop(while: { $0 == " " })
                 )
@@ -187,10 +221,12 @@ public struct LineParser: Sendable {
                 )
                 return .consumed(.testFailed(amended))
             }
+            if buffered == nil { droppedDeadBufferedLine = true }
             return buffered.map { .consumed($0) } ?? .ignored
         } else {
             // Current line is unrelated — enqueue its result, emit buffered now.
             if let overflow = processLine(line) { eventQueue.append(overflow) }
+            if buffered == nil { droppedDeadBufferedLine = true }
             return buffered.map { .consumed($0) } ?? .ignored
         }
     }
