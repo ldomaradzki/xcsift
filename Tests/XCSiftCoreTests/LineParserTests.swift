@@ -11,6 +11,13 @@ final class LineParserTests: XCTestCase {
         XCTAssertEqual(parser.feed("note: some note message"), .ignored)
     }
 
+    func testLineLengthLimitUsesUTF8Bytes() {
+        var parser = LineParser()
+        let line = "main.swift:1:1: error: " + String(repeating: "é", count: 3_000)
+
+        XCTAssertEqual(parser.feed(line), .ignored)
+    }
+
     // MARK: - Error
 
     func testError() {

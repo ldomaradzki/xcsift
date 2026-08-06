@@ -66,7 +66,7 @@ public enum LineResult {
 /// after the last line to drain buffered state (look-ahead windows, in-flight crash detection).
 ///
 /// ```swift
-/// let parser = LineParser()
+/// var parser = LineParser()
 /// for line in output.split(separator: "\n") {
 ///     if case .consumed(let event) = parser.feed(String(line)) {
 ///         handle(event)
@@ -75,6 +75,9 @@ public enum LineResult {
 /// for event in parser.flush() { handle(event) }
 /// ```
 public struct LineParser: Sendable {
+
+    /// Maximum UTF-8 byte length accepted for one input line.
+    public static let maximumLineBytes = 5_000
 
     // MARK: - Multi-line linker state
     private var currentLinkerArchitecture: String?
@@ -317,12 +320,7 @@ public struct LineParser: Sendable {
 
     /// Returns at most one ParseEvent for a line. Uses if/else if so only one branch fires.
     private mutating func processLine(_ line: String) -> ParseEvent? {
-        if line.isEmpty || line.count > 5000 { return nil }
-
-        // Suite name tracking (state only, no event emitted)
-        if let suiteName = parseCompletedXCTestSuiteName(line) {
-            lastCompletedXCTestSuiteName = suiteName
-        }
+        if line.isEmpty || line.utf8.count > Self.maximumLineBytes { return nil }
 
         // Linker (multi-line state machine)
         if let event = parseLinkerLine(line) { return event }
@@ -359,9 +357,24 @@ public struct LineParser: Sendable {
         }
 
         // Fast-path filter
+        let hasRelevantPrefix =
+            line.hasPrefix("CompileSwiftSources ")
+            || line.hasPrefix("CompileC ")
+            || line.hasPrefix("Ld ")
+            || line.hasPrefix("CopySwiftLibs ")
+            || line.hasPrefix("PhaseScriptExecution ")
+            || line.hasPrefix("LinkAssetCatalog ")
+            || line.hasPrefix("ProcessInfoPlistFile ")
+            || line.hasPrefix(XcodebuildSymbols.registerWithLaunchServices)
+            || line.hasPrefix(XcodebuildSymbols.validate)
+            || line.hasPrefix(XcodebuildSymbols.restartingAfter)
+            || line.hasPrefix("Build target ")
+            || line.hasPrefix("Build target '")
+
         let containsRelevant =
-            line.contains(XcodebuildSymbols.errorKeyword)
+            hasRelevantPrefix
             || line.contains(XcodebuildSymbols.warningKeyword)
+            || line.contains(XcodebuildSymbols.errorKeyword)
             || line.contains(XcodebuildSymbols.failedKeyword)
             || line.contains(XcodebuildSymbols.passedKeyword)
             || line.contains(XcodebuildSymbols.swiftTestingFail)
@@ -376,33 +389,24 @@ public struct LineParser: Sendable {
             || line.contains(XcodebuildSymbols.testFailed)
             || line.contains(XcodebuildSymbols.buildComplete)
             || line.contains(XcodebuildSymbols.recordedIssue)
-            || line.hasPrefix(XcodebuildSymbols.registerWithLaunchServices)
-            || line.hasPrefix(XcodebuildSymbols.validate)
             || line.contains(XcodebuildSymbols.fatalErrorKeyword)
             || (line.hasPrefix("/") && line.contains(XcodebuildSymbols.swiftFilePattern))
             || line.contains(XcodebuildSymbols.startedSuffix)
             || line.contains("\" started")
             || line.contains(XcodebuildSymbols.signalCode)
-            || line.hasPrefix(XcodebuildSymbols.restartingAfter)
-            || line.hasPrefix("Build target ")
-            || line.hasPrefix("Build target '")
             || line.contains(XcodebuildSymbols.targetPrefix)
             || line.contains(XcodebuildSymbols.dependencyOnTarget)
             || line.contains(XcodebuildSymbols.spmCompiling)
             || line.contains(XcodebuildSymbols.spmLinking)
             || line.contains("Test run with ")
-            || line.hasPrefix("CompileSwiftSources ")
-            || line.hasPrefix("CompileC ")
-            || line.hasPrefix("Ld ")
-            || line.hasPrefix("CopySwiftLibs ")
-            || line.hasPrefix("PhaseScriptExecution ")
-            || line.hasPrefix("LinkAssetCatalog ")
-            || line.hasPrefix("ProcessInfoPlistFile ")
             || (line.contains("SwiftDriver") && line.contains("Compilation"))
-            || line.hasPrefix("RegisterWithLaunchServices ")
-            || line.hasPrefix("Validate ")
 
         if !containsRelevant { return nil }
+
+        // Suite name tracking (state only, no event emitted)
+        if let suiteName = parseCompletedXCTestSuiteName(line) {
+            lastCompletedXCTestSuiteName = suiteName
+        }
 
         // Crash detection
         if let event = parseCrashLine(line) { return event }
@@ -513,7 +517,19 @@ public struct LineParser: Sendable {
     // MARK: - Linker Parsing
 
     private mutating func parseLinkerLine(_ line: String) -> ParseEvent? {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        let leadingTrimmed = line.drop { $0 == " " || $0 == "\t" }
+        let hasPendingContext = pendingLinkerSymbol != nil || pendingDuplicateSymbol != nil
+        guard hasPendingContext || isPotentialLinkerPrefix(leadingTrimmed.first) else {
+            return nil
+        }
+        guard
+            let lastNonWhitespace = leadingTrimmed.lastIndex(where: {
+                $0 != " " && $0 != "\t"
+            })
+        else {
+            return nil
+        }
+        let trimmed = leadingTrimmed[...lastNonWhitespace]
 
         if trimmed.hasPrefix(XcodebuildSymbols.undefinedSymbols) {
             let afterPrefix = trimmed.dropFirst(XcodebuildSymbols.undefinedSymbols.count)
@@ -573,12 +589,12 @@ public struct LineParser: Sendable {
         if pendingDuplicateSymbol != nil && (trimmed.hasSuffix(".o") || trimmed.hasSuffix(".a"))
             && (line.hasPrefix("    ") || line.hasPrefix("\t"))
         {
-            pendingConflictingFiles.append(trimmed)
+            pendingConflictingFiles.append(String(trimmed))
             return nil
         }
 
         if trimmed.hasPrefix("ld: building for ") && trimmed.contains("but linking") {
-            return .linkerError(LinkerError(message: trimmed))
+            return .linkerError(LinkerError(message: String(trimmed)))
         }
 
         if trimmed.hasPrefix("ld: ") && trimmed.contains("duplicate symbol") {
@@ -602,6 +618,15 @@ public struct LineParser: Sendable {
         }
 
         return nil
+    }
+
+    private func isPotentialLinkerPrefix(_ character: Character?) -> Bool {
+        switch character {
+        case "\"", "U", "d", "f", "l":
+            return true
+        default:
+            return false
+        }
     }
 
     // MARK: - Crash Detection
