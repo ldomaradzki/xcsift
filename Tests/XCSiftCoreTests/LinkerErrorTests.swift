@@ -195,6 +195,14 @@ final class LinkerErrorTests: XCTestCase {
         XCTAssertTrue(result.linkerErrors[0].message.contains("framework not found"))
     }
 
+    func testParseWhitespacePrefixedFrameworkNotFound() {
+        let parser = OutputParser()
+        let result = parser.parse(input: "    ld: framework not found SomeFramework")
+
+        XCTAssertEqual(result.linkerErrors.count, 1)
+        XCTAssertTrue(result.linkerErrors[0].message.contains("framework not found"))
+    }
+
     // MARK: - Library Not Found
 
     func testParseLibraryNotFound() {

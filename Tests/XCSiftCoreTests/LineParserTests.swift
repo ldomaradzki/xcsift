@@ -4,6 +4,12 @@ import XCTest
 
 final class LineParserTests: XCTestCase {
 
+    func testXcbeautifyInitializerFunctionReferenceRemainsSourceCompatible() {
+        let factory: (Bool) -> LineParser = LineParser.init(xcbeautify:)
+
+        _ = factory(false)
+    }
+
     // MARK: - Ignored line
 
     func testIgnoredLine() {
@@ -44,6 +50,58 @@ final class LineParserTests: XCTestCase {
         XCTAssertEqual(warning.message, "unused variable 'x'")
     }
 
+    func testJSONLikeDiagnosticTextRemainsIgnored() {
+        let lines = [
+            #"{"message":"Foo.swift:3:1: warning: not a diagnostic"}"#,
+            #"  "message" : "Foo.swift:3:1: error: not a diagnostic""#,
+            #"payload=\"Foo.swift:3:1: warning: not a diagnostic\""#,
+        ]
+
+        for line in lines {
+            var parser = LineParser()
+            XCTAssertEqual(parser.feed(line), .ignored, "Unexpected diagnostic for: \(line)")
+        }
+    }
+
+    func testWarningLocationParsingPreservesColonAndMalformedFieldSemantics() {
+        let cases: [(String, String?, Int?, Int?, String)] = [
+            ("Foo.swift:12: warning: line only", "Foo.swift", 12, nil, "line only"),
+            ("Foo.swift:12:3: warning: line and column", "Foo.swift", 12, 3, "line and column"),
+            (#"C:\work\Foo.swift:7:2: warning: Windows path"#, #"C:\work\Foo.swift"#, 7, 2, "Windows path"),
+            ("scheme:Foo.swift:9:4: warning: colon path", "scheme:Foo.swift", 9, 4, "colon path"),
+            ("a::2: warning: empty component", "a:", 2, nil, "empty component"),
+            ("Foo.swift:line:x: warning: malformed", "Foo.swift:line:x", nil, nil, "malformed"),
+            (":1:2: warning: empty file", "", 1, 2, "empty file"),
+            ("路径/Fóo.swift:8:1: warning: 注意", "路径/Fóo.swift", 8, 1, "注意"),
+        ]
+
+        for (line, expectedFile, expectedLine, expectedColumn, expectedMessage) in cases {
+            var parser = LineParser()
+            let result = parser.feed(line)
+            guard case .consumed(let event) = result, case .warning(let warning) = event else {
+                XCTFail("Expected warning for: \(line)")
+                continue
+            }
+            XCTAssertEqual(warning.file, expectedFile, "Unexpected file for: \(line)")
+            XCTAssertEqual(warning.line, expectedLine, "Unexpected line for: \(line)")
+            XCTAssertEqual(warning.column, expectedColumn, "Unexpected column for: \(line)")
+            XCTAssertEqual(warning.message, expectedMessage, "Unexpected message for: \(line)")
+        }
+    }
+
+    func testWarningMarkerRequiresExactASCIIBytes() {
+        let lines = [
+            "Foo.swift:1:1: warning:no space",
+            "Foo.swift:1:1: Warning: wrong case",
+            "Foo.swift:1:1: warning:\u{301} combining mark before space",
+        ]
+
+        for line in lines {
+            var parser = LineParser()
+            XCTAssertEqual(parser.feed(line), .ignored, "Unexpected warning for: \(line)")
+        }
+    }
+
     // MARK: - Failed test
 
     func testFailedTest() {
@@ -81,6 +139,15 @@ final class LineParserTests: XCTestCase {
             return XCTFail("Expected .consumed(.testStarted), got \(result)")
         }
         XCTAssertEqual(name, "-[MyModule.MyTests testBaz]")
+    }
+
+    func testSwiftTestingRunLifecycleIsNotTrackedAsATest() {
+        for line in ["◇ Test run started.", "◇ Test run started.\r"] {
+            var parser = LineParser()
+
+            XCTAssertEqual(parser.feed(line), .ignored)
+            XCTAssertTrue(parser.flush().isEmpty)
+        }
     }
 
     // MARK: - Linker: undefined symbol (3-line sequence)
@@ -127,6 +194,13 @@ final class LineParserTests: XCTestCase {
             "✘ Test \"myTest()\" recorded an issue at Foo.swift:10:1: Expectation failed"
         )
         XCTAssertEqual(result, .buffering)
+    }
+
+    func testRecordedIssueCandidateRequiresACharacterBoundary() {
+        var parser = LineParser()
+
+        XCTAssertEqual(parser.feed("✘ Test x recorded an issue\u{301}"), .ignored)
+        XCTAssertTrue(parser.flush().isEmpty)
     }
 
     // MARK: - Swift Testing look-ahead: comment appended
@@ -245,6 +319,32 @@ final class LineParserTests: XCTestCase {
         }
         XCTAssertEqual(target, "MyApp")
         XCTAssertEqual(phase, "CompileSwiftSources")
+    }
+
+    func testBuildPhaseParsingCanBeDisabled() {
+        var parser = LineParser(parseBuildInfo: false)
+
+        let result = parser.feed(
+            "CompileSwiftSources /some/path (in target 'MyApp' from project 'MyProject')"
+        )
+
+        XCTAssertEqual(result, .ignored)
+    }
+
+    func testDisablingBuildInfoDoesNotDiscardDiagnosticOnBuildPhaseLine() {
+        var parser = LineParser(parseBuildInfo: false)
+
+        let result = parser.feed(
+            "CompileSwiftSources /tmp/Foo.swift:1:2: warning: diagnostic on phase line"
+        )
+
+        guard case .consumed(let event) = result, case .warning(let warning) = event else {
+            return XCTFail("Expected .consumed(.warning), got \(result)")
+        }
+        XCTAssertEqual(warning.file, "CompileSwiftSources /tmp/Foo.swift")
+        XCTAssertEqual(warning.line, 1)
+        XCTAssertEqual(warning.column, 2)
+        XCTAssertEqual(warning.message, "diagnostic on phase line")
     }
 
     // MARK: - Executable

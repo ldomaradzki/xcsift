@@ -42,6 +42,64 @@ final class StreamingOutputParserTests: XCTestCase {
         XCTAssertTrue(result.warnings.isEmpty)
     }
 
+    func testCountOnlyWarningIdentityHandlesOptionalFieldsNULAndCanonicalUnicode() {
+        func warningCount(_ lines: [String]) -> Int {
+            var parser = StreamingOutputParser(retainWarnings: false)
+            for line in lines { parser.feed(line) }
+            return parser.finish().summary.warnings
+        }
+
+        XCTAssertEqual(
+            warningCount(["warning: same", ": warning: same"]),
+            2,
+            "nil and empty files must remain distinct"
+        )
+        XCTAssertEqual(
+            warningCount([
+                "File.swift: warning: same",
+                "File.swift:0: warning: same",
+            ]),
+            2,
+            "nil and zero line numbers must remain distinct"
+        )
+        XCTAssertEqual(
+            warningCount([
+                "x:1: warning: u\0l2\0mv",
+                "x\0l1\0mu:2: warning: v",
+            ]),
+            2,
+            "embedded NULs must not collide with key separators"
+        )
+        XCTAssertEqual(
+            warningCount([
+                "é.swift:1: warning: same",
+                "e\u{301}.swift:1: warning: same",
+            ]),
+            1,
+            "canonically equivalent Swift strings must deduplicate"
+        )
+    }
+
+    func testOmittingBuildInfoKeepsDiagnosticOnBuildPhaseLine() {
+        var parser = StreamingOutputParser(printWarnings: true, printBuildInfo: false)
+
+        parser.feed(
+            "CompileSwiftSources /tmp/Foo.swift:1:2: warning: diagnostic on phase line "
+                + "(in target 'MyApp' from project 'MyProject')"
+        )
+        parser.feed("** BUILD SUCCEEDED **")
+
+        let result = parser.finish()
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.warnings, 1)
+        XCTAssertEqual(
+            result.warnings.first?.message,
+            "diagnostic on phase line (in target 'MyApp' from project 'MyProject')"
+        )
+        XCTAssertNil(result.buildInfo)
+    }
+
     func testFinishDrainsBufferedRecordedIssueAtEOF() {
         var parser = StreamingOutputParser()
         parser.feed(

@@ -78,13 +78,14 @@ struct StreamingLineReader {
             receivedBytes = true
             endedWithNewline = chunk.last == 0x0A
 
-            var segmentStart = chunk.startIndex
-            while let newline = chunk[segmentStart...].firstIndex(of: 0x0A) {
-                append(chunk[segmentStart ..< newline])
-                try emitPendingLine(to: onLine)
-                segmentStart = chunk.index(after: newline)
+            try chunk.withUnsafeBytes { buffer in
+                var segmentStart = 0
+                while let newline = Self.firstNewline(in: buffer, startingAt: segmentStart) {
+                    try emitCompleteSegment(buffer[segmentStart ..< newline], to: onLine)
+                    segmentStart = newline + 1
+                }
+                append(buffer[segmentStart...])
             }
-            append(chunk[segmentStart...])
         }
 
         if isDiscardingOversizedLine || !pendingBytes.isEmpty {
@@ -98,6 +99,44 @@ struct StreamingLineReader {
             maximumBufferedBytes: maximumBufferedBytes,
             oversizedLinesDropped: oversizedLinesDropped
         )
+    }
+
+    private static func firstNewline(
+        in buffer: UnsafeRawBufferPointer,
+        startingAt start: Int
+    ) -> Int? {
+        guard start < buffer.count, let baseAddress = buffer.baseAddress else { return nil }
+
+        #if canImport(Darwin)
+            let match = Darwin.memchr(baseAddress.advanced(by: start), 0x0A, buffer.count - start)
+        #elseif canImport(Glibc)
+            let match = Glibc.memchr(baseAddress.advanced(by: start), 0x0A, buffer.count - start)
+        #elseif canImport(Musl)
+            let match = Musl.memchr(baseAddress.advanced(by: start), 0x0A, buffer.count - start)
+        #endif
+
+        guard let match else { return nil }
+        return baseAddress.distance(to: UnsafeRawPointer(match))
+    }
+
+    private mutating func emitCompleteSegment<Bytes: Collection>(
+        _ bytes: Bytes,
+        to onLine: (String) throws -> Void
+    ) throws where Bytes.Element == UInt8 {
+        if isDiscardingOversizedLine || !pendingBytes.isEmpty {
+            append(bytes)
+            try emitPendingLine(to: onLine)
+            return
+        }
+
+        guard bytes.count <= maximumLineBytes else {
+            isDiscardingOversizedLine = true
+            try emitPendingLine(to: onLine)
+            return
+        }
+
+        maximumBufferedBytes = max(maximumBufferedBytes, bytes.count)
+        try emitDecodedLine(String(decoding: bytes, as: UTF8.self), to: onLine)
     }
 
     private mutating func append<Bytes: Collection>(_ bytes: Bytes) where Bytes.Element == UInt8 {
@@ -125,6 +164,13 @@ struct StreamingLineReader {
 
         let line = String(decoding: pendingBytes, as: UTF8.self)
         pendingBytes.removeAll(keepingCapacity: true)
+        try emitDecodedLine(line, to: onLine)
+    }
+
+    private mutating func emitDecodedLine(
+        _ line: String,
+        to onLine: (String) throws -> Void
+    ) throws {
         if !containsNonWhitespace {
             let whitespace = CharacterSet.whitespacesAndNewlines
             containsNonWhitespace = line.unicodeScalars.contains {

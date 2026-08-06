@@ -286,6 +286,19 @@ final class XcbeautifyAutoDetectTests: XCTestCase {
 
         XCTAssertTrue(parser.didEmitXcbeautifyHint)
     }
+
+    func testAutoDetectHintRequiresAnExactMarkerAtTheStart() {
+        let parser = OutputParser()
+        let input = """
+             [x] leading whitespace
+            [xy] near miss
+            ⚡️ emoji near miss
+            """
+
+        _ = parser.parse(input: input, xcbeautify: false)
+
+        XCTAssertFalse(parser.didEmitXcbeautifyHint)
+    }
 }
 
 // MARK: - xcbeautify Diagnostic Parsing Tests

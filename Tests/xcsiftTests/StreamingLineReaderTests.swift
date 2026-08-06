@@ -119,6 +119,22 @@ final class StreamingLineReaderTests: XCTestCase {
         XCTAssertEqual(lines, ["first\r", "second\r", ""])
     }
 
+    func testSingleChunkLinesPreserveBufferAndOversizeSemantics() throws {
+        var source = ChunkSource(
+            chunks: [Data("1234\n\n12345\né\n".utf8)],
+            log: EventLog()
+        )
+        var reader = StreamingLineReader(chunkSize: 64, maximumLineBytes: 4)
+        var lines: [String] = []
+
+        let scan = try reader.consume(from: &source) { lines.append($0) }
+
+        XCTAssertEqual(lines, ["1234", "", "", "é", ""])
+        XCTAssertEqual(scan.oversizedLinesDropped, 1)
+        XCTAssertEqual(scan.maximumBufferedBytes, 4)
+        XCTAssertTrue(scan.containsNonWhitespace)
+    }
+
     func testUnicodeWhitespaceDoesNotCountAsInputContent() throws {
         var source = ChunkSource(
             chunks: [Data("\u{2003}\n\t".utf8)],

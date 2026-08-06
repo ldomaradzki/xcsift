@@ -20,6 +20,39 @@ public struct StreamingOutputParser {
         let message: String
     }
 
+    /// A single-allocation, exact warning identity for count-only parsing. NUL separates fields;
+    /// doubling NUL inside the optional file keeps that separator unambiguous.
+    private struct CompactWarningKey: Hashable {
+        private let value: String
+
+        init(_ warning: BuildWarning) {
+            var value = String()
+            value.reserveCapacity(
+                (warning.file?.utf8.count ?? 0) + warning.message.utf8.count + 24
+            )
+            if let file = warning.file {
+                value.append("f")
+                if file.utf8.contains(0) {
+                    value.append(file.replacingOccurrences(of: "\0", with: "\0\0"))
+                } else {
+                    value.append(file)
+                }
+            } else {
+                value.append("n")
+            }
+            value.append("\0")
+            if let line = warning.line {
+                value.append("l")
+                value.append(String(line))
+            } else {
+                value.append("n")
+            }
+            value.append("\0m")
+            value.append(warning.message)
+            self.value = value
+        }
+    }
+
     private struct ParseState {
         var errors: [BuildError] = []
         var warnings: [BuildWarning] = []
@@ -31,6 +64,8 @@ public struct StreamingOutputParser {
         var testTimeAccumulator: Double = 0
         var seenTestNames: Set<String> = []
         var seenWarnings: Set<WarningKey> = []
+        var seenCompactWarnings: Set<CompactWarningKey> = []
+        var lastCountOnlyWarning: WarningKey?
         var warningCount = 0
         var seenErrors: Set<String> = []
         var seenLinkerErrors: Set<String> = []
@@ -102,7 +137,10 @@ public struct StreamingOutputParser {
         discoverTestedTarget: Bool = false,
         xcbeautify: Bool = false
     ) {
-        lineParser = LineParser(xcbeautify: xcbeautify)
+        lineParser = LineParser(
+            xcbeautify: xcbeautify,
+            parseBuildInfo: printBuildInfo
+        )
         shouldPrintWarnings = printWarnings
         shouldRetainWarnings = retainWarnings || printWarnings || warningsAsErrors
         shouldTreatWarningsAsErrors = warningsAsErrors
@@ -289,7 +327,15 @@ public struct StreamingOutputParser {
 
         case .warning(let w):
             let key = WarningKey(file: w.file, line: w.line, message: w.message)
-            guard state.seenWarnings.insert(key).inserted else { return }
+            let inserted: Bool
+            if shouldRetainWarnings {
+                inserted = state.seenWarnings.insert(key).inserted
+            } else {
+                guard state.lastCountOnlyWarning != key else { return }
+                state.lastCountOnlyWarning = key
+                inserted = state.seenCompactWarnings.insert(CompactWarningKey(w)).inserted
+            }
+            guard inserted else { return }
             state.warningCount += 1
             if shouldRetainWarnings {
                 state.warnings.append(w)

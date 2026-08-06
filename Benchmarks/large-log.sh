@@ -25,7 +25,78 @@ else
   sizes_mib="10 100 500"
 fi
 
-printf 'size_mib,bytes,elapsed_seconds,throughput_mib_per_second,peak_rss_mib\n'
+profile=${XCSIFT_BENCHMARK_PROFILE:-phase}
+
+generate_input() {
+  local requested_bytes=$1
+  local generated_path=$2
+
+  case "$profile" in
+    phase)
+      yes "CompileSwiftSources normal arm64 /tmp/Foo.swift (in target 'VideoGo' from project 'VideoGo')" \
+        | head -c "$requested_bytes" >"$generated_path"
+      ;;
+    fast-reject)
+      yes "    cd /Users/runner/work/VideoGo/VideoGo && /usr/bin/touch /private/tmp/DerivedData/VideoGo/Build/Intermediates.noindex/stamp" \
+        | head -c "$requested_bytes" >"$generated_path"
+      ;;
+    fast-reject-unicode)
+      yes "    cd /Users/runner/work/VideoGo/构建路径 && /usr/bin/touch /private/tmp/DerivedData/VideoGo/Build/Intermediates.noindex/stamp" \
+        | head -c "$requested_bytes" >"$generated_path"
+      ;;
+    warning-duplicate)
+      yes "/tmp/VideoGo/Sources/Foo.swift:42:7: warning: immutable value 'value' was never used" \
+        | head -c "$requested_bytes" >"$generated_path"
+      ;;
+    warning-unique)
+      awk -v target="$requested_bytes" '
+        BEGIN {
+          bytes = 0
+          for (i = 1; bytes < target; i++) {
+            line = sprintf("/tmp/VideoGo/Sources/File%d.swift:%d:7: warning: unique diagnostic number %d", i % 10000, i % 500 + 1, i)
+            print line
+            bytes += length(line) + 1
+          }
+        }
+      ' >"$generated_path"
+      ;;
+    fixture-mixed)
+      while :; do
+        sed '$d' "$repository_root/Tests/XCSiftCoreTests/Fixtures/build.txt"
+      done | head -c "$requested_bytes" >"$generated_path"
+      ;;
+    video-go-shaped)
+      awk -v target="$requested_bytes" '
+        BEGIN {
+          bytes = 0
+          quote = sprintf("%c", 39)
+          for (i = 0; bytes < target; i++) {
+            slot = i % 10000
+            if (slot < 13) {
+              line = "CompileSwiftSources normal arm64 /tmp/Foo.swift (in target " \
+                quote "VideoGo" quote " from project " quote "VideoGo" quote ")"
+            } else if (slot < 956) {
+              line = sprintf("/tmp/VideoGo/Sources/File%d.swift:%d:7: warning: repeated diagnostic group %d", i % 1024, i % 500 + 1, i % 1024)
+            } else {
+              line = "    cd /Users/runner/work/VideoGo/VideoGo && /usr/bin/touch " \
+                "/private/tmp/DerivedData/VideoGo/Build/Intermediates.noindex/generated-stamp"
+            }
+            print line
+            bytes += length(line) + 1
+          }
+        }
+      ' >"$generated_path"
+      ;;
+    *)
+      echo "error: unknown benchmark profile: $profile" >&2
+      exit 1
+      ;;
+  esac
+
+  printf '\n** BUILD SUCCEEDED **\n' >>"$generated_path"
+}
+
+printf 'profile,size_mib,bytes,elapsed_seconds,throughput_mib_per_second,peak_rss_mib\n'
 
 for size_mib in $sizes_mib; do
   input_path="$benchmark_root/input-${size_mib}m.log"
@@ -33,9 +104,7 @@ for size_mib in $sizes_mib; do
   metrics_path="$benchmark_root/metrics-${size_mib}m.txt"
   requested_bytes=$((size_mib * 1024 * 1024))
 
-  yes "CompileSwiftSources normal arm64 /tmp/Foo.swift (in target 'VideoGo' from project 'VideoGo')" \
-    | head -c "$requested_bytes" >"$input_path"
-  printf '\n** BUILD SUCCEEDED **\n' >>"$input_path"
+  generate_input "$requested_bytes" "$input_path"
 
   if [ "$(uname -s)" = "Darwin" ]; then
     /usr/bin/time -lp "$xcsift_binary" -f toon <"$input_path" >"$output_path" 2>"$metrics_path"
@@ -57,8 +126,8 @@ for size_mib in $sizes_mib; do
 
   actual_bytes=$(wc -c <"$input_path" | tr -d ' ')
   throughput=$(awk -v bytes="$actual_bytes" -v seconds="$elapsed_seconds" \
-    'BEGIN { printf "%.2f", (bytes / 1048576) / seconds }')
+    'BEGIN { if (seconds > 0) printf "%.2f", (bytes / 1048576) / seconds; else printf "n/a" }')
 
-  printf '%s,%s,%s,%s,%s\n' \
-    "$size_mib" "$actual_bytes" "$elapsed_seconds" "$throughput" "$peak_rss_mib"
+  printf '%s,%s,%s,%s,%s,%s\n' \
+    "$profile" "$size_mib" "$actual_bytes" "$elapsed_seconds" "$throughput" "$peak_rss_mib"
 done

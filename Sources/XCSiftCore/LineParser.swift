@@ -102,6 +102,7 @@ public struct LineParser: Sendable {
 
     // MARK: - xcbeautify
     private let shouldParseXcbeautify: Bool
+    private let shouldParseBuildInfo: Bool
     private var xcbeautifyHintEmitted: Bool = false
 
     /// `true` if the parser wrote an xcbeautify auto-detection hint to stderr during parsing.
@@ -157,7 +158,13 @@ public struct LineParser: Sendable {
     /// - Parameter xcbeautify: Pass `true` when the input was pre-processed by xcbeautify or Tuist.
     ///   Enables parsing of `[x]`/`❌` error markers, `[!]`/`⚠️` warning markers, and `✔`/`✖` test markers.
     public init(xcbeautify: Bool = false) {
+        self.init(xcbeautify: xcbeautify, parseBuildInfo: true)
+    }
+
+    /// Internal feature gate used by aggregate parsers that omit build information.
+    init(xcbeautify: Bool = false, parseBuildInfo: Bool) {
         self.shouldParseXcbeautify = xcbeautify
+        self.shouldParseBuildInfo = parseBuildInfo
     }
 
     // MARK: - Public interface
@@ -192,9 +199,10 @@ public struct LineParser: Sendable {
     // Called when a queued event is being returned; current line must still be processed.
     private mutating func enqueueFromLine(_ line: String) {
         updateLookBackBuffer(line)
-        if line.contains(XcodebuildSymbols.recordedIssue) {
+        let candidates = Self.relevantCandidates(in: line)
+        if candidates.contains(.recordedIssue), line.contains(XcodebuildSymbols.recordedIssue) {
             pendingRecordedIssueLine = line
-        } else if let event = processLine(line) {
+        } else if let event = processLine(line, candidates: candidates) {
             eventQueue.append(event)
         }
     }
@@ -236,17 +244,18 @@ public struct LineParser: Sendable {
 
     // Path C: normal processing with look-back enrichment.
     private mutating func normalFeed(_ line: String) -> LineResult {
-        if line.contains(XcodebuildSymbols.recordedIssue) {
+        let candidates = Self.relevantCandidates(in: line)
+        if candidates.contains(.recordedIssue), line.contains(XcodebuildSymbols.recordedIssue) {
             pendingRecordedIssueLine = line
             updateLookBackBuffer(line)
             return .buffering
         }
 
-        var event = processLine(line)
+        var event = processLine(line, candidates: candidates)
 
         // PhaseScriptExecution look-back: enrich the error message with preceding context.
-        if line.contains("Command PhaseScriptExecution failed with a nonzero exit"),
-            case .error(let error) = event, error.message == line
+        if case .error(let error) = event, error.message == line,
+            line.contains("Command PhaseScriptExecution failed with a nonzero exit")
         {
             var contextLines: [String] = []
             for contextLine in lookBackBuffer {
@@ -318,15 +327,140 @@ public struct LineParser: Sendable {
 
     // MARK: - Core dispatch
 
+    private struct LineCandidates: OptionSet, Sendable {
+        let rawValue: UInt8
+
+        static let error = LineCandidates(rawValue: 1 << 0)
+        static let warning = LineCandidates(rawValue: 1 << 1)
+        static let test = LineCandidates(rawValue: 1 << 2)
+        static let status = LineCandidates(rawValue: 1 << 3)
+        static let buildInfo = LineCandidates(rawValue: 1 << 4)
+        static let executable = LineCandidates(rawValue: 1 << 5)
+        static let recordedIssue = LineCandidates(rawValue: 1 << 6)
+        static let jsonSyntax = LineCandidates(rawValue: 1 << 7)
+        static let parserCategories: LineCandidates = [
+            .error, .warning, .test, .status, .buildInfo, .executable,
+        ]
+        static let all = parserCategories.union(.jsonSyntax)
+    }
+
+    private struct UTF8Marker: Sendable {
+        let bytes: [UInt8]
+        let candidates: LineCandidates
+    }
+
+    /// Existing relevance markers grouped by their first UTF-8 byte. Scanning the line once avoids
+    /// asking Foundation to perform a separate Unicode-aware search for every marker.
+    private static let markerBuckets: [[UTF8Marker]] = {
+        var buckets = Array(repeating: [UTF8Marker](), count: 256)
+
+        func add(_ marker: String, candidates: LineCandidates) {
+            let bytes = Array(marker.utf8)
+            precondition(!bytes.isEmpty)
+            buckets[Int(bytes[0])].append(UTF8Marker(bytes: bytes, candidates: candidates))
+        }
+
+        add(XcodebuildSymbols.warningKeyword, candidates: .warning)
+        add(XcodebuildSymbols.errorKeyword, candidates: .error)
+        add(XcodebuildSymbols.failedKeyword, candidates: [.error, .test, .status])
+        add(XcodebuildSymbols.passedKeyword, candidates: .test)
+
+        for marker in [
+            "Build succeeded",
+            XcodebuildSymbols.succeededKeyword,
+            XcodebuildSymbols.buildFailedKeyword,
+            XcodebuildSymbols.testFailed,
+            XcodebuildSymbols.buildComplete,
+        ] {
+            add(marker, candidates: .status)
+        }
+
+        for marker in [
+            "Executed",
+            "] Testing ",
+            XcodebuildSymbols.startedSuffix,
+            "\" started",
+            XcodebuildSymbols.signalCode,
+            "Test run with ",
+        ] {
+            add(marker, candidates: .test)
+        }
+
+        add(XcodebuildSymbols.fatalErrorKeyword, candidates: .error)
+        add(XcodebuildSymbols.swiftFilePattern, candidates: .warning)
+        add(XcodebuildSymbols.recordedIssue, candidates: [.test, .recordedIssue])
+        add(XcodebuildSymbols.swiftTestingPass, candidates: .test)
+        add(XcodebuildSymbols.swiftTestingFail, candidates: .test)
+        add(XcodebuildSymbols.swiftTestingStartedPrefix, candidates: .test)
+        add(XcodebuildSymbols.emojiError, candidates: [.error, .test])
+
+        for marker in ["{", "[", "}", "]", "\"", "\\"] {
+            add(marker, candidates: .jsonSyntax)
+        }
+
+        for marker in [
+            XcodebuildSymbols.targetPrefix,
+            XcodebuildSymbols.dependencyOnTarget,
+            XcodebuildSymbols.spmCompiling,
+            XcodebuildSymbols.spmLinking,
+            "SwiftDriver",
+        ] {
+            add(marker, candidates: .buildInfo)
+        }
+
+        return buckets
+    }()
+
+    private static func relevantCandidates(in line: String) -> LineCandidates {
+        guard
+            let candidates = line.utf8.withContiguousStorageIfAvailable({ bytes in
+                var candidates: LineCandidates = []
+
+                for index in bytes.indices {
+                    let byte = bytes[index]
+                    for marker in markerBuckets[Int(byte)] {
+                        if marker.bytes.count > bytes.count - index { continue }
+
+                        var matches = true
+                        for offset in marker.bytes.indices
+                        where bytes[index + offset] != marker.bytes[offset] {
+                            matches = false
+                            break
+                        }
+                        if matches {
+                            candidates.formUnion(marker.candidates)
+                        }
+                    }
+                }
+
+                return candidates
+            })
+        else {
+            // Preserve parser behavior for an unusual non-contiguous UTF-8 view.
+            var candidates = LineCandidates.all
+            if line.contains(XcodebuildSymbols.recordedIssue) {
+                candidates.insert(.recordedIssue)
+            }
+            return candidates
+        }
+        return candidates
+    }
+
     /// Returns at most one ParseEvent for a line. Uses if/else if so only one branch fires.
-    private mutating func processLine(_ line: String) -> ParseEvent? {
+    private mutating func processLine(
+        _ line: String,
+        candidates preclassifiedCandidates: LineCandidates? = nil
+    ) -> ParseEvent? {
         if line.isEmpty || line.utf8.count > Self.maximumLineBytes { return nil }
 
         // Linker (multi-line state machine)
         if let event = parseLinkerLine(line) { return event }
 
         // xcbeautify auto-detection hint
-        if !shouldParseXcbeautify && !xcbeautifyHintEmitted {
+        if !shouldParseXcbeautify && !xcbeautifyHintEmitted,
+            let firstByte = line.utf8.first,
+            firstByte == 0x5B || firstByte == 0xE2
+        {
             if line.hasPrefix(XCBeautifySymbols.asciiError + " ")
                 || line.hasPrefix(XCBeautifySymbols.asciiWarning + " ")
                 || line.hasPrefix(XCBeautifySymbols.error + " ")
@@ -357,78 +491,60 @@ public struct LineParser: Sendable {
         }
 
         // Fast-path filter
-        let hasRelevantPrefix =
-            line.hasPrefix("CompileSwiftSources ")
-            || line.hasPrefix("CompileC ")
-            || line.hasPrefix("Ld ")
-            || line.hasPrefix("CopySwiftLibs ")
-            || line.hasPrefix("PhaseScriptExecution ")
-            || line.hasPrefix("LinkAssetCatalog ")
-            || line.hasPrefix("ProcessInfoPlistFile ")
-            || line.hasPrefix(XcodebuildSymbols.registerWithLaunchServices)
+        var candidates = preclassifiedCandidates ?? Self.relevantCandidates(in: line)
+        if line.hasPrefix(XcodebuildSymbols.registerWithLaunchServices)
             || line.hasPrefix(XcodebuildSymbols.validate)
-            || line.hasPrefix(XcodebuildSymbols.restartingAfter)
-            || line.hasPrefix("Build target ")
-            || line.hasPrefix("Build target '")
+        {
+            candidates.insert(.executable)
+        }
+        if line.hasPrefix(XcodebuildSymbols.restartingAfter) {
+            candidates.insert(.test)
+        }
+        if shouldParseBuildInfo
+            && (Self.phasePatterns.contains(where: { line.hasPrefix($0.prefix) })
+                || line.hasPrefix("Build target ")
+                || line.hasPrefix("Build target '"))
+        {
+            candidates.insert(.buildInfo)
+        }
+        if !shouldParseBuildInfo {
+            candidates.remove(.buildInfo)
+        }
 
-        let containsRelevant =
-            hasRelevantPrefix
-            || line.contains(XcodebuildSymbols.warningKeyword)
-            || line.contains(XcodebuildSymbols.errorKeyword)
-            || line.contains(XcodebuildSymbols.failedKeyword)
-            || line.contains(XcodebuildSymbols.passedKeyword)
-            || line.contains(XcodebuildSymbols.swiftTestingFail)
-            || line.contains(XcodebuildSymbols.swiftTestingPass)
-            || line.contains(XcodebuildSymbols.emojiError)
-            || line.contains("Build succeeded")
-            || line.contains("Build failed")
-            || line.contains("Executed")
-            || line.contains("] Testing ")
-            || line.contains(XcodebuildSymbols.succeededKeyword)
-            || line.contains(XcodebuildSymbols.buildFailedKeyword)
-            || line.contains(XcodebuildSymbols.testFailed)
-            || line.contains(XcodebuildSymbols.buildComplete)
-            || line.contains(XcodebuildSymbols.recordedIssue)
-            || line.contains(XcodebuildSymbols.fatalErrorKeyword)
-            || (line.hasPrefix("/") && line.contains(XcodebuildSymbols.swiftFilePattern))
-            || line.contains(XcodebuildSymbols.startedSuffix)
-            || line.contains("\" started")
-            || line.contains(XcodebuildSymbols.signalCode)
-            || line.contains(XcodebuildSymbols.targetPrefix)
-            || line.contains(XcodebuildSymbols.dependencyOnTarget)
-            || line.contains(XcodebuildSymbols.spmCompiling)
-            || line.contains(XcodebuildSymbols.spmLinking)
-            || line.contains("Test run with ")
-            || (line.contains("SwiftDriver") && line.contains("Compilation"))
-
-        if !containsRelevant { return nil }
+        if candidates.intersection(.parserCategories).isEmpty { return nil }
 
         // Suite name tracking (state only, no event emitted)
-        if let suiteName = parseCompletedXCTestSuiteName(line) {
+        if candidates.contains(.test), let suiteName = parseCompletedXCTestSuiteName(line) {
             lastCompletedXCTestSuiteName = suiteName
         }
 
         // Crash detection
-        if let event = parseCrashLine(line) { return event }
+        if candidates.contains(.test), let event = parseCrashLine(line) { return event }
 
         // Parallel test scheduling
-        if line.contains("] Testing "), let match = line.firstMatch(of: Self.parallelTestSchedulingRegex) {
+        if candidates.contains(.test), line.contains("] Testing "),
+            let match = line.firstMatch(of: Self.parallelTestSchedulingRegex)
+        {
             if let index = Int(match.1), let total = Int(match.2) {
                 return .parallelTestScheduled(index: index, total: total)
             }
         }
 
         // Executables
-        if let exec = parseExecutable(line) { return .executable(exec) }
+        if candidates.contains(.executable), let exec = parseExecutable(line) {
+            return .executable(exec)
+        }
 
         // Failed test
-        if let failed = parseFailedTest(line) {
+        if candidates.contains(.test), let failed = parseFailedTest(line) {
             if lastStartedTestName == failed.test { lastStartedTestName = nil }
             return .testFailed(failed)
         }
 
         // Error
-        if let error = parseError(line) {
+        if candidates.contains(.error),
+            let error = parseError(line, checkJSON: candidates.contains(.jsonSyntax))
+        {
             // Fatal error + lastStartedTestName → also emit a synthetic testFailed (matches original)
             if line.contains("Fatal error"), let testName = lastStartedTestName {
                 lastStartedTestName = nil
@@ -447,27 +563,41 @@ public struct LineParser: Sendable {
         }
 
         // Warning
-        if let warning = parseWarning(line) { return .warning(warning) }
-        if let warning = parseRuntimeWarning(line) { return .warning(warning) }
+        if candidates.contains(.warning) {
+            if let warning = parseWarning(line, checkJSON: candidates.contains(.jsonSyntax)) {
+                return .warning(warning)
+            }
+            if let warning = parseRuntimeWarning(line) { return .warning(warning) }
+        }
 
         // Passed test
-        if let (name, duration) = parsePassedTest(line) {
+        if candidates.contains(.test), let (name, duration) = parsePassedTest(line) {
             if lastStartedTestName == name { lastStartedTestName = nil }
             return .testPassed(name: name, duration: duration)
         }
 
         // Build / test time, XCTest summaries, Swift Testing summaries
-        if let event = parseBuildAndTestTime(line) { return event }
+        if candidates.contains(.status) || candidates.contains(.test) {
+            if let event = parseBuildAndTestTime(line) { return event }
+        }
 
-        // Build phases
-        if let (phase, target) = parseBuildPhase(line) { return .buildPhase(target: target, phase: phase) }
-        if let (phase, target) = parseSPMPhase(line) { return .buildPhase(target: target, phase: phase) }
+        if candidates.contains(.buildInfo) {
+            // Build phases
+            if let (phase, target) = parseBuildPhase(line) {
+                return .buildPhase(target: target, phase: phase)
+            }
+            if let (phase, target) = parseSPMPhase(line) {
+                return .buildPhase(target: target, phase: phase)
+            }
 
-        // Target timing
-        if let (name, duration) = parseTargetTiming(line) { return .targetCompleted(name: name, duration: duration) }
+            // Target timing
+            if let (name, duration) = parseTargetTiming(line) {
+                return .targetCompleted(name: name, duration: duration)
+            }
 
-        // Dependency graph
-        if let event = parseDependencyGraph(line) { return event }
+            // Dependency graph
+            if let event = parseDependencyGraph(line) { return event }
+        }
 
         return nil
     }
@@ -517,11 +647,11 @@ public struct LineParser: Sendable {
     // MARK: - Linker Parsing
 
     private mutating func parseLinkerLine(_ line: String) -> ParseEvent? {
-        let leadingTrimmed = line.drop { $0 == " " || $0 == "\t" }
         let hasPendingContext = pendingLinkerSymbol != nil || pendingDuplicateSymbol != nil
-        guard hasPendingContext || isPotentialLinkerPrefix(leadingTrimmed.first) else {
+        guard hasPendingContext || hasPotentialLinkerPrefix(line) else {
             return nil
         }
+        let leadingTrimmed = line.drop { $0 == " " || $0 == "\t" }
         guard
             let lastNonWhitespace = leadingTrimmed.lastIndex(where: {
                 $0 != " " && $0 != "\t"
@@ -620,13 +750,18 @@ public struct LineParser: Sendable {
         return nil
     }
 
-    private func isPotentialLinkerPrefix(_ character: Character?) -> Bool {
-        switch character {
-        case "\"", "U", "d", "f", "l":
-            return true
-        default:
-            return false
+    private func hasPotentialLinkerPrefix(_ line: String) -> Bool {
+        for byte in line.utf8 {
+            switch byte {
+            case 0x20, 0x09:
+                continue
+            case 0x22, 0x55, 0x64, 0x66, 0x6C:
+                return true
+            default:
+                return false
+            }
         }
+        return false
     }
 
     // MARK: - Crash Detection
@@ -683,8 +818,15 @@ public struct LineParser: Sendable {
             }
         }
 
-        if line.hasPrefix("◇ Test ") {
-            let afterPrefix = line.index(line.startIndex, offsetBy: "◇ Test ".count)
+        if line.hasPrefix(XcodebuildSymbols.swiftTestingStartedPrefix) {
+            let lineWithoutCarriageReturn = line.last == "\r" ? line.dropLast() : line[...]
+            if lineWithoutCarriageReturn == XcodebuildSymbols.swiftTestingRunStarted {
+                return nil
+            }
+            let afterPrefix = line.index(
+                line.startIndex,
+                offsetBy: XcodebuildSymbols.swiftTestingStartedPrefix.count
+            )
             if let result = extractSwiftTestingName(from: line, after: afterPrefix) {
                 let afterName = line[result.endIndex...]
                 if afterName.hasPrefix(" started") {
@@ -841,6 +983,32 @@ public struct LineParser: Sendable {
 
     // MARK: - Error / Warning Parsing
 
+    private static let warningFormatUTF8 = Array(XcodebuildSymbols.warningFormat.utf8)
+
+    private func warningFormatRange(in line: String) -> Range<String.Index>? {
+        let marker = Self.warningFormatUTF8
+        if let byteOffset = line.utf8.withContiguousStorageIfAvailable({ bytes in
+            guard bytes.count >= marker.count else { return -1 }
+
+            for start in 0 ... (bytes.count - marker.count) where bytes[start] == marker[0] {
+                var offset = 1
+                while offset < marker.count, bytes[start + offset] == marker[offset] {
+                    offset += 1
+                }
+                if offset == marker.count { return start }
+            }
+            return -1
+        }) {
+            guard byteOffset >= 0 else { return nil }
+            let utf8 = line.utf8
+            let lowerBound = utf8.index(utf8.startIndex, offsetBy: byteOffset)
+            let upperBound = utf8.index(lowerBound, offsetBy: marker.count)
+            return lowerBound ..< upperBound
+        }
+
+        return line.range(of: XcodebuildSymbols.warningFormat, options: .literal)
+    }
+
     private func isJSONLikeLine(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         if trimmed.hasPrefix("{") || trimmed.hasPrefix("[") || trimmed.hasPrefix("}")
@@ -874,8 +1042,8 @@ public struct LineParser: Sendable {
         return false
     }
 
-    private func parseError(_ line: String) -> BuildError? {
-        if isJSONLikeLine(line) { return nil }
+    private func parseError(_ line: String, checkJSON: Bool) -> BuildError? {
+        if checkJSON && isJSONLikeLine(line) { return nil }
         if isRuntimeLogNoise(line) { return nil }
         if line.hasPrefix(" "), line.contains("|") || line.contains("`") { return nil }
 
@@ -932,26 +1100,38 @@ public struct LineParser: Sendable {
         return nil
     }
 
-    private func parseWarning(_ line: String) -> BuildWarning? {
-        if isJSONLikeLine(line) { return nil }
+    private func parseWarning(_ line: String, checkJSON: Bool) -> BuildWarning? {
+        if checkJSON && isJSONLikeLine(line) { return nil }
         if isRuntimeLogNoise(line) { return nil }
         if line.hasPrefix(" "), line.contains("|") || line.contains("`") { return nil }
 
-        if let warningRange = line.range(of: XcodebuildSymbols.warningFormat) {
-            let beforeWarning = String(line[..<warningRange.lowerBound])
+        if let warningRange = warningFormatRange(in: line) {
+            let beforeWarning = line[..<warningRange.lowerBound]
             let message = String(line[warningRange.upperBound...])
-            let components = beforeWarning.split(separator: ":", omittingEmptySubsequences: false)
-            if components.count >= 3, let lineNum = Int(components[components.count - 2]),
-                let colNum = Int(components[components.count - 1])
-            {
-                let file = components[0 ..< (components.count - 2)].joined(separator: ":")
-                return BuildWarning(file: file, line: lineNum, message: message, column: colNum)
-            } else if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
-                let file = components[0 ..< (components.count - 1)].joined(separator: ":")
-                return BuildWarning(file: file, line: lineNum, message: message)
-            } else {
-                return BuildWarning(file: beforeWarning, line: nil, message: message)
+            if let finalColon = beforeWarning.lastIndex(of: ":") {
+                let finalComponent = beforeWarning[beforeWarning.index(after: finalColon)...]
+                if let finalNumber = Int(finalComponent) {
+                    let beforeFinalComponent = beforeWarning[..<finalColon]
+                    if let precedingColon = beforeFinalComponent.lastIndex(of: ":"),
+                        let lineNumber = Int(
+                            beforeFinalComponent[beforeFinalComponent.index(after: precedingColon)...]
+                        )
+                    {
+                        return BuildWarning(
+                            file: String(beforeFinalComponent[..<precedingColon]),
+                            line: lineNumber,
+                            message: message,
+                            column: finalNumber
+                        )
+                    }
+                    return BuildWarning(
+                        file: String(beforeFinalComponent),
+                        line: finalNumber,
+                        message: message
+                    )
+                }
             }
+            return BuildWarning(file: String(beforeWarning), line: nil, message: message)
         }
 
         if line.hasPrefix("warning: ") {
