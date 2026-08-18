@@ -284,6 +284,80 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.failedTests, 0)
     }
 
+    /// Issue #83: `swift test --filter` prints the same totals for the nested suite, the `.xctest`
+    /// bundle and the `Selected tests` wrapper. Only one of them may count.
+    func testSelectedTestsWrapperDoesNotDoubleCountBundleTotals() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'Selected tests' started at 2026-08-18 11:16:21.129.
+            Test Suite 'xcsiftPackageTests.xctest' started at 2026-08-18 11:16:21.130.
+            Test Suite 'PluginFilesTests' started at 2026-08-18 11:16:21.130.
+            Test Suite 'PluginFilesTests' passed at 2026-08-18 11:16:21.132.
+                 Executed 4 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+            Test Suite 'xcsiftPackageTests.xctest' passed at 2026-08-18 11:16:21.132.
+                 Executed 4 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+            Test Suite 'Selected tests' passed at 2026-08-18 11:16:21.132.
+                 Executed 4 tests, with 0 failures (0 unexpected) in 0.002 (0.003) seconds
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.summary.passedTests, 4)
+        XCTAssertEqual(result.summary.failedTests, 0)
+    }
+
+    /// Issue #83: the wrapper repeats the failure count too, so a filtered run with failures
+    /// must not report more failures than XCTest ran.
+    func testSelectedTestsWrapperDoesNotDoubleCountFailures() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'FeatureTests' failed at 2026-08-18 11:16:21.132.
+                 Executed 4 tests, with 1 failure (0 unexpected) in 0.002 (0.002) seconds
+            Test Suite 'MyPackageTests.xctest' failed at 2026-08-18 11:16:21.132.
+                 Executed 4 tests, with 1 failure (0 unexpected) in 0.002 (0.002) seconds
+            Test Suite 'Selected tests' failed at 2026-08-18 11:16:21.132.
+                 Executed 4 tests, with 1 failure (0 unexpected) in 0.002 (0.003) seconds
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.summary.failedTests, 1)
+        XCTAssertEqual(result.summary.passedTests, 3)
+    }
+
+    /// Issue #83: every suite level repeats the same duration, so test_time must count one level only.
+    func testXCTestSuiteDurationsAreNotDoubleCountedAcrossSuiteLevels() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'PluginFilesTests' passed at 2026-08-18 11:16:21.132.
+                 Executed 4 tests, with 0 failures (0 unexpected) in 1.500 (1.510) seconds
+            Test Suite 'xcsiftPackageTests.xctest' passed at 2026-08-18 11:16:21.132.
+                 Executed 4 tests, with 0 failures (0 unexpected) in 1.500 (1.510) seconds
+            Test Suite 'Selected tests' passed at 2026-08-18 11:16:21.132.
+                 Executed 4 tests, with 0 failures (0 unexpected) in 1.500 (1.520) seconds
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.summary.testTime, "1.500s")
+    }
+
+    /// Separate bundles hold disjoint tests, so their durations still add up.
+    func testXCTestBundleDurationsAccumulateAcrossBundles() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'UnitTests.xctest' passed at 2026-01-15 12:00:00.001.
+            Executed 2 tests, with 0 failures in 0.100 seconds
+            Test Suite 'UITests.xctest' passed at 2026-01-15 12:00:00.002.
+            Executed 3 tests, with 0 failures in 0.200 seconds
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.summary.testTime, "0.300s")
+        XCTAssertEqual(result.summary.passedTests, 5)
+    }
+
     /// Tests that test_time is accumulated correctly when both XCTest and Swift Testing are present
     /// Regression test for fix where test times are summed across multiple test bundles
     func testCombinedTestTimeAccumulation() {
