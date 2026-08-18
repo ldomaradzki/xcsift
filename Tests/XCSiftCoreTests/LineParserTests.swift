@@ -17,11 +17,22 @@ final class LineParserTests: XCTestCase {
         XCTAssertEqual(parser.feed("note: some note message"), .ignored)
     }
 
-    func testLineLengthLimitUsesUTF8Bytes() {
+    func testLongNonASCIIDiagnosticStaysWithinTheLineBudget() {
         var parser = LineParser()
         let line = "main.swift:1:1: error: " + String(repeating: "é", count: 3_000)
 
-        XCTAssertEqual(parser.feed(line), .ignored)
+        guard case .consumed(let event) = parser.feed(line), case .error(let error) = event else {
+            return XCTFail("Expected .consumed(.error), got \(parser.feed(line))")
+        }
+        XCTAssertEqual(error.file, "main.swift")
+        XCTAssertEqual(error.message.count, 3_000)
+    }
+
+    func testLineLengthLimitUsesUTF8Bytes() {
+        var parser = LineParser()
+        let padding = String(repeating: "é", count: LineParser.maximumLineBytes / 2)
+
+        XCTAssertEqual(parser.feed("main.swift:1:1: error: " + padding), .ignored)
     }
 
     // MARK: - Error
@@ -99,6 +110,19 @@ final class LineParserTests: XCTestCase {
         for line in lines {
             var parser = LineParser()
             XCTAssertEqual(parser.feed(line), .ignored, "Unexpected warning for: \(line)")
+        }
+    }
+
+    func testErrorMarkerRequiresExactASCIIBytes() {
+        let lines = [
+            "Foo.swift:1:1: error:no space",
+            "Foo.swift:1:1: Error: wrong case",
+            "Foo.swift:1:1: error:\u{301} combining mark before space",
+        ]
+
+        for line in lines {
+            var parser = LineParser()
+            XCTAssertEqual(parser.feed(line), .ignored, "Unexpected error for: \(line)")
         }
     }
 

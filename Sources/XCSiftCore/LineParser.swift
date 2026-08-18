@@ -67,8 +67,8 @@ public enum LineResult {
 ///
 /// ```swift
 /// var parser = LineParser()
-/// for line in output.split(separator: "\n") {
-///     if case .consumed(let event) = parser.feed(String(line)) {
+/// for line in lines {
+///     if case .consumed(let event) = parser.feed(line) {
 ///         handle(event)
 ///     }
 /// }
@@ -76,8 +76,10 @@ public enum LineResult {
 /// ```
 public struct LineParser: Sendable {
 
-    /// Maximum UTF-8 byte length accepted for one input line.
-    public static let maximumLineBytes = 5_000
+    /// Maximum UTF-8 byte length accepted for one input line. Longer lines are ignored.
+    ///
+    /// The budget is in bytes, so a non-ASCII diagnostic spends two to four bytes per character.
+    public static let maximumLineBytes = 64 * 1024
 
     // MARK: - Multi-line linker state
     private var currentLinkerArchitecture: String?
@@ -753,9 +755,10 @@ public struct LineParser: Sendable {
     private func hasPotentialLinkerPrefix(_ line: String) -> Bool {
         for byte in line.utf8 {
             switch byte {
-            case 0x20, 0x09:
+            case UInt8(ascii: " "), UInt8(ascii: "\t"):
                 continue
-            case 0x22, 0x55, 0x64, 0x66, 0x6C:
+            // First byte of `"symbol"`, `Undefined symbols`, `duplicate symbol`, `ld:`.
+            case UInt8(ascii: "\""), UInt8(ascii: "U"), UInt8(ascii: "d"), UInt8(ascii: "l"):
                 return true
             default:
                 return false
@@ -983,10 +986,25 @@ public struct LineParser: Sendable {
 
     // MARK: - Error / Warning Parsing
 
-    private static let warningFormatUTF8 = Array(XcodebuildSymbols.warningFormat.utf8)
+    /// A literal marker kept in both forms so the search never re-encodes it per line.
+    struct UTF8Needle: Sendable {
+        let bytes: [UInt8]
+        let text: String
 
-    private func warningFormatRange(in line: String) -> Range<String.Index>? {
-        let marker = Self.warningFormatUTF8
+        init(_ text: String) {
+            self.bytes = Array(text.utf8)
+            self.text = text
+        }
+    }
+
+    static let warningFormatNeedle = UTF8Needle(XcodebuildSymbols.warningFormat)
+    static let errorFormatNeedle = UTF8Needle(XcodebuildSymbols.errorFormat)
+    static let xctestBundleNeedle = UTF8Needle(".xctest")
+
+    /// Byte-exact substring search. `String.range(of:)` is Unicode-aware and dominates the
+    /// profile when every line of a large log runs several searches.
+    static func range(of needle: UTF8Needle, in line: String) -> Range<String.Index>? {
+        let marker = needle.bytes
         if let byteOffset = line.utf8.withContiguousStorageIfAvailable({ bytes in
             guard bytes.count >= marker.count else { return -1 }
 
@@ -1006,7 +1024,31 @@ public struct LineParser: Sendable {
             return lowerBound ..< upperBound
         }
 
-        return line.range(of: XcodebuildSymbols.warningFormat, options: .literal)
+        return line.range(of: needle.text, options: .literal)
+    }
+
+    static func contains(_ needle: UTF8Needle, in line: String) -> Bool {
+        range(of: needle, in: line) != nil
+    }
+
+    /// Splits the `file:line` prefix that precedes a diagnostic marker.
+    private func parseFileAndLine(_ prefix: Substring) -> (file: Substring, line: Int?) {
+        guard let finalColon = prefix.lastIndex(of: ":"),
+            let number = Int(prefix[prefix.index(after: finalColon)...])
+        else {
+            return (prefix, nil)
+        }
+        return (prefix[..<finalColon], number)
+    }
+
+    /// Splits the `file:line:column` prefix that precedes a diagnostic marker.
+    private func parseLocation(_ prefix: Substring) -> (file: Substring, line: Int?, column: Int?) {
+        let (withoutFinal, finalNumber) = parseFileAndLine(prefix)
+        guard let column = finalNumber else { return (prefix, nil, nil) }
+
+        let (file, lineNumber) = parseFileAndLine(withoutFinal)
+        guard let lineNumber else { return (withoutFinal, column, nil) }
+        return (file, lineNumber, column)
     }
 
     private func isJSONLikeLine(_ line: String) -> Bool {
@@ -1047,41 +1089,36 @@ public struct LineParser: Sendable {
         if isRuntimeLogNoise(line) { return nil }
         if line.hasPrefix(" "), line.contains("|") || line.contains("`") { return nil }
 
-        if let errorRange = line.range(of: XcodebuildSymbols.errorFormat) {
-            let beforeError = String(line[..<errorRange.lowerBound])
-            let message = String(line[errorRange.upperBound...])
-            let components = beforeError.split(separator: ":", omittingEmptySubsequences: false)
-            if components.count >= 3, let lineNum = Int(components[components.count - 2]),
-                let colNum = Int(components[components.count - 1])
-            {
-                let file = components[0 ..< (components.count - 2)].joined(separator: ":")
-                return BuildError(file: file, line: lineNum, message: message, column: colNum)
-            } else if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
-                let file = components[0 ..< (components.count - 1)].joined(separator: ":")
-                return BuildError(file: file, line: lineNum, message: message, column: nil)
-            } else {
-                return BuildError(file: beforeError, line: nil, message: message, column: nil)
-            }
+        if let errorRange = Self.range(of: Self.errorFormatNeedle, in: line) {
+            let location = parseLocation(line[..<errorRange.lowerBound])
+            return BuildError(
+                file: String(location.file),
+                line: location.line,
+                message: String(line[errorRange.upperBound...]),
+                column: location.column
+            )
         }
 
         if let fatalRange = line.range(of: XcodebuildSymbols.fatalErrorFormat) {
-            let beforeError = String(line[..<fatalRange.lowerBound])
-            let message = String(line[fatalRange.upperBound...])
-            let components = beforeError.split(separator: ":", omittingEmptySubsequences: false)
-            if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
-                let file = components[0 ..< (components.count - 1)].joined(separator: ":")
-                return BuildError(file: file, line: lineNum, message: message, column: nil)
-            } else {
-                return BuildError(file: beforeError, line: nil, message: message, column: nil)
-            }
+            let (file, lineNumber) = parseFileAndLine(line[..<fatalRange.lowerBound])
+            return BuildError(
+                file: String(file),
+                line: lineNumber,
+                message: String(line[fatalRange.upperBound...]),
+                column: nil
+            )
         }
 
         if line.hasSuffix(XcodebuildSymbols.fatalErrorSuffix), !line.contains(" xctest[") {
-            let beforeFatal = String(line.dropLast(XcodebuildSymbols.fatalErrorSuffix.count))
-            let components = beforeFatal.split(separator: ":", omittingEmptySubsequences: false)
-            if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
-                let file = components[0 ..< (components.count - 1)].joined(separator: ":")
-                return BuildError(file: file, line: lineNum, message: "Fatal error", column: nil)
+            let beforeFatal = line.dropLast(XcodebuildSymbols.fatalErrorSuffix.count)
+            let (file, lineNumber) = parseFileAndLine(beforeFatal)
+            if let lineNumber {
+                return BuildError(
+                    file: String(file),
+                    line: lineNumber,
+                    message: "Fatal error",
+                    column: nil
+                )
             }
         }
 
@@ -1105,33 +1142,14 @@ public struct LineParser: Sendable {
         if isRuntimeLogNoise(line) { return nil }
         if line.hasPrefix(" "), line.contains("|") || line.contains("`") { return nil }
 
-        if let warningRange = warningFormatRange(in: line) {
-            let beforeWarning = line[..<warningRange.lowerBound]
-            let message = String(line[warningRange.upperBound...])
-            if let finalColon = beforeWarning.lastIndex(of: ":") {
-                let finalComponent = beforeWarning[beforeWarning.index(after: finalColon)...]
-                if let finalNumber = Int(finalComponent) {
-                    let beforeFinalComponent = beforeWarning[..<finalColon]
-                    if let precedingColon = beforeFinalComponent.lastIndex(of: ":"),
-                        let lineNumber = Int(
-                            beforeFinalComponent[beforeFinalComponent.index(after: precedingColon)...]
-                        )
-                    {
-                        return BuildWarning(
-                            file: String(beforeFinalComponent[..<precedingColon]),
-                            line: lineNumber,
-                            message: message,
-                            column: finalNumber
-                        )
-                    }
-                    return BuildWarning(
-                        file: String(beforeFinalComponent),
-                        line: finalNumber,
-                        message: message
-                    )
-                }
-            }
-            return BuildWarning(file: String(beforeWarning), line: nil, message: message)
+        if let warningRange = Self.range(of: Self.warningFormatNeedle, in: line) {
+            let location = parseLocation(line[..<warningRange.lowerBound])
+            return BuildWarning(
+                file: String(location.file),
+                line: location.line,
+                message: String(line[warningRange.upperBound...]),
+                column: location.column
+            )
         }
 
         if line.hasPrefix("warning: ") {

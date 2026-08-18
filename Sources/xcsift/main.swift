@@ -289,6 +289,13 @@ struct XCSift: ParsableCommand {
             throw ExitCode.failure
         }
 
+        if inputScan.oversizedLinesDropped > 0 {
+            writeToStderr(
+                "hint: Ignored \(inputScan.oversizedLinesDropped) input line(s) longer than "
+                    + "\(LineParser.maximumLineBytes) bytes.\n"
+            )
+        }
+
         // Check if input is empty
         if !inputScan.containsNonWhitespace {
             throw ValidationError(
