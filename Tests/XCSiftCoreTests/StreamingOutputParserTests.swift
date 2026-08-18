@@ -147,6 +147,21 @@ final class StreamingOutputParserTests: XCTestCase {
         XCTAssertEqual(try encoder.encode(first), try encoder.encode(second))
     }
 
+    func testCompleteInputParserSplitsCRLFLineEndings() {
+        let parser = OutputParser()
+        let input = [
+            "First.swift:1:1: error: broken",
+            "Second.swift:2:1: error: also broken",
+            "** BUILD FAILED **",
+        ].joined(separator: "\r\n")
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.errors, 2)
+        XCTAssertEqual(result.errors.first?.file, "First.swift")
+    }
+
     func testCompleteInputParserDoesNotLeakStateAcrossCalls() {
         let parser = OutputParser()
 

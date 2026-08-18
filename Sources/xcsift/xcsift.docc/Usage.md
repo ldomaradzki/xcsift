@@ -329,6 +329,13 @@ xcodebuild build 2>&1 | xcsift --Werror --exit-on-failure
 swift test 2>&1 | xcsift -W -E -f toon
 ```
 
+## Large Build Logs
+
+xcsift parses stdin as it arrives, so memory stays bounded no matter how large the log is.
+
+One input line is limited to 64 KiB of UTF-8. Longer lines are ignored, and xcsift reports the
+count to stderr.
+
 ## Exit Codes
 
 - `0` — Build succeeded (or xcsift completed normally without `--exit-on-failure`)

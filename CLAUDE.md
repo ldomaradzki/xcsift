@@ -242,10 +242,15 @@ The codebase follows a modular architecture:
 ### Core Components
 
 1. **main.swift** - Entry point using Swift ArgumentParser
-   - Reads from stdin and coordinates parsing/output
+   - Reads stdin through `StreamingLineReader` and coordinates parsing/output
    - Outputs JSON or TOON format (controlled by `--format` / `-f` flag)
 
+1b. **StreamingLineReader.swift** - Bounded stdin reader
+   - Reads 64 KiB chunks and frames lines on the newline byte (CRLF input keeps a trailing `\r`)
+   - Lines longer than `LineParser.maximumLineBytes` (64 KiB) are ignored and reported to stderr
+
 2. **OutputParser.swift** - Core parsing logic
+   - `StreamingOutputParser` accumulates events line-by-line; `OutputParser` wraps it for complete input
    - `OutputParser` class with regex-based line parsing
    - Defines data structures: `BuildResult`, `BuildSummary`, `BuildError`, `BuildWarning`, `FailedTest`, `SlowTest`, `CodeCoverage`, `FileCoverage`, `BuildInfo`, `TargetBuildInfo`, `Executable`
    - Pattern matching for various Xcode/SPM output formats

@@ -93,6 +93,21 @@ final class StreamingLineReaderTests: XCTestCase {
         XCTAssertTrue(scan.containsNonWhitespace)
     }
 
+    func testInvalidUTF8BytesDoNotDiscardTheLine() throws {
+        var source = ChunkSource(
+            chunks: [Data("main.swift:1:1: error: bad ".utf8) + Data([0xFF]) + Data(" byte\n".utf8)],
+            log: EventLog()
+        )
+        var reader = StreamingLineReader()
+        var lines: [String] = []
+
+        let scan = try reader.consume(from: &source) { lines.append($0) }
+
+        XCTAssertEqual(lines.first?.hasPrefix("main.swift:1:1: error: bad"), true)
+        XCTAssertEqual(lines.first?.contains("byte"), true)
+        XCTAssertTrue(scan.containsNonWhitespace)
+    }
+
     func testPreservesEmptyLinesAndUnterminatedFinalLine() throws {
         var source = ChunkSource(
             chunks: [Data("\n\nlast line".utf8)],
