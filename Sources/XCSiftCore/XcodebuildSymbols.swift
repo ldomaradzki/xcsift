@@ -40,6 +40,8 @@ enum XcodebuildSymbols {
     // Swift Testing symbols (macOS Private Use Area + Linux fallback)
     static let swiftTestingPass = "✓"
     static let swiftTestingFail = "✘"
+    static let swiftTestingStartedPrefix = "◇ Test "
+    static let swiftTestingRunStarted = "◇ Test run started."
     static let emojiError = "❌"
     // U+100135 (macOS PUA) / U+21B3 (Linux) — carries #expect custom comment on the line after recorded-issue
     static let swiftTestingDetailsPrefix = "􀄵"

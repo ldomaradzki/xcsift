@@ -27,6 +27,7 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 - **Configuration files** — `.xcsift.toml` for project or user-wide defaults
 - **Quiet/Werror/exit-on-failure modes** — for CI pipelines
 - **xcbeautify/Tuist input** — parse pre-formatted output with `--xcbeautify`
+- **Streaming large-log parsing** — consumes stdin incrementally with bounded line buffering
 
 See the [full documentation](https://ldomaradzki.github.io/xcsift/documentation/xcsift) for details.
 
@@ -112,6 +113,13 @@ See [Usage](https://ldomaradzki.github.io/xcsift/documentation/xcsift/usage) for
 swift build                            # Build
 swift test                             # Run tests
 swift format --recursive --in-place .  # Format (required before committing)
+```
+
+Large-log release benchmarks are available in [`Benchmarks/`](Benchmarks/README.md):
+
+```bash
+Benchmarks/large-log.sh 10          # Pull-request smoke benchmark
+Benchmarks/large-log.sh 10 100 500  # Full size progression
 ```
 
 Documentation source is in `Sources/xcsift.docc/`. Preview locally:

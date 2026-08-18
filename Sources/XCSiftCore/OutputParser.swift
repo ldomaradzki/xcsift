@@ -1,17 +1,57 @@
 import Foundation
 import RegexBuilder
 
-/// Parses a complete xcodebuild or SPM output string and returns a structured ``BuildResult``.
+/// Incrementally parses xcodebuild or SPM output and returns a structured ``BuildResult``.
 ///
-/// `OutputParser` drives ``LineParser`` internally, accumulating and deduplicating events across
-/// all lines before producing a single ``BuildResult``. Use this when you have the full build
-/// output in memory rather than streaming it line-by-line.
+/// A `StreamingOutputParser` is a single-use parsing session. Feed it complete lines, then call
+/// ``finish(coverage:)`` once the source reaches EOF. Use ``OutputParser`` when the complete build
+/// output is already in memory.
 ///
 /// ```swift
-/// let result = OutputParser().parse(input: rawOutput, printWarnings: true)
-/// let json = try JSONEncoder().encode(result)
+/// var parser = StreamingOutputParser(printWarnings: true)
+/// parser.feed(line)
+/// let result = parser.finish()
 /// ```
-public class OutputParser {
+public struct StreamingOutputParser {
+
+    private struct WarningKey: Hashable {
+        let file: String?
+        let line: Int?
+        let message: String
+    }
+
+    /// A single-allocation, exact warning identity for count-only parsing. NUL separates fields;
+    /// doubling NUL inside the optional file keeps that separator unambiguous.
+    private struct CompactWarningKey: Hashable {
+        private let value: String
+
+        init(_ warning: BuildWarning) {
+            var value = String()
+            value.reserveCapacity(
+                (warning.file?.utf8.count ?? 0) + warning.message.utf8.count + 24
+            )
+            if let file = warning.file {
+                value.append("f")
+                if file.utf8.contains(0) {
+                    value.append(file.replacingOccurrences(of: "\0", with: "\0\0"))
+                } else {
+                    value.append(file)
+                }
+            } else {
+                value.append("n")
+            }
+            value.append("\0")
+            if let line = warning.line {
+                value.append("l")
+                value.append(String(line))
+            } else {
+                value.append("n")
+            }
+            value.append("\0m")
+            value.append(warning.message)
+            self.value = value
+        }
+    }
 
     private struct ParseState {
         var errors: [BuildError] = []
@@ -23,7 +63,10 @@ public class OutputParser {
         var buildTime: String?
         var testTimeAccumulator: Double = 0
         var seenTestNames: Set<String> = []
-        var seenWarnings: Set<String> = []
+        var seenWarnings: Set<WarningKey> = []
+        var seenCompactWarnings: Set<CompactWarningKey> = []
+        var lastCountOnlyWarning: WarningKey?
+        var warningCount = 0
         var seenErrors: Set<String> = []
         var seenLinkerErrors: Set<String> = []
         var seenPassedTestNames: Set<String> = []
@@ -47,9 +90,22 @@ public class OutputParser {
     }
 
     private var state = ParseState()
+    private var lineParser = LineParser()
+    private var shouldPrintWarnings = false
+    private var shouldRetainWarnings = true
+    private var shouldTreatWarningsAsErrors = false
+    private var shouldPrintCoverageDetails = false
+    private var slowThreshold: Double?
+    private var shouldPrintBuildInfo = false
+    private var shouldPrintExecutables = false
+    private var shouldDiscoverTestedTarget = false
+    private var finishedResult: BuildResult?
 
-    /// `true` if the most recent ``parse(input:printWarnings:warningsAsErrors:coverage:printCoverageDetails:slowThreshold:printBuildInfo:printExecutables:xcbeautify:)`` call caused an xcbeautify auto-detection hint to be written to stderr.
+    /// `true` if this session caused an xcbeautify auto-detection hint to be written to stderr.
     public private(set) var didEmitXcbeautifyHint: Bool = false
+
+    /// The tested target discovered while feeding build output, when target discovery is enabled.
+    public private(set) var testedTarget: String?
 
     // Target regex for extractTestedTarget (used externally)
     private nonisolated(unsafe) static let testSuiteRegex = Regex {
@@ -58,52 +114,66 @@ public class OutputParser {
         ".xctest'"
     }
 
-    public init() {}
-
-    /// Parses raw xcodebuild or SPM output and returns a structured ``BuildResult``.
-    ///
-    /// The method is stateless across calls — each invocation resets internal accumulators —
-    /// so a single `OutputParser` instance can be reused for multiple runs.
+    /// Creates a single-use streaming parse session.
     ///
     /// - Parameters:
-    ///   - input: The complete build output as a single string (typically captured from stderr).
-    ///   - printWarnings: When `true`, the returned `BuildResult` includes the full warnings list;
-    ///     when `false` (default), only the warning count appears in the summary.
-    ///   - warningsAsErrors: When `true`, every warning is converted to an error and the warnings
-    ///     list is cleared, mirroring `-Werror` behavior.
-    ///   - coverage: Pre-parsed ``CodeCoverage`` data to embed in the result. Pass `nil` (default)
-    ///     when coverage is not needed.
-    ///   - printCoverageDetails: When `true`, per-file coverage details are included in the result;
-    ///     when `false` (default), only the summary percentage is included.
-    ///   - slowThreshold: Tests whose duration exceeds this value (in seconds) are reported as slow.
-    ///     Pass `nil` (default) to disable slow-test detection.
-    ///   - printBuildInfo: When `true`, per-target phases, durations, and dependency graph data are
-    ///     included in the result.
-    ///   - printExecutables: When `true`, the executables list is populated in the result.
-    ///   - xcbeautify: Pass `true` when the input was pre-processed by xcbeautify or Tuist.
-    /// - Returns: A ``BuildResult`` representing the parsed build state.
-    public func parse(
-        input: String,
+    ///   - printWarnings: Include retained warning details when encoding the result.
+    ///   - retainWarnings: Keep warning models in the result. Disable for exact count-only parsing.
+    ///   - warningsAsErrors: Convert warnings to errors when finishing; this forces retention.
+    ///   - printCoverageDetails: Include per-file coverage details when encoding the result.
+    ///   - slowThreshold: Report tests slower than this many seconds.
+    ///   - printBuildInfo: Accumulate per-target phases, timing, and dependencies.
+    ///   - printExecutables: Include discovered executable targets.
+    ///   - discoverTestedTarget: Detect the `.xctest` target used for coverage filtering.
+    ///   - xcbeautify: Parse xcbeautify/Tuist markers.
+    public init(
         printWarnings: Bool = false,
+        retainWarnings: Bool = true,
         warningsAsErrors: Bool = false,
-        coverage: CodeCoverage? = nil,
         printCoverageDetails: Bool = false,
         slowThreshold: Double? = nil,
         printBuildInfo: Bool = false,
         printExecutables: Bool = false,
+        discoverTestedTarget: Bool = false,
         xcbeautify: Bool = false
-    ) -> BuildResult {
-        state = ParseState()
-        var lineParser = LineParser(xcbeautify: xcbeautify)
-        let lines = input.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    ) {
+        lineParser = LineParser(
+            xcbeautify: xcbeautify,
+            parseBuildInfo: printBuildInfo
+        )
+        shouldPrintWarnings = printWarnings
+        shouldRetainWarnings = retainWarnings || printWarnings || warningsAsErrors
+        shouldTreatWarningsAsErrors = warningsAsErrors
+        shouldPrintCoverageDetails = printCoverageDetails
+        self.slowThreshold = slowThreshold
+        shouldPrintBuildInfo = printBuildInfo
+        shouldPrintExecutables = printExecutables
+        shouldDiscoverTestedTarget = discoverTestedTarget
+    }
 
-        for line in lines {
-            if case .consumed(let event) = lineParser.feed(line) {
-                handleEvent(event, printBuildInfo: printBuildInfo)
-            }
+    /// Feeds one complete line, without its trailing newline, into the current parse.
+    ///
+    /// Feeding after ``finish(coverage:)`` is a programmer error.
+    public mutating func feed(_ line: String) {
+        precondition(finishedResult == nil, "Cannot feed a finished StreamingOutputParser")
+        if shouldDiscoverTestedTarget, testedTarget == nil {
+            testedTarget = Self.extractTestedTarget(fromLine: line)
+        }
+        if case .consumed(let event) = lineParser.feed(line) {
+            handleEvent(event, printBuildInfo: shouldPrintBuildInfo)
+        }
+        didEmitXcbeautifyHint = lineParser.didEmitXcbeautifyHint
+    }
+
+    /// Finishes the current parse and returns its aggregate result.
+    ///
+    /// Repeated calls return the result produced by the first call.
+    public mutating func finish(coverage: CodeCoverage? = nil) -> BuildResult {
+        if let finishedResult {
+            return finishedResult
         }
         for event in lineParser.flush() {
-            handleEvent(event, printBuildInfo: printBuildInfo)
+            handleEvent(event, printBuildInfo: shouldPrintBuildInfo)
         }
         didEmitXcbeautifyHint = lineParser.didEmitXcbeautifyHint
         let sawSuccessMarker = lineParser.sawSuccessMarker
@@ -113,7 +183,7 @@ public class OutputParser {
         var finalErrors = state.errors
         var finalWarnings = state.warnings
 
-        if warningsAsErrors && !state.warnings.isEmpty {
+        if shouldTreatWarningsAsErrors && !state.warnings.isEmpty {
             for warning in state.warnings {
                 finalErrors.append(
                     BuildError(
@@ -185,7 +255,7 @@ public class OutputParser {
         }()
 
         let slowTests: [SlowTest] = {
-            guard let threshold = slowThreshold else { return [] }
+            guard let threshold = self.slowThreshold else { return [] }
             return detectSlowTests(threshold: threshold)
         }()
 
@@ -198,7 +268,7 @@ public class OutputParser {
 
         let summary = BuildSummary(
             errors: finalErrors.count,
-            warnings: finalWarnings.count,
+            warnings: shouldTreatWarningsAsErrors ? 0 : state.warningCount,
             failedTests: totalFailed,
             linkerErrors: state.linkerErrors.count,
             passedTests: computedPassedTests,
@@ -207,11 +277,11 @@ public class OutputParser {
             coveragePercent: coverage?.lineCoverage,
             slowTests: slowTests.isEmpty ? nil : slowTests.count,
             flakyTests: flakyTests.isEmpty ? nil : flakyTests.count,
-            executables: printExecutables && !state.executables.isEmpty ? state.executables.count : nil
+            executables: shouldPrintExecutables && !state.executables.isEmpty ? state.executables.count : nil
         )
 
         let buildInfo: BuildInfo? =
-            printBuildInfo
+            shouldPrintBuildInfo
             ? {
                 let targets = state.targetOrder.map { targetName in
                     TargetBuildInfo(
@@ -225,7 +295,7 @@ public class OutputParser {
                 return BuildInfo(targets: targets, slowestTargets: slowestTargets)
             }() : nil
 
-        return BuildResult(
+        let result = BuildResult(
             status: status,
             summary: summary,
             errors: finalErrors,
@@ -237,16 +307,18 @@ public class OutputParser {
             flakyTests: flakyTests,
             buildInfo: buildInfo,
             executables: state.executables,
-            printWarnings: printWarnings,
-            printCoverageDetails: printCoverageDetails,
-            printBuildInfo: printBuildInfo,
-            printExecutables: printExecutables
+            printWarnings: shouldPrintWarnings,
+            printCoverageDetails: shouldPrintCoverageDetails,
+            printBuildInfo: shouldPrintBuildInfo,
+            printExecutables: shouldPrintExecutables
         )
+        finishedResult = result
+        return result
     }
 
     // MARK: - Event handling (accumulation + dedup)
 
-    private func handleEvent(_ event: ParseEvent, printBuildInfo: Bool) {
+    private mutating func handleEvent(_ event: ParseEvent, printBuildInfo: Bool) {
         switch event {
         case .error(let e):
             let key = "\(e.file ?? ""):\(e.line ?? 0):\(e.message)"
@@ -254,9 +326,20 @@ public class OutputParser {
             state.errors.append(e)
 
         case .warning(let w):
-            let key = "\(w.file ?? ""):\(w.line ?? 0):\(w.message)"
-            guard state.seenWarnings.insert(key).inserted else { return }
-            state.warnings.append(w)
+            let key = WarningKey(file: w.file, line: w.line, message: w.message)
+            let inserted: Bool
+            if shouldRetainWarnings {
+                inserted = state.seenWarnings.insert(key).inserted
+            } else {
+                guard state.lastCountOnlyWarning != key else { return }
+                state.lastCountOnlyWarning = key
+                inserted = state.seenCompactWarnings.insert(CompactWarningKey(w)).inserted
+            }
+            guard inserted else { return }
+            state.warningCount += 1
+            if shouldRetainWarnings {
+                state.warnings.append(w)
+            }
 
         case .linkerError(let e):
             let key = "\(e.symbol):\(e.message)"
@@ -405,32 +488,19 @@ public class OutputParser {
         return Array(sorted.prefix(limit).map { $0.name })
     }
 
-    /// Extracts the name of the tested target from xcodebuild output.
-    ///
-    /// Scans for a `Test Suite '*.xctest' started` line and derives the target name by stripping
-    /// the `.xctest` suffix and an optional `Tests` suffix (e.g. `MyAppTests.xctest` → `MyApp`).
-    ///
-    /// This is used internally by ``CoverageParser`` to filter coverage data to the relevant target.
-    ///
-    /// - Parameter input: Raw xcodebuild or SPM output.
-    /// - Returns: The inferred target name, or `nil` if no `.xctest` suite line was found.
-    public func extractTestedTarget(from input: String) -> String? {
-        let lines = input.split(separator: "\n")
-        for line in lines {
-            let lineStr = String(line)
-            let hasTestSuite =
-                lineStr.contains("Test Suite '") || lineStr.contains("Test suite '")
-            if hasTestSuite, lineStr.contains(".xctest"), lineStr.contains("started") {
-                if let match = lineStr.firstMatch(of: Self.testSuiteRegex) {
-                    var targetName = String(match.1)
-                    if targetName.hasSuffix("Tests") {
-                        targetName = String(targetName.dropLast(5))
-                    }
-                    return targetName
-                }
-            }
+    fileprivate static func extractTestedTarget(fromLine line: String) -> String? {
+        let hasTestSuite = line.contains("Test Suite '") || line.contains("Test suite '")
+        guard hasTestSuite, line.contains(".xctest"), line.contains("started"),
+            let match = line.firstMatch(of: Self.testSuiteRegex)
+        else {
+            return nil
         }
-        return nil
+
+        var targetName = String(match.1)
+        if targetName.hasSuffix("Tests") {
+            targetName = String(targetName.dropLast(5))
+        }
+        return targetName
     }
 
     private func normalizeTestName(_ testName: String) -> String {
@@ -446,5 +516,76 @@ public class OutputParser {
 
     private func resolvedXCTestFailedCount() -> Int? {
         state.sawBundleLevelXCTestSummary ? state.xctestBundleFailedCount : state.xctestFallbackFailedCount
+    }
+}
+
+/// Parses a complete xcodebuild or SPM output string into a structured ``BuildResult``.
+///
+/// Each call creates an isolated ``StreamingOutputParser`` session, so one `OutputParser` can be
+/// reused across multiple complete inputs without carrying state between runs.
+public class OutputParser {
+    /// `true` if the most recent ``parse(input:printWarnings:warningsAsErrors:coverage:printCoverageDetails:slowThreshold:printBuildInfo:printExecutables:xcbeautify:)``
+    /// call emitted an xcbeautify auto-detection hint.
+    public private(set) var didEmitXcbeautifyHint = false
+
+    public init() {}
+
+    /// Parses raw xcodebuild or SPM output and returns a structured ``BuildResult``.
+    ///
+    /// Each invocation uses a fresh streaming session, so an `OutputParser` instance can be reused
+    /// across multiple complete inputs without carrying state between runs.
+    ///
+    /// - Parameters:
+    ///   - input: The complete build output as a single string.
+    ///   - printWarnings: Include full warning details instead of summary count only.
+    ///   - warningsAsErrors: Convert warnings to errors in the final result.
+    ///   - coverage: Pre-parsed coverage data to embed in the result.
+    ///   - printCoverageDetails: Include per-file coverage details.
+    ///   - slowThreshold: Report tests slower than this many seconds.
+    ///   - printBuildInfo: Include per-target phases, timing, and dependencies.
+    ///   - printExecutables: Include discovered executable targets.
+    ///   - xcbeautify: Parse xcbeautify/Tuist markers.
+    public func parse(
+        input: String,
+        printWarnings: Bool = false,
+        warningsAsErrors: Bool = false,
+        coverage: CodeCoverage? = nil,
+        printCoverageDetails: Bool = false,
+        slowThreshold: Double? = nil,
+        printBuildInfo: Bool = false,
+        printExecutables: Bool = false,
+        xcbeautify: Bool = false
+    ) -> BuildResult {
+        var parser = StreamingOutputParser(
+            printWarnings: printWarnings,
+            warningsAsErrors: warningsAsErrors,
+            printCoverageDetails: printCoverageDetails,
+            slowThreshold: slowThreshold,
+            printBuildInfo: printBuildInfo,
+            printExecutables: printExecutables,
+            xcbeautify: xcbeautify
+        )
+
+        for line in input.split(separator: "\n", omittingEmptySubsequences: false) {
+            parser.feed(String(line))
+        }
+
+        let result = parser.finish(coverage: coverage)
+        didEmitXcbeautifyHint = parser.didEmitXcbeautifyHint
+        return result
+    }
+
+    /// Extracts the tested target name used to filter xcodebuild coverage data.
+    ///
+    /// A `.xctest` suite name such as `MyAppTests.xctest` resolves to `MyApp`.
+    public func extractTestedTarget(from input: String) -> String? {
+        for line in input.split(separator: "\n") {
+            if let testedTarget = StreamingOutputParser.extractTestedTarget(
+                fromLine: String(line)
+            ) {
+                return testedTarget
+            }
+        }
+        return nil
     }
 }

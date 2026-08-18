@@ -265,11 +265,32 @@ struct XCSift: ParsableCommand {
             )
         }
 
-        let parser = OutputParser()
-        let input = readStandardInput()
+        var parser = StreamingOutputParser(
+            printWarnings: resolved.warnings,
+            retainWarnings: resolved.warnings || resolved.warningsAsErrors,
+            warningsAsErrors: resolved.warningsAsErrors,
+            printCoverageDetails: resolved.coverageDetails,
+            slowThreshold: resolved.slowThreshold,
+            printBuildInfo: resolved.buildInfo,
+            printExecutables: resolved.executable,
+            discoverTestedTarget: resolved.coverage,
+            xcbeautify: resolved.xcbeautify
+        )
+        var inputSource = POSIXInputSource(fileDescriptor: STDIN_FILENO)
+        var lineReader = StreamingLineReader()
+        let inputScan: InputScan
+
+        do {
+            inputScan = try lineReader.consume(from: &inputSource) { line in
+                parser.feed(line)
+            }
+        } catch {
+            writeToStderr("Error: Failed to read standard input: \(error.localizedDescription)\n")
+            throw ExitCode.failure
+        }
 
         // Check if input is empty
-        if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if !inputScan.containsNonWhitespace {
             throw ValidationError(
                 "No input provided. Please pipe xcodebuild output to xcsift.\n\nExample: xcodebuild build | xcsift"
             )
@@ -279,7 +300,7 @@ struct XCSift: ParsableCommand {
         var coverageData: CodeCoverage? = nil
         if resolved.coverage {
             let path = resolved.coveragePath ?? ""
-            let targetFilter = parser.extractTestedTarget(from: input)
+            let targetFilter = parser.testedTarget
             coverageData = CoverageParser.parseCoverageFromPath(path, targetFilter: targetFilter)
 
             // Warn if target filter was extracted but no coverage data was found
@@ -290,17 +311,7 @@ struct XCSift: ParsableCommand {
             }
         }
 
-        let result = parser.parse(
-            input: input,
-            printWarnings: resolved.warnings,
-            warningsAsErrors: resolved.warningsAsErrors,
-            coverage: coverageData,
-            printCoverageDetails: resolved.coverageDetails,
-            slowThreshold: resolved.slowThreshold,
-            printBuildInfo: resolved.buildInfo,
-            printExecutables: resolved.executable,
-            xcbeautify: resolved.xcbeautify
-        )
+        let result = parser.finish(coverage: coverageData)
         outputResult(result, resolved: resolved)
 
         if result.status == "incomplete" {
@@ -336,22 +347,6 @@ struct XCSift: ParsableCommand {
         } catch {
             writeToStderr("Error: Failed to create \(filename): \(error.localizedDescription)\n")
             throw ExitCode.failure
-        }
-    }
-
-    private func readStandardInput() -> String {
-        if #available(macOS 10.15.4, *) {
-            // Use modern API that properly handles EOF
-            do {
-                let data = try FileHandle.standardInput.readToEnd() ?? Data()
-                return String(data: data, encoding: .utf8) ?? ""
-            } catch {
-                return ""
-            }
-        } else {
-            // Fallback for older systems
-            let data = FileHandle.standardInput.readDataToEndOfFile()
-            return String(data: data, encoding: .utf8) ?? ""
         }
     }
 
