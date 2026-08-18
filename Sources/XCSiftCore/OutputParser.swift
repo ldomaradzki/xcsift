@@ -28,7 +28,7 @@ public struct StreamingOutputParser {
         var executables: [Executable] = []
         var seenExecutablePaths: Set<String> = []
         var buildTime: String?
-        var testTimeAccumulator: Double = 0
+        var swiftTestingTimeAccumulator: Double = 0
         var seenTestNames: Set<String> = []
         var seenWarnings: Set<WarningKey> = []
         var warningCount = 0
@@ -37,8 +37,10 @@ public struct StreamingOutputParser {
         var seenPassedTestNames: Set<String> = []
         var xctestBundleExecutedCount: Int = 0
         var xctestBundleFailedCount: Int = 0
+        var xctestBundleDuration: Double = 0
         var xctestFallbackExecutedCount: Int?
         var xctestFallbackFailedCount: Int?
+        var xctestFallbackDuration: Double = 0
         var sawBundleLevelXCTestSummary: Bool = false
         var swiftTestingExecutedCount: Int?
         var swiftTestingFailedCount: Int?
@@ -228,9 +230,10 @@ public struct StreamingOutputParser {
 
         let flakyTests = detectFlakyTests()
 
+        let totalTestTime = state.swiftTestingTimeAccumulator + resolvedXCTestDuration()
         let formattedTestTime: String? =
-            state.testTimeAccumulator > 0
-            ? String(format: "%.3fs", state.testTimeAccumulator)
+            totalTestTime > 0
+            ? String(format: "%.3fs", totalTestTime)
             : nil
 
         let summary = BuildSummary(
@@ -345,20 +348,22 @@ public struct StreamingOutputParser {
             }
 
         case .testSuiteCompleted(let suiteName, let executed, let failed, let duration):
-            if suiteName.hasSuffix(".xctest") || suiteName == XcodebuildSymbols.selectedTestsSuite {
+            // "Selected tests"/"All tests" wrap the bundles, so they repeat totals instead of adding to them
+            if suiteName.hasSuffix(".xctest") {
                 state.xctestBundleExecutedCount += executed
                 state.xctestBundleFailedCount += failed
+                state.xctestBundleDuration += duration
                 state.sawBundleLevelXCTestSummary = true
             } else {
                 state.xctestFallbackExecutedCount = executed
                 state.xctestFallbackFailedCount = failed
+                state.xctestFallbackDuration = duration
             }
-            state.testTimeAccumulator += duration
 
         case .swiftTestingCompleted(let executed, let failed, let duration):
             state.swiftTestingExecutedCount = (state.swiftTestingExecutedCount ?? 0) + executed
             state.swiftTestingFailedCount = (state.swiftTestingFailedCount ?? 0) + failed
-            state.testTimeAccumulator += duration
+            state.swiftTestingTimeAccumulator += duration
 
         case .parallelTestScheduled(let index, let total):
             if let previousIndex = state.lastParallelTestSchedulingIndex {
@@ -475,6 +480,10 @@ public struct StreamingOutputParser {
 
     private func resolvedXCTestFailedCount() -> Int? {
         state.sawBundleLevelXCTestSummary ? state.xctestBundleFailedCount : state.xctestFallbackFailedCount
+    }
+
+    private func resolvedXCTestDuration() -> Double {
+        state.sawBundleLevelXCTestSummary ? state.xctestBundleDuration : state.xctestFallbackDuration
     }
 }
 
