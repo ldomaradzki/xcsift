@@ -147,6 +147,28 @@ cat ~/.cursor/hooks.json
 xcodebuild build 2>&1  # Should show xcsift-formatted output
 ```
 
+## Which Commands the Hooks Rewrite
+
+The Claude Code and Cursor hooks rewrite a command only when it runs a build or a test:
+
+```bash
+xcodebuild build          # becomes { xcodebuild build ; } 2>&1 | xcsift -f toon
+swift test --filter Foo   # becomes { swift test --filter Foo ; } 2>&1 | xcsift -f toon
+cd App && xcodebuild build
+```
+
+The hooks leave every other command unchanged, and the terminal shows its raw output:
+
+- Informational commands, such as `xcodebuild -version`, `-list`, `-showsdks`, `-showdestinations`,
+  `-showTestPlans`, `-showBuildSettings`, `-find-executable`, `-create-xcframework`,
+  `swift build --show-bin-path`, and any `--help` or `--version` command. These commands print an
+  answer, not a build log, and xcsift discards that answer.
+- Commands with their own pipe or file redirection, such as `xcodebuild build > log.txt` or
+  `xcodebuild build | tee log.txt`. Your redirection has priority.
+- Commands that already call xcsift.
+
+Codex has no hook support. Its skill tells the model to apply the same rule by hand.
+
 ## Troubleshooting
 
 ### Claude Code: "Command not found: claude"
