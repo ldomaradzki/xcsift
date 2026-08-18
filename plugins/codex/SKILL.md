@@ -14,6 +14,16 @@ xcsift parses and formats xcodebuild/SPM output into token-efficient TOON format
 - `swift build` / `swift test`
 - Any command that produces Xcode/SPM build output
 
+## When Not to Use
+
+Informational commands print an answer, not a build log. xcsift discards that answer, so run them
+directly:
+
+- `xcodebuild -version` / `-usage` / `-help`
+- `xcodebuild -list` / `-showsdks` / `-showdestinations` / `-showTestPlans` / `-showBuildSettings`
+- `xcodebuild -find-executable` / `-find-library` / `-create-xcframework`
+- `swift build --show-bin-path`, `swift test --list-tests`, and any `--help` or `--version` command
+
 ## Usage Pattern
 
 Always redirect stderr and use TOON format:

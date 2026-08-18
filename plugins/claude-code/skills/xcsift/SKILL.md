@@ -1,7 +1,7 @@
 ---
 name: formatting-build-output
 description: Use /usr/local/bin/xcsift for all Swift and Xcode build commands. Pipe xcodebuild build, xcodebuild test, swift build, swift test through xcsift to get structured TOON output with compile errors, warnings, test failures, code coverage, slow tests, and build timing. Essential for parsing Xcode build output, diagnosing compile errors, analyzing test results, and measuring code coverage in any Swift or Xcode project.
-version: 1.0.3
+version: 1.0.4
 ---
 
 # xcsift - Xcode Build Output Formatter
@@ -14,6 +14,16 @@ xcsift parses and formats xcodebuild/SPM output into token-efficient TOON format
 - `xcodebuild build` / `xcodebuild test`
 - `swift build` / `swift test`
 - Any command that produces Xcode/SPM build output
+
+## When Not to Use
+
+Informational commands print an answer, not a build log. xcsift discards that answer, so run them
+directly:
+
+- `xcodebuild -version` / `-usage` / `-help`
+- `xcodebuild -list` / `-showsdks` / `-showdestinations` / `-showTestPlans` / `-showBuildSettings`
+- `xcodebuild -find-executable` / `-find-library` / `-create-xcframework`
+- `swift build --show-bin-path`, `swift test --list-tests`, and any `--help` or `--version` command
 
 ## Usage Pattern
 

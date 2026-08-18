@@ -23,19 +23,22 @@ if ! command -v xcsift &> /dev/null; then
     exit 0
 fi
 
-# Patterns that should be piped through xcsift
-# Match: xcodebuild, swift build, swift test (with any arguments)
-# But NOT: already piped through xcsift
-if echo "$COMMAND" | grep -qE '^\s*(xcodebuild|swift\s+(build|test))\b' && \
-   ! echo "$COMMAND" | grep -q 'xcsift'; then
+# Build commands. The leading separator also matches `cd App && xcodebuild build`.
+BUILD_RE='(^|[;&|][[:space:]]*)[[:space:]]*(xcodebuild|swift[[:space:]]+(build|test))([[:space:]]|$)'
 
-    # Add 2>&1 if not present (to capture stderr)
-    if ! echo "$COMMAND" | grep -q '2>&1'; then
-        COMMAND="$COMMAND 2>&1"
-    fi
+# Informational commands print an answer, not a build log. xcsift discards that answer.
+QUERY_RE='(^|[[:space:]])--?(version|usage|help|h|list|showsdks|showdestinations|showTestPlans|showBuildSettings|showBuildSettingsForIndex|find-executable|find-library|checkFirstLaunchStatus|create-xcframework|show-bin-path|list-tests)([[:space:]]|$)'
 
-    # Pipe through xcsift with TOON format
-    MODIFIED_COMMAND="$COMMAND | xcsift -f toon"
+# Remove the redirections this hook adds, to find the redirections the user wrote.
+BARE=$(printf '%s' "$COMMAND" | sed 's/2>&1//g; s/>&2//g')
+
+if echo "$COMMAND" | grep -qE "$BUILD_RE" \
+   && ! echo "$COMMAND" | grep -qE "$QUERY_RE" \
+   && ! echo "$COMMAND" | grep -q 'xcsift' \
+   && ! echo "$BARE" | grep -qE '[|>]'; then
+
+    # Group the command, so each part of a `;` or `&&` chain goes to xcsift.
+    MODIFIED_COMMAND="{ $COMMAND ; } 2>&1 | xcsift -f toon"
 
     # Return modified command
     jq -n --arg cmd "$MODIFIED_COMMAND" '{"permission":"allow","updated_input":{"command":$cmd}}'
