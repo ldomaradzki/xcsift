@@ -1863,6 +1863,51 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.failedTests, 0)
     }
 
+    func testTerminalSuccessMarkersForEveryPhase() {
+        for marker in [
+            "** BUILD SUCCEEDED **",
+            "** ARCHIVE SUCCEEDED **",
+            "** EXPORT SUCCEEDED **",
+            "** CLEAN SUCCEEDED **",
+            "** TEST EXECUTE SUCCEEDED **",
+        ] {
+            let parser = OutputParser()
+            let result = parser.parse(input: marker)
+            XCTAssertEqual(result.status, "success", marker)
+        }
+    }
+
+    func testTerminalFailureMarkersForEveryPhase() {
+        for marker in ["** BUILD FAILED **", "** ARCHIVE FAILED **", "** EXPORT FAILED **"] {
+            let parser = OutputParser()
+            let result = parser.parse(input: marker)
+            XCTAssertEqual(result.status, "failed", marker)
+        }
+    }
+
+    func testArchiveSuccessMarkerKeepsBuildTime() {
+        let parser = OutputParser()
+        let result = parser.parse(input: "** ARCHIVE SUCCEEDED ** [12.345 sec]")
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.buildTime, "12.345 sec")
+    }
+
+    func testArchiveFailedMarkerOutranksPassedTests() {
+        // Only `** TEST FAILED **` is unreliable (issue #52). Every other phase marker is
+        // authoritative, so earlier passed tests must not turn the run green.
+        let parser = OutputParser()
+        let input = """
+            Test Case 'MyTests.testExample' passed (0.001 seconds).
+            Executed 1 test, with 0 failures in 0.001 seconds
+            ** ARCHIVE FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+    }
+
     func testIncompleteOnMarkerlessStream() {
         let parser = OutputParser()
         let input = """

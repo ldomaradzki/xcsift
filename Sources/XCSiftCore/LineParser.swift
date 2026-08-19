@@ -114,11 +114,12 @@ public struct LineParser: Sendable {
     public private(set) var didEmitXcbeautifyHint: Bool = false
 
     /// `true` if a positive terminal success marker was seen
-    /// (`** BUILD SUCCEEDED **`, `** TEST SUCCEEDED **`, `Build complete!`, `Build succeeded in …`).
+    /// (`** <PHASE> SUCCEEDED **`, `Build complete!`, `Build succeeded in …`).
     public private(set) var sawSuccessMarker: Bool = false
 
-    /// `true` if a terminal failure marker was seen
-    /// (`** BUILD FAILED **`, `** TEST FAILED **`, `Build failed after …`).
+    /// `true` if an authoritative terminal failure marker was seen
+    /// (`** <PHASE> FAILED **`, `Build failed after …`). This excludes `** TEST FAILED **`, which
+    /// xcodebuild also prints for a run that passes; that marker arrives as `.testRunFailed`.
     public private(set) var sawFailureMarker: Bool = false
 
     // MARK: - Event queue (events waiting to be delivered one per feed() call)
@@ -370,8 +371,7 @@ public struct LineParser: Sendable {
         for marker in [
             "Build succeeded",
             XcodebuildSymbols.succeededKeyword,
-            XcodebuildSymbols.buildFailedKeyword,
-            XcodebuildSymbols.testFailed,
+            XcodebuildSymbols.failedUppercaseKeyword,
             XcodebuildSymbols.buildComplete,
         ] {
             add(marker, candidates: .status)
@@ -480,9 +480,9 @@ public struct LineParser: Sendable {
         }
 
         // xcbeautify rewrites the terminal `** … SUCCEEDED **` markers to title-case status lines.
-        if shouldParseXcbeautify
-            && (line.contains(XCBeautifySymbols.buildSucceeded)
-                || line.contains(XCBeautifySymbols.testSucceeded))
+        // The suffix test is a cheap gate; the phase test then rejects run-script output.
+        if shouldParseXcbeautify, line.contains(XCBeautifySymbols.succeededSuffix),
+            XCBeautifySymbols.succeededMarkers.contains(where: { line.contains($0) })
         {
             sawSuccessMarker = true
         }
@@ -1411,23 +1411,21 @@ public struct LineParser: Sendable {
     }
 
     private mutating func parseBuildAndTestTime(_ line: String) -> ParseEvent? {
-        if line.contains(XcodebuildSymbols.buildSucceeded)
-            || line.contains(XcodebuildSymbols.testSucceeded)
-            || line.contains(XcodebuildSymbols.testExecuteSucceeded)
-        {
+        if line.contains(XcodebuildSymbols.testFailed) {
+            sawTestRunFailed = true
+            return .testRunFailed
+        }
+
+        if line.contains(XcodebuildSymbols.succeededMarkerSuffix) {
             sawSuccessMarker = true
             return bracketedTime(line)
         }
 
-        if line.contains(XcodebuildSymbols.buildFailed) {
+        if line.contains(XcodebuildSymbols.failedMarkerSuffix) {
             sawFailureMarker = true
+            // A dead test executor also ends the test that was still in flight.
+            if line.contains(XcodebuildSymbols.testExecuteFailed) { sawTestRunFailed = true }
             return bracketedTime(line)
-        }
-
-        if line.contains(XcodebuildSymbols.testFailed) {
-            sawTestRunFailed = true
-            sawFailureMarker = true
-            return .testRunFailed
         }
 
         if line.hasPrefix(XcodebuildSymbols.buildComplete) {

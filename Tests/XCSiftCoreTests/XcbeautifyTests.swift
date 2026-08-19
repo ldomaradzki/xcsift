@@ -391,6 +391,53 @@ final class XcbeautifyIntegrationTests: XCTestCase {
         XCTAssertEqual(result.status, "success")
     }
 
+    func testArchiveAndExportSuccessMarkers() {
+        // xcbeautify rewrites every ** <PHASE> SUCCEEDED ** to "<Phase> Succeeded".
+        for marker in ["Archive Succeeded", "Export Succeeded", "Test Execute Succeeded"] {
+            let parser = OutputParser()
+            let result = parser.parse(input: marker, xcbeautify: true)
+            XCTAssertEqual(result.status, "success", marker)
+        }
+    }
+
+    func testScriptOutputContainingSucceededIsNotATerminalMarker() {
+        // A run-script line is not a phase marker. A killed build must stay incomplete.
+        let parser = OutputParser()
+        let input = """
+            Compiling MyApp
+            [Upload] Upload Succeeded
+            Killed: 9
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.status, "incomplete")
+    }
+
+    func testEveryXcbeautifyPhaseSuccessMarker() {
+        // xcbeautify title-cases the phase word of `** <PHASE> SUCCEEDED **`. Verified against
+        // xcbeautify 3.2.1 for the whole xcodebuild action set.
+        for marker in [
+            "Build Succeeded", "Build For Testing Succeeded", "Test Succeeded",
+            "Test Execute Succeeded", "Test Without Building Succeeded", "Analyze Succeeded",
+            "Analyze For Testing Succeeded", "Archive Succeeded", "Export Succeeded",
+            "Clean Succeeded", "Install Succeeded", "Installsrc Succeeded",
+            "Installhdrs Succeeded", "Installloc Succeeded", "Docbuild Succeeded",
+        ] {
+            let parser = OutputParser()
+            let result = parser.parse(input: marker, xcbeautify: true)
+            XCTAssertEqual(result.status, "success", marker)
+        }
+    }
+
+    func testColoredSuccessMarker() {
+        // Terminal renderer wraps the marker in ANSI codes.
+        let parser = OutputParser()
+        let result = parser.parse(input: "\u{1B}[32;1mArchive Succeeded\u{1B}[0m", xcbeautify: true)
+
+        XCTAssertEqual(result.status, "success")
+    }
+
     func testDefaultModeUnaffected() {
         let parser = OutputParser()
         let input = """
