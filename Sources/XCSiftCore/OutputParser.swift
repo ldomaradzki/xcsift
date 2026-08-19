@@ -146,7 +146,8 @@ public struct StreamingOutputParser {
         }
         didEmitXcbeautifyHint = lineParser.didEmitXcbeautifyHint
         let sawSuccessMarker = lineParser.sawSuccessMarker
-        let sawFailureMarker = lineParser.sawFailureMarker || state.testRunFailed
+        let sawFailureMarker = lineParser.sawFailureMarker
+        let sawTestRunFailure = state.testRunFailed
 
         // If warnings-as-errors is enabled, convert warnings to errors
         var finalErrors = state.errors
@@ -207,9 +208,13 @@ public struct StreamingOutputParser {
 
             let hasPassedTests = (computedPassedTests ?? 0) > 0
 
-            // A terminal failure marker means the run failed even when no specific failure was
-            // attributed — unless tests actually passed (guards a stray "TEST FAILED" substring).
-            if sawFailureMarker {
+            // A terminal phase marker is authoritative even when no specific failure was
+            // attributed to a file or a test.
+            if sawFailureMarker { return "failed" }
+
+            // `** TEST FAILED **` is not authoritative: xcodebuild also prints it for a run that
+            // passes under -skipMacroValidation (issue #52), so passed tests outrank it.
+            if sawTestRunFailure {
                 return hasPassedTests ? "success" : "failed"
             }
 

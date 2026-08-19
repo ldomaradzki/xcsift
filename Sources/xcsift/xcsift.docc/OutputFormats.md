@@ -59,7 +59,7 @@ The default format outputs structured JSON with build status, summary, and detai
 ### Status Values
 
 - `success` — the build/test run completed with no errors, no failed tests, and produced positive evidence of completion (a terminal `** <PHASE> SUCCEEDED **` marker — `BUILD`, `TEST`, `ARCHIVE`, `EXPORT`, `CLEAN` … — a `Build complete!` marker, or passed tests).
-- `failed` — errors, failed tests, linker errors, or a terminal `** … FAILED **` marker were detected.
+- `failed` — errors, failed tests, linker errors, or a terminal `** … FAILED **` marker were detected. `** TEST FAILED **` is the one exception: xcodebuild also prints it for a run that passes under `-skipMacroValidation`, so passed tests outrank it.
 - `incomplete` — the stream ended without any terminal marker and without recognizable results. This typically means the build was truncated or killed (e.g. `Killed: 9` on memory pressure) before reporting an outcome. xcsift never reports a truncated run as `success`; combine with `--exit-on-failure` to fail the pipeline on `incomplete`.
 
 > **Migration note:** `incomplete` was introduced alongside the "success requires positive evidence" model. A successful stream lacking a recognizable terminal marker *and* passed tests now reports `incomplete` instead of `success`. Consumers that gate on status should treat anything other than `success` as non-success — checking only `status == "failed"` will miss `incomplete` runs. `--exit-on-failure` and `--quiet` already handle `incomplete` correctly.

@@ -400,6 +400,36 @@ final class XcbeautifyIntegrationTests: XCTestCase {
         }
     }
 
+    func testScriptOutputContainingSucceededIsNotATerminalMarker() {
+        // A run-script line is not a phase marker. A killed build must stay incomplete.
+        let parser = OutputParser()
+        let input = """
+            Compiling MyApp
+            [Upload] Upload Succeeded
+            Killed: 9
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.status, "incomplete")
+    }
+
+    func testEveryXcbeautifyPhaseSuccessMarker() {
+        // xcbeautify title-cases the phase word of `** <PHASE> SUCCEEDED **`. Verified against
+        // xcbeautify 3.2.1 for the whole xcodebuild action set.
+        for marker in [
+            "Build Succeeded", "Build For Testing Succeeded", "Test Succeeded",
+            "Test Execute Succeeded", "Test Without Building Succeeded", "Analyze Succeeded",
+            "Analyze For Testing Succeeded", "Archive Succeeded", "Export Succeeded",
+            "Clean Succeeded", "Install Succeeded", "Installsrc Succeeded",
+            "Installhdrs Succeeded", "Installloc Succeeded", "Docbuild Succeeded",
+        ] {
+            let parser = OutputParser()
+            let result = parser.parse(input: marker, xcbeautify: true)
+            XCTAssertEqual(result.status, "success", marker)
+        }
+    }
+
     func testColoredSuccessMarker() {
         // Terminal renderer wraps the marker in ANSI codes.
         let parser = OutputParser()

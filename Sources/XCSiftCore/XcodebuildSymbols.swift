@@ -50,9 +50,12 @@ enum XcodebuildSymbols {
     // (BUILD, TEST, TEST EXECUTE, ARCHIVE, EXPORT, CLEAN, INSTALL, ANALYZE …)
     static let succeededMarkerSuffix = " SUCCEEDED **"
     static let failedMarkerSuffix = " FAILED **"
+    // The two keywords below route a line to the status parser. They are wider than the two
+    // markers above on purpose: the fast-path filter must not drop a line the parser still reads.
     static let succeededKeyword = "SUCCEEDED"
     static let failedUppercaseKeyword = "FAILED"
     static let testFailed = "TEST FAILED"
+    static let testExecuteFailed = "TEST EXECUTE FAILED"
     static let buildComplete = "Build complete!"
     static let buildSucceededInPrefix = "Build succeeded in "
     static let buildFailedAfterPrefix = "Build failed after "

@@ -315,7 +315,8 @@ final class LineParserTests: XCTestCase {
     }
 
     func testSawFailureMarker() {
-        for marker in ["** BUILD FAILED **", "** TEST FAILED **", "Build failed after 1.2s"] {
+        // `** TEST FAILED **` is absent on purpose: it arrives as .testRunFailed instead.
+        for marker in ["** BUILD FAILED **", "** ARCHIVE FAILED **", "Build failed after 1.2s"] {
             var parser = LineParser()
             _ = parser.feed(marker)
             XCTAssertTrue(parser.sawFailureMarker, "Expected failure marker for \(marker)")
@@ -412,6 +413,19 @@ final class LineParserTests: XCTestCase {
         XCTAssertEqual(failedEvents.count, 1)
         XCTAssertEqual(failedEvents[0].test, "-[MyModule.MyTests testCrashing]")
         XCTAssertEqual(failedEvents[0].message, "Test did not complete (possible crash or timeout)")
+    }
+
+    func testFlushEmitsCrashForInFlightTestOnTestExecuteFailed() {
+        var parser = LineParser()
+        _ = parser.feed("Test Case '-[MyModule.MyTests testCrashing]' started.")
+        _ = parser.feed("** TEST EXECUTE FAILED **")
+        let events = parser.flush()
+        let failedEvents = events.compactMap { event -> FailedTest? in
+            if case .testFailed(let failed) = event { return failed }
+            return nil
+        }
+        XCTAssertEqual(failedEvents.count, 1)
+        XCTAssertEqual(failedEvents.first?.test, "-[MyModule.MyTests testCrashing]")
     }
 
     // MARK: - No phantom testFailed after last test passes then TEST FAILED fires (issue #52 variant)
