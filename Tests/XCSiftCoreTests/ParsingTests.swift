@@ -1863,6 +1863,36 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.failedTests, 0)
     }
 
+    func testTerminalSuccessMarkersForEveryPhase() {
+        for marker in [
+            "** BUILD SUCCEEDED **",
+            "** ARCHIVE SUCCEEDED **",
+            "** EXPORT SUCCEEDED **",
+            "** CLEAN SUCCEEDED **",
+            "** TEST EXECUTE SUCCEEDED **",
+        ] {
+            let parser = OutputParser()
+            let result = parser.parse(input: marker)
+            XCTAssertEqual(result.status, "success", marker)
+        }
+    }
+
+    func testTerminalFailureMarkersForEveryPhase() {
+        for marker in ["** BUILD FAILED **", "** ARCHIVE FAILED **", "** EXPORT FAILED **"] {
+            let parser = OutputParser()
+            let result = parser.parse(input: marker)
+            XCTAssertEqual(result.status, "failed", marker)
+        }
+    }
+
+    func testArchiveSuccessMarkerKeepsBuildTime() {
+        let parser = OutputParser()
+        let result = parser.parse(input: "** ARCHIVE SUCCEEDED ** [12.345 sec]")
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.buildTime, "12.345 sec")
+    }
+
     func testIncompleteOnMarkerlessStream() {
         let parser = OutputParser()
         let input = """

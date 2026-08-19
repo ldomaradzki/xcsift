@@ -319,7 +319,7 @@ The codebase follows a modular architecture:
   - **Slowest Targets**: Top 5 targets sorted by duration (descending) in `slowest_targets` array
   - Supports xcodebuild phase detection from "(in target 'X' from project 'Y')" patterns
   - Supports SPM phase detection from "[N/M] Compiling/Linking TARGET" patterns
-  - Parses "Build target X (Ys)" and "** BUILD SUCCEEDED ** [Xs]" patterns
+  - Parses "Build target X (Ys)" and "** <PHASE> SUCCEEDED ** [Xs]" patterns
   - Build time in `summary.build_time`, test execution time in `summary.test_time` (not duplicated in build_info)
   - xcodebuild phases: `CompileSwiftSources`, `SwiftCompilation`, `CompileC`, `Link`, `CopySwiftLibs`, `PhaseScriptExecution`, `LinkAssetCatalog`, `ProcessInfoPlistFile`
   - SPM phases: `Compiling`, `Linking`

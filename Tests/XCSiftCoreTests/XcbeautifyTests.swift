@@ -391,6 +391,23 @@ final class XcbeautifyIntegrationTests: XCTestCase {
         XCTAssertEqual(result.status, "success")
     }
 
+    func testArchiveAndExportSuccessMarkers() {
+        // xcbeautify rewrites every ** <PHASE> SUCCEEDED ** to "<Phase> Succeeded".
+        for marker in ["Archive Succeeded", "Export Succeeded", "Test Execute Succeeded"] {
+            let parser = OutputParser()
+            let result = parser.parse(input: marker, xcbeautify: true)
+            XCTAssertEqual(result.status, "success", marker)
+        }
+    }
+
+    func testColoredSuccessMarker() {
+        // Terminal renderer wraps the marker in ANSI codes.
+        let parser = OutputParser()
+        let result = parser.parse(input: "\u{1B}[32;1mArchive Succeeded\u{1B}[0m", xcbeautify: true)
+
+        XCTAssertEqual(result.status, "success")
+    }
+
     func testDefaultModeUnaffected() {
         let parser = OutputParser()
         let input = """

@@ -15,7 +15,6 @@ enum XCBeautifySymbols {
     static let measure = "◷"
     static let skipped = "⊘"
 
-    // Terminal status lines (xcbeautify rewrites `** BUILD/TEST SUCCEEDED **` to these).
-    static let buildSucceeded = "Build Succeeded"
-    static let testSucceeded = "Test Succeeded"
+    // Terminal status line (xcbeautify rewrites `** <PHASE> SUCCEEDED **` to "<Phase> Succeeded").
+    static let succeededSuffix = " Succeeded"
 }

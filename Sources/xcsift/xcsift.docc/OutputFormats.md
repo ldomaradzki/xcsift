@@ -58,7 +58,7 @@ The default format outputs structured JSON with build status, summary, and detai
 
 ### Status Values
 
-- `success` — the build/test run completed with no errors, no failed tests, and produced positive evidence of completion (a terminal `** BUILD SUCCEEDED **` / `** TEST SUCCEEDED **` / `Build complete!` marker, or passed tests).
+- `success` — the build/test run completed with no errors, no failed tests, and produced positive evidence of completion (a terminal `** <PHASE> SUCCEEDED **` marker — `BUILD`, `TEST`, `ARCHIVE`, `EXPORT`, `CLEAN` … — a `Build complete!` marker, or passed tests).
 - `failed` — errors, failed tests, linker errors, or a terminal `** … FAILED **` marker were detected.
 - `incomplete` — the stream ended without any terminal marker and without recognizable results. This typically means the build was truncated or killed (e.g. `Killed: 9` on memory pressure) before reporting an outcome. xcsift never reports a truncated run as `success`; combine with `--exit-on-failure` to fail the pipeline on `incomplete`.
 
