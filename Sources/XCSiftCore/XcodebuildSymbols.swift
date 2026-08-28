@@ -6,6 +6,7 @@ enum XcodebuildSymbols {
     // Diagnostic format patterns (used in parseError/parseWarning)
     static let errorFormat = ": error: "
     static let warningFormat = ": warning: "
+    static let noteFormat = ": note: "
     static let fatalErrorFormat = ": Fatal error: "
     static let fatalErrorSuffix = ": Fatal error"
 
@@ -15,6 +16,7 @@ enum XcodebuildSymbols {
     // Fast-path filter keywords
     static let errorKeyword = "error:"
     static let warningKeyword = "warning:"
+    static let noteKeyword = "note:"
     static let fatalErrorKeyword = "Fatal error"
     static let passedKeyword = "passed"
     static let failedKeyword = "failed"
