@@ -102,6 +102,12 @@ public struct LineParser: Sendable {
     private var pendingRecordedIssueLine: String?
     private var lookBackBuffer: [String] = []
 
+    /// True while a compiler source-context block is open. A `file:line:col: error:/warning:/note:`
+    /// header is followed by the offending source line, indented, then a caret line. Echoed source
+    /// can carry `: error: ` inside a string literal or a comment, which is not a diagnostic.
+    /// Tracking the block keeps indented tool output — `swiftgen: error: …` — reportable.
+    private var sourceContextOpen = false
+
     // MARK: - xcbeautify
     private let shouldParseXcbeautify: Bool
     private let shouldParseBuildInfo: Bool
@@ -331,7 +337,7 @@ public struct LineParser: Sendable {
     // MARK: - Core dispatch
 
     private struct LineCandidates: OptionSet, Sendable {
-        let rawValue: UInt8
+        let rawValue: UInt16
 
         static let error = LineCandidates(rawValue: 1 << 0)
         static let warning = LineCandidates(rawValue: 1 << 1)
@@ -341,6 +347,9 @@ public struct LineParser: Sendable {
         static let executable = LineCandidates(rawValue: 1 << 5)
         static let recordedIssue = LineCandidates(rawValue: 1 << 6)
         static let jsonSyntax = LineCandidates(rawValue: 1 << 7)
+        /// `note:` opens a source-context block but is not itself a reported diagnostic, so the
+        /// bit stays out of ``parserCategories``.
+        static let diagnosticNote = LineCandidates(rawValue: 1 << 8)
         static let parserCategories: LineCandidates = [
             .error, .warning, .test, .status, .buildInfo, .executable,
         ]
@@ -365,6 +374,7 @@ public struct LineParser: Sendable {
 
         add(XcodebuildSymbols.warningKeyword, candidates: .warning)
         add(XcodebuildSymbols.errorKeyword, candidates: .error)
+        add(XcodebuildSymbols.noteKeyword, candidates: .diagnosticNote)
         add(XcodebuildSymbols.failedKeyword, candidates: [.error, .test, .status])
         add(XcodebuildSymbols.passedKeyword, candidates: .test)
 
@@ -513,6 +523,20 @@ public struct LineParser: Sendable {
             candidates.remove(.buildInfo)
         }
 
+        // Source-context echo tracking (state only, no event emitted)
+        let firstByte = line.utf8.first
+        let isIndented = firstByte == UInt8(ascii: " ") || firstByte == UInt8(ascii: "\t")
+        let insideSourceContext = isIndented && sourceContextOpen
+        if insideSourceContext {
+            if Self.isCaretLine(line) { sourceContextOpen = false }
+        } else if !isIndented {
+            // A `note:` header opens a block too, and no other parser reads those lines. An
+            // `error:`/`warning:` header sets the flag from its own parse result below, so the
+            // hot path never scans the same line twice.
+            sourceContextOpen =
+                candidates.contains(.diagnosticNote) && isLocatedHeader(line, Self.noteFormatNeedle)
+        }
+
         if candidates.intersection(.parserCategories).isEmpty { return nil }
 
         // Suite name tracking (state only, no event emitted)
@@ -544,9 +568,11 @@ public struct LineParser: Sendable {
         }
 
         // Error
-        if candidates.contains(.error),
+        if candidates.contains(.error), !insideSourceContext,
             let error = parseError(line, checkJSON: candidates.contains(.jsonSyntax))
         {
+            // A located diagnostic header opens a source-context block.
+            if !isIndented, error.line != nil { sourceContextOpen = true }
             // Fatal error + lastStartedTestName → also emit a synthetic testFailed (matches original)
             if line.contains("Fatal error"), let testName = lastStartedTestName {
                 lastStartedTestName = nil
@@ -565,8 +591,9 @@ public struct LineParser: Sendable {
         }
 
         // Warning
-        if candidates.contains(.warning) {
+        if candidates.contains(.warning), !insideSourceContext {
             if let warning = parseWarning(line, checkJSON: candidates.contains(.jsonSyntax)) {
+                if !isIndented, warning.line != nil { sourceContextOpen = true }
                 return .warning(warning)
             }
             if let warning = parseRuntimeWarning(line) { return .warning(warning) }
@@ -999,6 +1026,7 @@ public struct LineParser: Sendable {
 
     static let warningFormatNeedle = UTF8Needle(XcodebuildSymbols.warningFormat)
     static let errorFormatNeedle = UTF8Needle(XcodebuildSymbols.errorFormat)
+    static let noteFormatNeedle = UTF8Needle(XcodebuildSymbols.noteFormat)
     static let xctestBundleNeedle = UTF8Needle(".xctest")
 
     /// Byte-exact substring search. `String.range(of:)` is Unicode-aware and dominates the
@@ -1082,6 +1110,34 @@ public struct LineParser: Sendable {
             }
         }
         return false
+    }
+
+    /// True for a `file:line:col: <marker>` header. The location test rejects tool output such as
+    /// `swiftgen: error: …`, which never echoes source.
+    private func isLocatedHeader(_ line: String, _ needle: UTF8Needle) -> Bool {
+        guard let range = Self.range(of: needle, in: line) else { return false }
+        return parseLocation(line[..<range.lowerBound]).line != nil
+    }
+
+    /// True for the `      ^~~~~` line that closes a source-context block. The last byte is a
+    /// cheap gate: every indented log line reaches this test.
+    private static func isCaretLine(_ line: String) -> Bool {
+        guard let last = line.utf8.last,
+            last == UInt8(ascii: "^") || last == UInt8(ascii: "~")
+        else { return false }
+
+        var sawCaret = false
+        for byte in line.utf8 {
+            switch byte {
+            case UInt8(ascii: " "), UInt8(ascii: "\t"), UInt8(ascii: "~"):
+                continue
+            case UInt8(ascii: "^"):
+                sawCaret = true
+            default:
+                return false
+            }
+        }
+        return sawCaret
     }
 
     private func parseError(_ line: String, checkJSON: Bool) -> BuildError? {

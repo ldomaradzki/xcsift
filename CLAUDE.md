@@ -289,6 +289,12 @@ The codebase follows a modular architecture:
 - For multi-line context, use **look-ahead/look-back** in the `parse()` loop (has access to `lines` array by index)
 - Existing examples: look-back for `PhaseScriptExecution` context, look-ahead for Swift Testing `#expect` comments
 - `failedTests` are deduplicated by normalized test name — duplicate names get merged, not appended
+- **Source-context echo**: a `file:line:col: error:/warning:/note:` header opens a block that holds
+  the indented source line and the caret line. `LineParser.sourceContextOpen` tracks the block and
+  skips error/warning parsing inside it, because echoed source can carry `: error: ` in a string
+  literal. The block closes on the caret line or on the next line without indentation. Indentation
+  alone must never suppress a diagnostic: indented tool output (`swiftgen: error: …`) stays
+  reportable.
 
 ### Key Features
 - **Error/Warning Parsing**: Multiple regex patterns handle various Xcode error formats
