@@ -28,6 +28,7 @@ A Swift command-line tool to parse and format xcodebuild/SPM output for coding a
 - **Quiet/Werror/exit-on-failure modes** — for CI pipelines
 - **xcbeautify/Tuist input** — parse pre-formatted output with `--xcbeautify`
 - **Streaming large-log parsing** — consumes stdin incrementally with bounded line buffering
+- **MCP proxy** — `xcsift mcp` wraps an Xcode MCP server so agents get structured results
 
 See the [full documentation](https://ldomaradzki.github.io/xcsift/documentation/xcsift) for details.
 
@@ -61,6 +62,56 @@ Integrate with coding assistants via built-in installers:
 | Cursor | `xcsift install-cursor` | `xcsift uninstall-cursor` |
 
 See [Plugin Installation](https://ldomaradzki.github.io/xcsift/documentation/xcsift/plugininstallation) for options and verification steps.
+
+## MCP Proxy
+
+`xcsift mcp` sits between a coding agent and an Xcode MCP server, forwarding the protocol untouched
+and sifting only the tool results that carry build output:
+
+```
+agent  ⇄  xcsift mcp  ⇄  xcrun mcpbridge  ⇄  Xcode
+```
+
+By default it wraps Xcode's own MCP server (Xcode 26+), reached through `xcrun mcpbridge`:
+
+```bash
+xcsift mcp --print-config     # Print an MCP client configuration snippet
+xcsift mcp --install          # Register the proxy with Claude Code
+xcsift mcp --uninstall        # Remove that registration again
+xcsift mcp                    # Same as: xcsift mcp -- xcrun mcpbridge
+xcsift mcp -- <any other stdio Xcode MCP server>
+```
+
+```json
+{
+  "mcpServers": {
+    "xcode": {
+      "command": "xcsift",
+      "args": ["mcp", "--", "xcrun", "mcpbridge"]
+    }
+  }
+}
+```
+
+Setup for a coding agent, in three steps:
+
+1. Enable Xcode's MCP server — Xcode ▸ Settings ▸ Intelligence, or `sudo xcrun mcp-server enable`
+   (`xcrun mcp-server status` reports the current state).
+2. Register the proxy instead of the bridge: `xcsift mcp --install` (the same thing as
+   `claude mcp add --transport stdio xcode -- xcsift mcp`, with the flags you pass recorded in it).
+3. Approve the agent `xcsift` when Xcode asks, on the first project open or build.
+
+`xcsift mcp --uninstall` takes the registration back out, whichever way it was made.
+
+Xcode approves an agent by binary and signature, so install xcsift (Homebrew) rather than pointing
+the config at a build directory, and expect one fresh approval after an upgrade.
+
+Raw `xcodebuild` transcripts are replaced by the structured result. A server that already summarises
+the build and writes the full log to disk keeps its summary, and the complete diagnostics parsed from
+that log are appended. The proxy also adds an `xcsift_parse_build_log` tool so an agent can pull the
+full diagnostics behind any build log.
+
+See [MCP Proxy](https://ldomaradzki.github.io/xcsift/documentation/xcsift/mcpproxy) for the full reference.
 
 ## Quick Start
 

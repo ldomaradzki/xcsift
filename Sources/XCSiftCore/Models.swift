@@ -269,6 +269,10 @@ public struct BuildSummary: Codable, Sendable {
     public let slowTests: Int?
     public let flakyTests: Int?
     public let executables: Int?
+    /// Tests that started and whose outcome the log never reported, so the counts above are that
+    /// many short. Xcode's console transcript drops lines under load; a run summary, when the log
+    /// carries one, is used instead and leaves this nil.
+    public let unreportedTests: Int?
 
     public enum CodingKeys: String, CodingKey {
         case errors
@@ -282,6 +286,7 @@ public struct BuildSummary: Codable, Sendable {
         case slowTests = "slow_tests"
         case flakyTests = "flaky_tests"
         case executables
+        case unreportedTests = "unreported_tests"
     }
 
     public init(
@@ -295,7 +300,8 @@ public struct BuildSummary: Codable, Sendable {
         coveragePercent: Double?,
         slowTests: Int? = nil,
         flakyTests: Int? = nil,
-        executables: Int? = nil
+        executables: Int? = nil,
+        unreportedTests: Int? = nil
     ) {
         self.errors = errors
         self.warnings = warnings
@@ -308,6 +314,7 @@ public struct BuildSummary: Codable, Sendable {
         self.slowTests = slowTests
         self.flakyTests = flakyTests
         self.executables = executables
+        self.unreportedTests = unreportedTests
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -338,6 +345,9 @@ public struct BuildSummary: Codable, Sendable {
         }
         if let executables = executables {
             try container.encode(executables, forKey: .executables)
+        }
+        if let unreportedTests = unreportedTests, unreportedTests > 0 {
+            try container.encode(unreportedTests, forKey: .unreportedTests)
         }
     }
 }

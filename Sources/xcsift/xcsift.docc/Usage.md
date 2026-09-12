@@ -329,6 +329,30 @@ xcodebuild build 2>&1 | xcsift --Werror --exit-on-failure
 swift test 2>&1 | xcsift -W -E -f toon
 ```
 
+## MCP Proxy
+
+### `mcp`
+
+Runs an Xcode MCP server as a child process and sifts the build output in its tool results. The
+parsing and formatting flags above apply, except `--quiet` and `--exit-on-failure`, which have no
+meaning over MCP and are ignored, and `-f github-actions`, which is refused.
+
+```bash
+# Wrap Xcode's built-in MCP server (the default when no command is given)
+xcsift mcp
+
+# TOON output with the full warning list
+xcsift mcp -f toon -w -- xcrun mcpbridge
+
+# Or any other stdio Xcode MCP server
+xcsift mcp -- /usr/local/bin/my-xcode-mcp serve
+
+# Print an MCP client configuration snippet
+xcsift mcp --print-config
+```
+
+See <doc:MCPProxy> for the proxy-specific options and behaviour.
+
 ## Large Build Logs
 
 xcsift parses stdin as it arrives, so memory stays bounded no matter how large the log is.

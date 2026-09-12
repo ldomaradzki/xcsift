@@ -94,6 +94,35 @@ public struct LineParser: Sendable {
 
     // MARK: - Test suite tracking
     private var lastCompletedXCTestSuiteName: String?
+    /// Suite completions already counted, keyed by suite name and timestamp. Xcode's own console
+    /// log repeats each completion — inline, under `Summary:`, sometimes again — with the identical
+    /// millisecond timestamp, and counting the repeats inflates the run.
+    ///
+    /// Two genuine completions of one suite within the same millisecond would be indistinguishable
+    /// and the second would be dropped; a completion whose line carries no parseable timestamp is
+    /// always counted, which is the safety valve for formats that omit one (the parallel
+    /// `Test suite 'X' passed on 'Device'` form, for instance).
+    private var seenXCTestSuiteCompletions: Set<String> = []
+
+    // Swift Testing reports every test's outcome on its own line, and when the transcript carries
+    // no run summary those lines are the only count of that framework's tests there is. Xcode
+    // repeats whole blocks of its console log, so an outcome counts once per test name.
+    private var seenSwiftTestingOutcomes: Set<String> = []
+    private var startedSwiftTestingTests: Set<String> = []
+    private var lastCompletedXCTestSuiteKey: String?
+
+    /// Swift Testing test cases the log reported as passing. A parameterised test reports its
+    /// cases in one line (`with 4 test cases`), and each case counts as a test — which is how
+    /// Xcode counts them too.
+    public private(set) var swiftTestingPassedCases: Int = 0
+    /// Swift Testing test cases the log reported as failing.
+    public private(set) var swiftTestingFailedCases: Int = 0
+    /// Tests Swift Testing said it started and never reported an outcome for. Xcode's console
+    /// transcript drops lines under load, so a count taken from it can be short — and saying by
+    /// how much is the difference between a number that is wrong and one that is qualified.
+    public var swiftTestingUnreportedTests: Int {
+        startedSwiftTestingTests.subtracting(seenSwiftTestingOutcomes).count
+    }
 
     // MARK: - Dependency graph state
     private var currentDependencyTarget: String?
@@ -107,6 +136,16 @@ public struct LineParser: Sendable {
     /// can carry `: error: ` inside a string literal or a comment, which is not a diagnostic.
     /// Tracking the block keeps indented tool output — `swiftgen: error: …` — reportable.
     private var sourceContextOpen = false
+
+    /// The timestamp in `Test Suite 'X' passed at 2026-09-12 16:47:46.179.`, which is what tells a
+    /// repeated completion from a new one. Formats without one return nil and are never deduped.
+    private func parseXCTestSuiteCompletionTimestamp(_ line: String) -> String? {
+        guard let atRange = line.range(of: "' passed at ") ?? line.range(of: "' failed at ") else {
+            return nil
+        }
+        let timestamp = line[atRange.upperBound...].trimmingCharacters(in: .whitespaces)
+        return timestamp.isEmpty ? nil : timestamp
+    }
 
     // MARK: - xcbeautify
     private let shouldParseXcbeautify: Bool
@@ -402,6 +441,7 @@ public struct LineParser: Sendable {
         add(XcodebuildSymbols.swiftFilePattern, candidates: .warning)
         add(XcodebuildSymbols.recordedIssue, candidates: [.test, .recordedIssue])
         add(XcodebuildSymbols.swiftTestingPass, candidates: .test)
+        add(XcodebuildSymbols.swiftTestingPassHeavy, candidates: .test)
         add(XcodebuildSymbols.swiftTestingFail, candidates: .test)
         add(XcodebuildSymbols.swiftTestingStartedPrefix, candidates: .test)
         add(XcodebuildSymbols.emojiError, candidates: [.error, .test])
@@ -542,7 +582,13 @@ public struct LineParser: Sendable {
         // Suite name tracking (state only, no event emitted)
         if candidates.contains(.test), let suiteName = parseCompletedXCTestSuiteName(line) {
             lastCompletedXCTestSuiteName = suiteName
+            lastCompletedXCTestSuiteKey = parseXCTestSuiteCompletionTimestamp(line).map { "\(suiteName)|\($0)" }
         }
+
+        // Swift Testing outcome tallying (state only): the event a line produces says nothing
+        // about which framework reported it, and the totals have to be kept apart — an XCTest
+        // bundle reports its own count, and Swift Testing tests inside one are counted as zero.
+        if candidates.contains(.test) { tallySwiftTestingOutcome(line) }
 
         // Crash detection
         if candidates.contains(.test), let event = parseCrashLine(line) { return event }
@@ -999,7 +1045,7 @@ public struct LineParser: Sendable {
                 afterKeyword[afterKeyword.index(after: openParen) ..< closeParen]
                 .trimmingCharacters(in: .whitespaces)
                 .replacingOccurrences(of: " seconds", with: "")
-            duration = Double(durationStr)
+            duration = Self.finiteDuration(Double(durationStr))
         }
 
         if passed {
@@ -1064,18 +1110,37 @@ public struct LineParser: Sendable {
         guard let finalColon = prefix.lastIndex(of: ":"),
             let number = Int(prefix[prefix.index(after: finalColon)...])
         else {
-            return (prefix, nil)
+            return (withoutIndentation(prefix), nil)
         }
-        return (prefix[..<finalColon], number)
+        return (withoutIndentation(prefix[..<finalColon]), number)
+    }
+
+    /// Rejects a duration that is not a finite number. `Double("inf")` and `Double("nan")` both
+    /// parse, and a non-finite value cannot be encoded as JSON — it would turn the whole result
+    /// into an encoding error at the very end of a build.
+    private static func finiteDuration(_ value: Double?) -> Double? {
+        guard let value, value.isFinite else { return nil }
+        return value
+    }
+
+    /// Drops the indentation in front of a diagnostic's path. Xcode's own build logs nest each
+    /// diagnostic under the task that emitted it, and that leading whitespace is not part of the
+    /// file path — keeping it would hand callers a path nothing can open.
+    private func withoutIndentation(_ file: Substring) -> Substring {
+        var result = file
+        while let first = result.first, first == " " || first == "\t" {
+            result = result.dropFirst()
+        }
+        return result
     }
 
     /// Splits the `file:line:column` prefix that precedes a diagnostic marker.
     private func parseLocation(_ prefix: Substring) -> (file: Substring, line: Int?, column: Int?) {
         let (withoutFinal, finalNumber) = parseFileAndLine(prefix)
-        guard let column = finalNumber else { return (prefix, nil, nil) }
+        guard let column = finalNumber else { return (withoutIndentation(prefix), nil, nil) }
 
         let (file, lineNumber) = parseFileAndLine(withoutFinal)
-        guard let lineNumber else { return (withoutFinal, column, nil) }
+        guard let lineNumber else { return (withoutIndentation(withoutFinal), column, nil) }
         return (file, lineNumber, column)
     }
 
@@ -1282,25 +1347,121 @@ public struct LineParser: Sendable {
             if let lastParen = line.range(of: "(", options: .backwards),
                 let secondsEnd = line.range(of: XcodebuildSymbols.secondsKeyword, options: .backwards)
             {
-                duration = Double(String(line[lastParen.upperBound ..< secondsEnd.lowerBound]))
+                duration = Self.finiteDuration(Double(String(line[lastParen.upperBound ..< secondsEnd.lowerBound])))
             }
             return (testName, duration)
         }
 
-        if line.hasPrefix("✓ Test \""), let endQuote = line.range(of: "\" passed") {
-            let startIndex = line.index(line.startIndex, offsetBy: 8)
-            let testName = String(line[startIndex ..< endQuote.lowerBound])
-            var duration: Double?
-            if let afterRange = line.range(of: " after ", range: endQuote.upperBound ..< line.endIndex) {
-                let afterStr = line[afterRange.upperBound...]
-                if let secondsRange = afterStr.range(of: " seconds") {
-                    duration = Double(String(afterStr[..<secondsRange.lowerBound]))
-                }
-            }
-            return (testName, duration)
+        if let report = Self.parseSwiftTestingReport(line), report.outcome == .passed {
+            return (report.name, report.duration)
         }
 
         return nil
+    }
+
+    // MARK: - Swift Testing per-test reports
+
+    enum SwiftTestingOutcome {
+        case started
+        case passed
+        case failed
+    }
+
+    struct SwiftTestingReport {
+        let name: String
+        let outcome: SwiftTestingOutcome
+        /// How many tests the line accounts for. One, unless the test is parameterised.
+        let cases: Int
+        let duration: Double?
+    }
+
+    /// Reads one of Swift Testing's per-test lines:
+    ///
+    /// ```text
+    ///   ◇ Test "Addition operation" started.
+    ///   ✔ Test "Addition operation" with 4 test cases passed after 0.012 seconds.
+    ///   ✘ Test "Intentional failure" failed after 0.011 seconds with 1 issue.
+    /// ```
+    ///
+    /// The leading glyph varies by platform and Xcode indents the line under the task that emitted
+    /// it, so the shape of the line is matched rather than a prefix. Nothing before `Test "` may
+    /// carry a letter, which keeps prose that quotes such a line from being read as one.
+    static func parseSwiftTestingReport(_ line: String) -> SwiftTestingReport? {
+        guard let testRange = line.range(of: "Test ") else { return nil }
+        guard !line[..<testRange.lowerBound].contains(where: { $0.isLetter }) else { return nil }
+
+        let remainder = line[testRange.upperBound...]
+        // `Test run with …` is the run summary, `Test Case '…'` is XCTest, and
+        // `Test case passing … to "X" started.` reports one case of a parameterised test — whose
+        // function-level line is counted instead, so counting both would double it.
+        guard !remainder.hasPrefix("run with "), !remainder.lowercased().hasPrefix("case ") else {
+            return nil
+        }
+        guard remainder.hasPrefix("\"") else { return nil }
+
+        let nameStart = line.index(after: testRange.upperBound)
+        guard let quoteEnd = line[nameStart...].firstIndex(of: "\"") else { return nil }
+        let name = String(line[nameStart ..< quoteEnd])
+        guard !name.isEmpty else { return nil }
+
+        let tail = String(line[line.index(after: quoteEnd)...])
+        let cases = parameterisedCaseCount(in: tail) ?? 1
+
+        if tail.contains(" started.") {
+            return SwiftTestingReport(name: name, outcome: .started, cases: cases, duration: nil)
+        }
+        if let passed = tail.range(of: " passed after ") {
+            return SwiftTestingReport(
+                name: name,
+                outcome: .passed,
+                cases: cases,
+                duration: seconds(in: tail[passed.upperBound...])
+            )
+        }
+        if let failed = tail.range(of: " failed after ") {
+            return SwiftTestingReport(
+                name: name,
+                outcome: .failed,
+                cases: cases,
+                duration: seconds(in: tail[failed.upperBound...])
+            )
+        }
+        // `recorded an issue at …` is how a failing test is first reported; the `failed after`
+        // line follows, and counting by name makes the pair one failure.
+        if tail.contains(XcodebuildSymbols.recordedIssue) {
+            return SwiftTestingReport(name: name, outcome: .failed, cases: cases, duration: nil)
+        }
+
+        return nil
+    }
+
+    /// `with 4 test cases passed after …` → 4.
+    private static func parameterisedCaseCount(in tail: String) -> Int? {
+        guard let with = tail.range(of: " with "), let cases = tail.range(of: " test case") else {
+            return nil
+        }
+        guard with.upperBound <= cases.lowerBound else { return nil }
+        return Int(tail[with.upperBound ..< cases.lowerBound].trimmingCharacters(in: .whitespaces))
+    }
+
+    private static func seconds(in text: Substring) -> Double? {
+        guard let secondsRange = text.range(of: " seconds") else { return nil }
+        return Self.finiteDuration(Double(text[..<secondsRange.lowerBound].trimmingCharacters(in: .whitespaces)))
+    }
+
+    private mutating func tallySwiftTestingOutcome(_ line: String) {
+        guard let report = Self.parseSwiftTestingReport(line) else { return }
+
+        switch report.outcome {
+        case .started:
+            startedSwiftTestingTests.insert(report.name)
+        case .passed:
+            guard seenSwiftTestingOutcomes.insert(report.name).inserted else { return }
+            swiftTestingPassedCases += report.cases
+        case .failed:
+            guard seenSwiftTestingOutcomes.insert(report.name).inserted else { return }
+            swiftTestingFailedCases += report.cases
+        }
     }
 
     private func parseFailedTest(_ line: String) -> FailedTest? {
@@ -1316,7 +1477,12 @@ public struct LineParser: Sendable {
                 let components = beforeError.split(separator: ":", omittingEmptySubsequences: false)
                 if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
                     let file = components[0 ..< (components.count - 1)].joined(separator: ":")
-                    return FailedTest(test: testName, message: message, file: file, line: lineNum)
+                    return FailedTest(
+                        test: testName,
+                        message: message,
+                        file: String(withoutIndentation(Substring(file))),
+                        line: lineNum
+                    )
                 }
             }
             if let bracketStart = line.range(of: "-["),
@@ -1330,8 +1496,21 @@ public struct LineParser: Sendable {
                     line: nil
                 )
             }
+            // `<file>:test failure:<message>` — Xcode restating a failure it reports in full
+            // elsewhere in the transcript. Parsed rather than swallowed: when it is the only
+            // rendering present, its file and message are all there is.
+            if let marker = line.range(of: XcodebuildSymbols.testFailureRestatement) {
+                let file = String(withoutIndentation(line[..<marker.lowerBound]))
+                return FailedTest(
+                    test: XcodebuildSymbols.unnamedTestFailure,
+                    message: String(line[marker.upperBound...]).trimmingCharacters(in: .whitespaces),
+                    file: file.isEmpty ? nil : file,
+                    line: nil
+                )
+            }
+
             return FailedTest(
-                test: "Test assertion",
+                test: XcodebuildSymbols.unnamedTestFailure,
                 message: line.trimmingCharacters(in: .whitespaces),
                 file: nil,
                 line: nil
@@ -1358,7 +1537,7 @@ public struct LineParser: Sendable {
             if let lastParen = line.range(of: "(", options: .backwards),
                 let secondsEnd = line.range(of: XcodebuildSymbols.secondsKeyword, options: .backwards)
             {
-                duration = Double(String(line[lastParen.upperBound ..< secondsEnd.lowerBound]))
+                duration = Self.finiteDuration(Double(String(line[lastParen.upperBound ..< secondsEnd.lowerBound])))
             }
 
             let message = duration.map { String(format: "%.3f seconds", $0) } ?? "failed"
@@ -1382,7 +1561,7 @@ public struct LineParser: Sendable {
                             omittingEmptySubsequences: false
                         )
                         if parts.count >= 4, let lineNum = Int(parts[1]) {
-                            let file = String(parts[0])
+                            let file = String(withoutIndentation(parts[0]))
                             let message = String(parts[3]).trimmingCharacters(in: .whitespaces)
                             return FailedTest(test: testName, message: message, file: file, line: lineNum)
                         }
@@ -1392,7 +1571,7 @@ public struct LineParser: Sendable {
                         var duration: Double?
                         let afterFailed = line[failedAfter.upperBound...]
                         if let secondsRange = afterFailed.range(of: " seconds") {
-                            duration = Double(String(afterFailed[..<secondsRange.lowerBound]))
+                            duration = Self.finiteDuration(Double(String(afterFailed[..<secondsRange.lowerBound])))
                         }
                         return FailedTest(
                             test: testName,
@@ -1543,11 +1722,21 @@ public struct LineParser: Sendable {
                 } else {
                     durationStr = String(afterIn)
                 }
-                duration = Double(durationStr.trimmingCharacters(in: CharacterSet(charactersIn: ". \t"))) ?? 0
+                duration =
+                    Self.finiteDuration(
+                        Double(durationStr.trimmingCharacters(in: CharacterSet(charactersIn: ". \t")))
+                    ) ?? 0
             }
 
             let suiteName = lastCompletedXCTestSuiteName ?? ""
+            let completionKey = lastCompletedXCTestSuiteKey
             lastCompletedXCTestSuiteName = nil
+            lastCompletedXCTestSuiteKey = nil
+
+            // A repeat of a completion already counted carries no new tests.
+            if let completionKey, !seenXCTestSuiteCompletions.insert(completionKey).inserted {
+                return nil
+            }
 
             if let executed = executedCount {
                 return .testSuiteCompleted(
@@ -1578,7 +1767,10 @@ public struct LineParser: Sendable {
             } else {
                 durationStr = String(afterPassed)
             }
-            let duration = Double(durationStr.trimmingCharacters(in: CharacterSet(charactersIn: ". \t"))) ?? 0
+            let duration =
+                Self.finiteDuration(
+                    Double(durationStr.trimmingCharacters(in: CharacterSet(charactersIn: ". \t")))
+                ) ?? 0
 
             return .swiftTestingCompleted(
                 executed: passedCount + failedCount,
@@ -1649,7 +1841,9 @@ public struct LineParser: Sendable {
                         durationStr = String(afterPassed)
                     }
                     duration =
-                        Double(durationStr.trimmingCharacters(in: CharacterSet(charactersIn: ". \t"))) ?? 0
+                        Self.finiteDuration(
+                            Double(durationStr.trimmingCharacters(in: CharacterSet(charactersIn: ". \t")))
+                        ) ?? 0
                 }
                 return .swiftTestingCompleted(executed: total, failed: 0, duration: duration)
             }

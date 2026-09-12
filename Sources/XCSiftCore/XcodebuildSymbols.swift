@@ -32,6 +32,11 @@ enum XcodebuildSymbols {
     static let testFailedSuffix = "' failed ("
     static let testPassedOnSuffix = "' passed on '"
     static let testFailedOnSuffix = "' failed on '"
+    /// Xcode's console log restates a test failure as `<file>:test failure:<message>`, without the
+    /// test's name — a rendering of a failure the transcript also reports in full elsewhere.
+    static let testFailureRestatement = ":test failure:"
+    /// Stands in for the test a failure could not be attributed to.
+    static let unnamedTestFailure = "Test assertion"
     static let testSuitePrefix = "Test Suite '"
     static let testSuiteLowerPrefix = "Test suite '"
     static let testSuiteStartedSuffix = "' started"
@@ -40,6 +45,8 @@ enum XcodebuildSymbols {
 
     // Swift Testing symbols (macOS Private Use Area + Linux fallback)
     static let swiftTestingPass = "✓"
+    /// Xcode's own console transcript writes the heavy check, not the light one the terminal uses.
+    static let swiftTestingPassHeavy = "✔"
     static let swiftTestingFail = "✘"
     static let swiftTestingStartedPrefix = "◇ Test "
     static let swiftTestingRunStarted = "◇ Test run started."

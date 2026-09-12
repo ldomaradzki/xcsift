@@ -55,6 +55,7 @@ The default format outputs structured JSON with build status, summary, and detai
 | `summary.slow_tests` | Count of slow tests (with `--slow-threshold`) |
 | `summary.flaky_tests` | Count of flaky tests (auto-detected) |
 | `summary.executables` | Count of executable targets (with `--executable`) |
+| `summary.unreported_tests` | Tests that started and whose outcome the log never reported, so the counts above are that many short (Xcode's console transcript drops lines; present only when it happened) |
 
 ### Status Values
 

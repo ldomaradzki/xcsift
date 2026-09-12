@@ -50,6 +50,8 @@ let package = Package(
                 .copy("Fixtures/build.txt"),
                 .copy("Fixtures/swift-testing-output.txt"),
                 .copy("Fixtures/linker-error-output.txt"),
+                .copy("Fixtures/xcode-console-test-run.txt"),
+                .copy("Fixtures/xcode-test-results-summary.txt"),
             ]
         ),
         .testTarget(

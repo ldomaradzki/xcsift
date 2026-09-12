@@ -1,0 +1,886 @@
+================================================================================
+TEST RESULTS SUMMARY
+================================================================================
+Generated: 2026-09-12T11:48:08Z
+Total Results: 72
+================================================================================
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 1/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: CalculatorBasicTests/testInitialState()
+TEST_DISPLAY_NAME: Calculator initializes with correct default values
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 8
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 2/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: CalculatorBasicTests/testClear()
+TEST_DISPLAY_NAME: Clear function resets calculator to initial state
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 18
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 3/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: CalculatorBasicTests/testIntentionalFailure()
+TEST_DISPLAY_NAME: This test should fail to verify error reporting
+TEST_STATE: Failed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 32
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 1
+
+TEST_ISSUES:
+    CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift:37 CalculatorBasicTests/testIntentionalFailure(): Expectation failed: calculator.display == "999"
+calculator.display → "0": // This test is designed to fail to test error reporting
+This should fail - display should be 0, not 999
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 4/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: CalculatorIntegrationTests/testSimpleAddition()
+TEST_DISPLAY_NAME: Simple addition calculation
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 164
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 5/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: CalculatorIntegrationTests/testChainCalculations()
+TEST_DISPLAY_NAME: Chain calculations
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 177
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 6/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: CalculatorIntegrationTests/testComplexCalculation()
+TEST_DISPLAY_NAME: Complex calculation sequence
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 191
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 7/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: CalculatorIntegrationTests/testRepetitiveEquals()
+TEST_DISPLAY_NAME: Repetitive equals press repeats last operation
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 209
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 8/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: CalculatorIntegrationTests/testExpressionDisplay()
+TEST_DISPLAY_NAME: Expression display updates correctly
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 227
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 9/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: DecimalEdgeCaseTests/testVerySmallDecimals()
+TEST_DISPLAY_NAME: Very small decimal numbers
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 450
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 10/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: DecimalEdgeCaseTests/testDecimalPrecision()
+TEST_DISPLAY_NAME: Decimal operations precision
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 464
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 11/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: EdgeCaseTests/testCalculateWithoutOperation()
+TEST_DISPLAY_NAME: Calculate without setting operation
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 359
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 12/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: EdgeCaseTests/testOperationWithoutPreviousNumber()
+TEST_DISPLAY_NAME: Setting operation without previous number
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 369
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 13/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: EdgeCaseTests/testMultipleEquals()
+TEST_DISPLAY_NAME: Multiple equals presses
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 380
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 14/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: ErrorHandlingTests/testInvalidInputHandling()
+TEST_DISPLAY_NAME: Calculator handles invalid input gracefully
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 401
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 15/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: ErrorHandlingTests/testMultipleClearOperations()
+TEST_DISPLAY_NAME: Calculator state after multiple clears
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 414
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 16/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: ErrorHandlingTests/testLargeNumberError()
+TEST_DISPLAY_NAME: Large number error handling
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 432
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 17/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: InputHandlerTests/testNumberInputThroughHandler()
+TEST_DISPLAY_NAME: Number input through handler
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 303
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 18/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: InputHandlerTests/testOperationInputThroughHandler()
+TEST_DISPLAY_NAME: Operation input through handler
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 315
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 19/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: InputHandlerTests/testClearInputThroughHandler()
+TEST_DISPLAY_NAME: Clear input through handler
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 328
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 20/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: InputHandlerTests/testDecimalInputThroughHandler()
+TEST_DISPLAY_NAME: Decimal input through handler
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 342
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 21/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testAddition(a:b:expected:)
+TEST_DISPLAY_NAME: 5.0, 3.0, 8.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 109
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 22/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testAddition(a:b:expected:)
+TEST_DISPLAY_NAME: 10.0, -2.0, 8.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 109
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 23/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testAddition(a:b:expected:)
+TEST_DISPLAY_NAME: 0.0, 5.0, 5.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 109
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 24/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testAddition(a:b:expected:)
+TEST_DISPLAY_NAME: -3.0, -7.0, -10.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 109
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 25/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testSubtraction(a:b:expected:)
+TEST_DISPLAY_NAME: 10.0, 3.0, 7.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 120
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 26/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testSubtraction(a:b:expected:)
+TEST_DISPLAY_NAME: 5.0, 8.0, -3.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 120
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 27/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testSubtraction(a:b:expected:)
+TEST_DISPLAY_NAME: 0.0, 5.0, -5.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 120
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 28/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testSubtraction(a:b:expected:)
+TEST_DISPLAY_NAME: -3.0, -7.0, 4.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 120
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 29/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testMultiplication(a:b:expected:)
+TEST_DISPLAY_NAME: 5.0, 3.0, 15.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 131
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 30/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testMultiplication(a:b:expected:)
+TEST_DISPLAY_NAME: 4.0, -2.0, -8.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 131
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 31/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testMultiplication(a:b:expected:)
+TEST_DISPLAY_NAME: 0.0, 5.0, 0.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 131
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 32/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testMultiplication(a:b:expected:)
+TEST_DISPLAY_NAME: -3.0, -7.0, 21.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 131
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 33/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testDivision(a:b:expected:)
+TEST_DISPLAY_NAME: 10.0, 2.0, 5.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 142
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 34/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testDivision(a:b:expected:)
+TEST_DISPLAY_NAME: 15.0, 3.0, 5.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 142
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 35/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testDivision(a:b:expected:)
+TEST_DISPLAY_NAME: -8.0, 2.0, -4.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 142
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 36/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testDivision(a:b:expected:)
+TEST_DISPLAY_NAME: 7.0, 2.0, 3.5
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 142
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 37/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: OperationTests/testDivisionByZero()
+TEST_DISPLAY_NAME: Division by zero returns zero
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 153
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 38/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: NumberInputTests/testSingleDigitInput()
+TEST_DISPLAY_NAME: Adding single digit numbers
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 46
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 39/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: NumberInputTests/testMultipleDigitInput()
+TEST_DISPLAY_NAME: Adding multiple digit numbers
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 55
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 40/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: NumberInputTests/testDecimalInput()
+TEST_DISPLAY_NAME: Adding decimal numbers
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 67
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 41/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: NumberInputTests/testMultipleDecimalPoints()
+TEST_DISPLAY_NAME: Multiple decimal points should be ignored
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 79
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 42/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: NumberInputTests/testDecimalAtStart()
+TEST_DISPLAY_NAME: Decimal point at start creates 0.
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 93
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 43/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: SpecialFunctionsTests/testToggleSignPositive()
+TEST_DISPLAY_NAME: Toggle sign on positive number
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 250
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 44/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: SpecialFunctionsTests/testToggleSignNegative()
+TEST_DISPLAY_NAME: Toggle sign on negative number
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 261
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 45/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: SpecialFunctionsTests/testToggleSignZero()
+TEST_DISPLAY_NAME: Toggle sign on zero has no effect
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 273
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 46/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: SpecialFunctionsTests/testPercentage(input:expected:)
+TEST_DISPLAY_NAME: "100", 1.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 283
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 47/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: SpecialFunctionsTests/testPercentage(input:expected:)
+TEST_DISPLAY_NAME: "50", 0.5
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 283
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 48/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: SpecialFunctionsTests/testPercentage(input:expected:)
+TEST_DISPLAY_NAME: "25", 0.25
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 283
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 49/72
+TEST_TARGET: CalculatorAppFeatureTests
+TEST_IDENTIFIER: SpecialFunctionsTests/testPercentage(input:expected:)
+TEST_DISPLAY_NAME: "200", 2.0
+TEST_STATE: Passed
+TEST_FILE_PATH: CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift
+TEST_LINE_NUMBER: 283
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 50/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testAppLaunch()
+TEST_DISPLAY_NAME: testAppLaunch()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 51/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testCalculationPerformance()
+TEST_DISPLAY_NAME: testCalculationPerformance()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 52/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testCalculatorServiceBasicOperation()
+TEST_DISPLAY_NAME: testCalculatorServiceBasicOperation()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 53/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testCalculatorOperationsEnum()
+TEST_DISPLAY_NAME: testCalculatorOperationsEnum()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 54/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testCalculatorServiceFailure()
+TEST_DISPLAY_NAME: testCalculatorServiceFailure()
+TEST_STATE: Failed
+TEST_FILE_PATH: CalculatorApp/CalculatorAppTests/CalculatorAppTests.swift
+TEST_LINE_NUMBER: 51
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 1
+
+TEST_ISSUES:
+    CalculatorApp/CalculatorAppTests/CalculatorAppTests.swift:52 CalculatorAppTests/testCalculatorServiceFailure(): XCTAssertEqual failed: ("0") is not equal to ("999") - This test should fail - display should be 0, not 999
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 55/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testCalculatorServiceCreation()
+TEST_DISPLAY_NAME: testCalculatorServiceCreation()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 56/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testCalculatorServiceClear()
+TEST_DISPLAY_NAME: testCalculatorServiceClear()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 57/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testCalculatorServiceChainedOperations()
+TEST_DISPLAY_NAME: testCalculatorServiceChainedOperations()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 58/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testMultipleDecimalPointsHandling()
+TEST_DISPLAY_NAME: testMultipleDecimalPointsHandling()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 59/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testLargeNumbers()
+TEST_DISPLAY_NAME: testLargeNumbers()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 60/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testLargeNumberInputPerformance()
+TEST_DISPLAY_NAME: testLargeNumberInputPerformance()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 61/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testDivisionByZero()
+TEST_DISPLAY_NAME: testDivisionByZero()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 62/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testContentViewInitialization()
+TEST_DISPLAY_NAME: testContentViewInitialization()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 63/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testComplexCalculationWorkflow()
+TEST_DISPLAY_NAME: testComplexCalculationWorkflow()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 64/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testCalculatorServicePublicProperties()
+TEST_DISPLAY_NAME: testCalculatorServicePublicProperties()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 65/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testCalculatorServicePublicInterface()
+TEST_DISPLAY_NAME: testCalculatorServicePublicInterface()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 66/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testStateConsistencyWithDecimalNumbers()
+TEST_DISPLAY_NAME: testStateConsistencyWithDecimalNumbers()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 67/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testStateConsistencyAfterOperations()
+TEST_DISPLAY_NAME: testStateConsistencyAfterOperations()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 68/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testSignToggle()
+TEST_DISPLAY_NAME: testSignToggle()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 69/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testRepeatedEquals()
+TEST_DISPLAY_NAME: testRepeatedEquals()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 70/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testPercentageCalculation()
+TEST_DISPLAY_NAME: testPercentageCalculation()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 71/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: CalculatorAppTests/testAddition()
+TEST_DISPLAY_NAME: testAddition()
+TEST_STATE: Passed
+TEST_FILE_PATH: (not available)
+TEST_LINE_NUMBER: (not available)
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 0
+
+--------------------------------------------------------------------------------
+TEST_RESULT_INDEX: 72/72
+TEST_TARGET: CalculatorAppTests
+TEST_IDENTIFIER: IntentionalFailureTests/test()
+TEST_DISPLAY_NAME: test()
+TEST_STATE: Failed
+TEST_FILE_PATH: CalculatorApp/CalculatorAppTests/CalculatorAppTests.swift
+TEST_LINE_NUMBER: 285
+TEST_TAGS: (none)
+
+TEST_ISSUE_COUNT: 1
+
+TEST_ISSUES:
+    CalculatorApp/CalculatorAppTests/CalculatorAppTests.swift:286 IntentionalFailureTests/test(): XCTAssertTrue failed - This test should fail to verify error reporting
+
+
+================================================================================
+END OF TEST RESULTS SUMMARY
+================================================================================

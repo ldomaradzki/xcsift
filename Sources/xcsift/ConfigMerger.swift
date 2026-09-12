@@ -4,22 +4,45 @@ import Foundation
 
 /// Resolved configuration after merging file config with CLI arguments.
 /// All values are concrete (non-optional) after merge.
+/// What the parser needs: which findings to keep, and how to judge them. Every value here can
+/// change what a build's output is found to *be*.
+struct ParseConfig: Sendable {
+    var warnings: Bool
+    var warningsAsErrors: Bool
+    var coverage: Bool
+    var coverageDetails: Bool
+    var coveragePath: String?
+    var slowThreshold: Double?
+    var buildInfo: Bool
+    var executable: Bool
+    var xcbeautify: Bool
+}
+
+/// What the renderer needs: the encoding, and the shape it takes. Nothing here can change what the
+/// result says — which is why a renderer is handed this and not the rest.
+struct RenderConfig: Sendable {
+    var format: FormatType
+    var toonDelimiter: TOONDelimiterType
+    var toonKeyFolding: TOONKeyFoldingType
+    var toonFlattenDepth: Int?
+}
+
+/// A resolved configuration: the two halves a result passes through, and what the pipeline then
+/// does with it.
+///
+/// The halves are separate so that what a consumer is given says what it can do. The MCP proxy
+/// takes both and never sees ``quiet`` or ``exitOnFailure`` — the two values documented as having
+/// no meaning over MCP, now by construction rather than by promise.
+///
+/// `var` on purpose: the proxy overrides a few of these per tool call, and a hand-written
+/// field-by-field copy would silently reset whatever is added here next.
 struct ResolvedConfig: Sendable {
-    let format: FormatType
-    let warnings: Bool
-    let warningsAsErrors: Bool
-    let quiet: Bool
-    let coverage: Bool
-    let coverageDetails: Bool
-    let coveragePath: String?
-    let slowThreshold: Double?
-    let buildInfo: Bool
-    let executable: Bool
-    let exitOnFailure: Bool
-    let xcbeautify: Bool
-    let toonDelimiter: TOONDelimiterType
-    let toonKeyFolding: TOONKeyFoldingType
-    let toonFlattenDepth: Int?
+    var parse: ParseConfig
+    var render: RenderConfig
+    /// Suppress output when the build succeeded with nothing to report.
+    var quiet: Bool
+    /// Exit non-zero when the build did not succeed.
+    var exitOnFailure: Bool
 }
 
 // MARK: - Config Merger
@@ -124,21 +147,25 @@ enum ConfigMerger {
         }
 
         return ResolvedConfig(
-            format: format,
-            warnings: warnings,
-            warningsAsErrors: warningsAsErrors,
+            parse: ParseConfig(
+                warnings: warnings,
+                warningsAsErrors: warningsAsErrors,
+                coverage: coverage,
+                coverageDetails: coverageDetails,
+                coveragePath: coveragePath,
+                slowThreshold: slowThreshold,
+                buildInfo: buildInfo,
+                executable: executable,
+                xcbeautify: xcbeautify
+            ),
+            render: RenderConfig(
+                format: format,
+                toonDelimiter: toonDelimiter,
+                toonKeyFolding: toonKeyFolding,
+                toonFlattenDepth: toonFlattenDepth
+            ),
             quiet: quiet,
-            coverage: coverage,
-            coverageDetails: coverageDetails,
-            coveragePath: coveragePath,
-            slowThreshold: slowThreshold,
-            buildInfo: buildInfo,
-            executable: executable,
-            exitOnFailure: exitOnFailure,
-            xcbeautify: xcbeautify,
-            toonDelimiter: toonDelimiter,
-            toonKeyFolding: toonKeyFolding,
-            toonFlattenDepth: toonFlattenDepth
+            exitOnFailure: exitOnFailure
         )
     }
 
