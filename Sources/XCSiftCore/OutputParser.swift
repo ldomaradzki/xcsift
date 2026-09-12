@@ -167,6 +167,15 @@ public struct StreamingOutputParser {
             finalWarnings = []
         }
 
+        // Swift Testing states its own totals when the log carries a run summary. When it does
+        // not — Xcode's console transcript frequently does not — the per-test lines are the only
+        // record of that framework's tests, and an XCTest bundle counts them as zero. Dropping
+        // them reported a run of two frameworks as the smaller one.
+        let swiftTestingObserved = lineParser.swiftTestingPassedCases + lineParser.swiftTestingFailedCases
+        let swiftTestingExecuted: Int? =
+            state.swiftTestingExecutedCount ?? (swiftTestingObserved > 0 ? swiftTestingObserved : nil)
+        let swiftTestingFailed = state.swiftTestingFailedCount ?? lineParser.swiftTestingFailedCases
+
         // Aggregate test counts from both XCTest and Swift Testing
         let totalExecuted: Int? = {
             if let parallelTotal = state.parallelTestsTotalCount {
@@ -176,7 +185,7 @@ public struct StreamingOutputParser {
                 return parallelTotal
             }
             let xctest = resolvedXCTestExecutedCount() ?? 0
-            let swiftTesting = state.swiftTestingExecutedCount ?? 0
+            let swiftTesting = swiftTestingExecuted ?? 0
             if xctest > 0 || swiftTesting > 0 {
                 return xctest + swiftTesting
             }
@@ -184,10 +193,10 @@ public struct StreamingOutputParser {
         }()
 
         let totalFailed: Int = {
-            let xctestFailed = resolvedXCTestFailedCount() ?? 0
-            let swiftTestingFailed = state.swiftTestingFailedCount ?? 0
-            let aggregated = xctestFailed + swiftTestingFailed
-            return aggregated > 0 ? aggregated : state.failedTests.count
+            let aggregated = (resolvedXCTestFailedCount() ?? 0) + swiftTestingFailed
+            // The reported failures are evidence of their own: a summary that counts fewer than
+            // the list it ships is wrong on its face, whatever the framework totals said.
+            return max(aggregated, state.failedTests.count)
         }()
 
         let computedPassedTests: Int? = {
@@ -252,7 +261,12 @@ public struct StreamingOutputParser {
             coveragePercent: coverage?.lineCoverage,
             slowTests: slowTests.isEmpty ? nil : slowTests.count,
             flakyTests: flakyTests.isEmpty ? nil : flakyTests.count,
-            executables: shouldPrintExecutables && !state.executables.isEmpty ? state.executables.count : nil
+            executables: shouldPrintExecutables && !state.executables.isEmpty ? state.executables.count : nil,
+            // Only meaningful where the per-test lines were the count: a run summary states the
+            // total the transcript failed to show, so there is nothing missing to declare.
+            unreportedTests: state.swiftTestingExecutedCount == nil && lineParser.swiftTestingUnreportedTests > 0
+                ? lineParser.swiftTestingUnreportedTests
+                : nil
         )
 
         let buildInfo: BuildInfo? =
@@ -324,6 +338,22 @@ public struct StreamingOutputParser {
 
         case .testFailed(let t):
             let normalized = normalizeTestName(t.test)
+
+            if t.test == XcodebuildSymbols.unnamedTestFailure {
+                // A failure the log restated without naming its test is the same failure again
+                // whenever something already reported carries that message.
+                guard !state.failedTests.contains(where: { restates($0.message, t.message) }) else {
+                    return
+                }
+            } else if let unnamed = state.failedTests.firstIndex(where: {
+                $0.test == XcodebuildSymbols.unnamedTestFailure && restates($0.message, t.message)
+            }) {
+                // The unnamed rendering came first this time. The named one says strictly more,
+                // so it replaces it rather than joining it.
+                state.seenTestNames.remove(normalizeTestName(XcodebuildSymbols.unnamedTestFailure))
+                state.failedTests.remove(at: unnamed)
+            }
+
             if !state.seenTestNames.contains(normalized) {
                 state.failedTests.append(t)
                 state.seenTestNames.insert(normalized)
@@ -477,6 +507,13 @@ public struct StreamingOutputParser {
             return String(testName.dropFirst(2).dropLast(1))
         }
         return testName
+    }
+
+    /// Whether two failure messages are the same report. Xcode's restatement carries the assertion
+    /// text verbatim, where the named rendering may wrap it in the test's own description.
+    private func restates(_ reported: String, _ candidate: String) -> Bool {
+        guard !reported.isEmpty, !candidate.isEmpty else { return false }
+        return reported.contains(candidate) || candidate.contains(reported)
     }
 
     private func resolvedXCTestExecutedCount() -> Int? {

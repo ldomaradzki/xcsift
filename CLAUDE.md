@@ -402,6 +402,23 @@ explicitly:
   indistinguishable, and a completion line with no timestamp is always counted.
   `Tests/XCSiftCoreTests/XcodeConsoleLogTests.swift` uses `.xctest` suite names on purpose: only
   bundle-level totals accumulate, so a fixture without that suffix would pass without the fix.
+- **Two frameworks, one run.** Xcode runs XCTest bundles and Swift Testing in the same session and
+  an XCTest bundle summary counts Swift Testing's tests as zero, so the bundle total alone reports
+  a two-framework run as the smaller one (a measured 72-test run came back as 23). Swift Testing's
+  own per-test lines are counted instead, when the log carries no run summary to use: `LineParser`
+  tallies `✔ Test "…" passed after …` by test name (Xcode repeats whole blocks) and expands
+  `with N test cases`, because each case of a parameterised test counts as a test. The glyph is the
+  heavy check U+2714, not U+2713, and the line is indented under the task that emitted it — the
+  shape of the line is matched, not a prefix.
+- **The transcript is lossy, and says so.** That same run printed `started` for 34 Swift Testing
+  tests and an outcome for 29. `summary.unreported_tests` carries the difference, so a total that
+  falls short of Xcode's own is explainable rather than silent. A run summary, where the log has
+  one, is authoritative and leaves the field nil.
+- **A failure restated without its test.** Xcode also writes `<file>:test failure:<message>`, which
+  used to become a second failure named `Test assertion`. A failure with no test name is dropped
+  when something already reported carries that message, and replaced by the named rendering when
+  that arrives second. The summary never counts fewer failures than the list it ships.
+
 - **CRLF line endings.** `String.split(separator: "\n")` never matches one, because Swift reads
   `\r\n` as a single `Character`. `TextLines.split` (XCSiftCore) splits on the newline *byte*
   instead, and every path that takes whole text rather than a stream goes through it: `OutputParser`,
@@ -497,6 +514,8 @@ Real-world output samples are stored in `Tests/Fixtures/` for integration tests:
 - **build.txt** (~2.7MB) - Large successful xcodebuild output for performance testing
 - **swift-testing-output.txt** (~11KB) - Swift Testing output with 23 passed tests
 - **linker-error-output.txt** - Real linker error output with undefined symbols
+- **xcode-console-test-run.txt** (~94KB) - Xcode's own console transcript for a 72-test run of two
+  frameworks, with every block repeated under `Summary:` and five Swift Testing outcomes missing
 
 To add new fixtures:
 1. Create the file in `Tests/Fixtures/`
@@ -683,6 +702,9 @@ The tool outputs structured data optimized for coding agents in two formats:
 ### JSON Format (default)
 
 - **JSON**: Structured format with `status`, `summary`, `errors`, `warnings` (optional), `failed_tests`, `linker_errors` (optional), `coverage` (optional), `phases` (optional), `timing` (optional)
+  - **`summary.unreported_tests`** (only when non-zero): tests that started and whose outcome the
+    log never reported. Xcode's console transcript drops lines, so a count taken from one can be
+    short; this says by how many tests.
   - **Summary always includes warning and linker error counts**: `{"summary": {"warnings": N, "linker_errors": N, ...}}`
   - **Summary includes coverage percentage** (when `--coverage` flag is used): `{"summary": {"coverage_percent": X.X, ...}}`
   - **Detailed warnings list** (with `--warnings` flag): `{"warnings": [{"file": "...", "line": N, "message": "...", "type": "compile|runtime|swiftui"}]}`

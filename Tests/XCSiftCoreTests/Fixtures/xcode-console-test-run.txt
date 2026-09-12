@@ -1,0 +1,1166 @@
+Test CalculatorApp
+  ◇ Test "Decimal point at start creates 0." started.
+  ◇ Test "Multiple decimal points should be ignored" started.
+  ◇ Test "Adding multiple digit numbers" started.
+  ◇ Test "Adding decimal numbers" started.
+  ◇ Test "Adding single digit numbers" started.
+  ◇ Test "Multiplication operation" started.
+  ◇ Test "Division operation" started.
+  ◇ Test "Subtraction operation" started.
+  ◇ Test "Division by zero returns zero" started.
+  ◇ Test "Addition operation" started.
+  ◇ Test "Toggle sign on zero has no effect" started.
+  ◇ Test "Toggle sign on positive number" started.
+  ◇ Test "Toggle sign on negative number" started.
+  ◇ Test "Percentage calculation" started.
+  ◇ Test "Calculate without setting operation" started.
+  ◇ Test "Setting operation without previous number" started.
+  ◇ Test "Multiple equals presses" started.
+  ◇ Test "Clear input through handler" started.
+  ◇ Test "Operation input through handler" started.
+  ◇ Test "Decimal input through handler" started.
+  ◇ Test "Number input through handler" started.
+  ◇ Test "Large number error handling" started.
+  ◇ Test "Calculator handles invalid input gracefully" started.
+  ◇ Test "Calculator state after multiple clears" started.
+  ◇ Test "Calculator initializes with correct default values" started.
+  ◇ Test "Clear function resets calculator to initial state" started.
+  ◇ Test "This test should fail to verify error reporting" started.
+  ◇ Test "Decimal operations precision" started.
+  ◇ Test "Very small decimal numbers" started.
+  ◇ Test case passing 3 arguments a → 4.0, b → -2.0, expected → -8.0 to "Multiplication operation" started.
+  ​◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → 0.0 to "Multiplication operation" started.
+  ​◇ Test case passing 3 arguments a → 5.0, b → 3.0, expected → 15.0 to "Multiplication operation" started.
+  ◇ Test case passing 3 arguments a → -3.0, b → -7.0, expected → 21.0 to "Multiplication operation" started.
+  ​◇ Test case passing 3 arguments a → 10.0, b → 2.0, expected → 5.0 to "Division operation" started.
+  ​◇ Test case passing 3 arguments a → 15.0, b → 3.0, expected → 5.0 to "Division operation" started.
+  ​​◇ Test case passing 3 arguments a → 7.0, b → 2.0, expected → 3.5 to "Division operation" started.
+  ◇ Test case passing 3 arguments a → 10.0, b → 3.0, expected → 7.0 to "Subtraction operation" started.
+  ​​◇ Test case passing 3 arguments a → 5.0, b → 8.0, expected → -3.0 to "Subtraction operation" started.
+  ◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → -5.0 to "Subtraction operation" started.
+  ​​◇ Test case passing 3 arguments a → -3.0, b → -7.0, expected → 4.0 to "Subtraction operation" started.
+  ​◇ Test case passing 3 arguments a → 5.0, b → 3.0, expected → 8.0 to "Addition operation" started.
+  ​◇ Test case passing 3 arguments a → 10.0, b → -2.0, expected → 8.0 to "Addition operation" started.
+  ​◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → 5.0 to "Addition operation" started.
+  ​◇ Suite "Calculator Integration Tests" started.
+  ◇ Test case passing 2 arguments input → "100", expected → 1.0 to "Percentage calculation" started.
+  ​◇ Test case passing 2 arguments input → "50", expected → 0.5 to "Percentage calculation" started.
+  ◇ Test case passing 2 arguments input → "25", expected → 0.25 to "Percentage calculation" started.
+  ​​​◇ Test case passing 2 arguments input → "200", expected → 2.0 to "Percentage calculation" started.
+  ​✔ Test "Decimal point at start creates 0." passed after 0.010 seconds.
+  ✔ Test "Multiple decimal points should be ignored" passed after 0.010 seconds.
+  ✔ Test "Adding multiple digit numbers" passed after 0.010 seconds.
+  ✔ Test "Adding decimal numbers" passed after 0.010 seconds.
+  ✔ Test "Adding single digit numbers" passed after 0.010 seconds.
+  ◇ Test case passing 3 arguments a → -3.0, b → -7.0, expected → -10.0 to "Addition operation" started.
+  ​✔ Test "Subtraction operation" with 4 test cases passed after 0.011 seconds.
+  ✘ Test "This test should fail to verify error reporting" recorded an issue at CalculatorServiceTests.swift:37:9: Expectation failed: calculator.display == "999"
+  ↳ // This test is designed to fail to test error reporting
+  ↳ This should fail - display should be 0, not 999
+  ↳ calculator.display == "999" → false
+  ↳   calculator.display → "0"
+  ✔ Test "Division by zero returns zero" passed after 0.011 seconds.
+  ✔ Test "Toggle sign on zero has no effect" passed after 0.010 seconds.
+  ✔ Test "Percentage calculation" with 4 test cases passed after 0.010 seconds.
+  ✔ Test "Toggle sign on negative number" passed after 0.010 seconds.
+  ✔ Test "Setting operation without previous number" passed after 0.010 seconds.
+  ✔ Test "Multiple equals presses" passed after 0.010 seconds.
+  ✔ Test "Operation input through handler" passed after 0.010 seconds.
+  ✔ Test "Toggle sign on positive number" passed after 0.010 seconds.
+  ✔ Test "Large number error handling" passed after 0.010 seconds.
+  ✔ Test "Calculator handles invalid input gracefully" passed after 0.010 seconds.
+  ✔ Test "Calculator initializes with correct default values" passed after 0.010 seconds.
+  ✔ Test "Clear function resets calculator to initial state" passed after 0.010 seconds.
+  ✔ Test "Decimal operations precision" passed after 0.010 seconds.
+  ✔ Test "Very small decimal numbers" passed after 0.009 seconds.
+  ✔ Test "Decimal input through handler" passed after 0.010 seconds.
+  ✔ Test "Calculate without setting operation" passed after 0.010 seconds.
+  ◇ Test "Complex calculation sequence" started.
+  ◇ Test "Repetitive equals press repeats last operation" started.
+  ✔ Test "Addition operation" with 4 test cases passed after 0.012 seconds.
+  ◇ Test "Chain calculations" started.
+  ✔ Suite "Special Functions" passed after 0.017 seconds.
+  ✔ Suite "Error Handling" passed after 0.017 seconds.
+  ✔ Test "Clear input through handler" passed after 0.012 seconds.
+  ✘ Test "This test should fail to verify error reporting" failed after 0.011 seconds with 1 issue.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testAddition]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testAddition]' passed (0.003 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testAppLaunch]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testAppLaunch]' passed (0.039 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' started.
+  
+  2026-09-12 16:48:07.379911+0500 [16173:19503348] [General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+  /project/CalculatorAppTests/CalculatorAppTests.swift:209: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' measured [Time, seconds] average: 0.007, relative standard deviation: 1.662%, values: [0.006632, 0.006538, 0.006336, 0.006627, 0.006583, 0.006540, 0.006599, 0.006558, 0.006425, 0.006325], performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.100, maxStandardDeviation: 0.100
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' passed (0.350 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorOperationsEnum]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorOperationsEnum]' passed (0.000 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceBasicOperation]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceBasicOperation]' passed (0.000 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceChainedOperations]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceChainedOperations]' passed (0.001 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceClear]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceClear]' passed (0.000 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceCreation]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceCreation]' passed (0.000 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' started.
+  /project/CalculatorAppTests/CalculatorAppTests.swift:52: error: -[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure] : XCTAssertEqual failed: ("0") is not equal to ("999") - This test should fail - display should be 0, not 999
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' failed (0.002 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicInterface]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicInterface]' passed (0.000 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicProperties]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicProperties]' passed (0.000 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testComplexCalculationWorkflow]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testComplexCalculationWorkflow]' passed (0.005 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testContentViewInitialization]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testContentViewInitialization]' passed (0.009 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testDivisionByZero]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testDivisionByZero]' passed (0.001 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' started.
+  /project/CalculatorAppTests/CalculatorAppTests.swift:224: Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' measured [Time, seconds] average: 0.000, relative standard deviation: 94.505%, values: [0.000041, 0.000009, 0.000008, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007], performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.100, maxStandardDeviation: 0.100
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' passed (0.252 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumbers]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumbers]' passed (0.000 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testMultipleDecimalPointsHandling]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testMultipleDecimalPointsHandling]' passed (0.000 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testPercentageCalculation]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testPercentageCalculation]' passed (0.000 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testRepeatedEquals]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testRepeatedEquals]' passed (0.000 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testSignToggle]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testSignToggle]' passed (0.000 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyAfterOperations]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyAfterOperations]' passed (0.001 seconds).
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyWithDecimalNumbers]' started.
+  Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyWithDecimalNumbers]' passed (0.000 seconds).
+  Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' started.
+  /project/CalculatorAppTests/CalculatorAppTests.swift:286: error: -[CalculatorAppTests.IntentionalFailureTests test] : XCTAssertTrue failed - This test should fail to verify error reporting
+  Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' failed (0.001 seconds).
+
+  Launch actions
+    Launch CalculatorAppFeatureTests
+      notice:Platform: iOS Simulator
+      notice:Device Identifier: A751AB76-0F22-406B-A7AD-3B1EA35AEDE1
+      notice:Operating System Version: 27.0 (24A5423a)
+      notice:Model: iPhone 17 Pro (iPhone18,1)
+      notice:Target Architecture: arm64
+    
+      Installing built products
+        notice:Installing on iPhone 17 Pro
+        notice:Successfully installed
+      
+      Launching CalculatorAppFeatureTests
+        notice:Launching CalculatorAppFeatureTests
+        notice:Launching from /Applications/Xcode-27.0.0-Beta.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/xctest
+        notice:Launching suspended and the launcher is responsible for resuming.
+        notice:Successfully launched CalculatorAppFeatureTests
+        notice:Process with pid 16081 launched
+        notice:Console logging policy: Synchronously obtain os_logs via libLogRedirect, and read stdio from File Descriptors
+        notice:Resumed target process.
+      
+    Launch CalculatorAppTests
+      notice:Platform: iOS Simulator
+      notice:Device Identifier: A751AB76-0F22-406B-A7AD-3B1EA35AEDE1
+      notice:Operating System Version: 27.0 (24A5423a)
+      notice:Model: iPhone 17 Pro (iPhone18,1)
+      notice:Target Architecture: arm64
+    
+      Installing built products
+        notice:Installing on iPhone 17 Pro
+        notice:Successfully installed
+      
+      Launching CalculatorAppTests
+        notice:Launching io.sentry.calculatorapp
+        notice:Launching from /Users/ak/Library/Developer/Xcode/DerivedData/CalculatorApp-aznhcahfeeapogbajbgyxvvusrxg/Build/Products/Debug-iphonesimulator/CalculatorApp.app
+        notice:Launching suspended and the launcher is responsible for resuming.
+        notice:Successfully launched CalculatorAppTests
+        notice:Process with pid 16173 launched
+        notice:Console logging policy: Synchronously obtain os_logs via libLogRedirect, and read stdio from File Descriptors
+        notice:Resumed target process.
+      
+  Generating coverage report
+    notice:Unable to load coverage tools for toolchain 'com.apple.dt.toolchain.Metal.32023.921.5': Error Domain=XCTHLLVMCoverageToolsErrorDomain Code=2 "libLTO.dylib is not present in the toolchain at path /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.5252.6.b5Vdb6/Metal.xctoolchain" UserInfo={NSLocalizedDescription=libLTO.dylib is not present in the toolchain at path /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.5252.6.b5Vdb6/Metal.xctoolchain}
+  
+    Downloading profiles from iPhone 17 Pro
+      notice:Downloading profiles for xctest command-line tool from 1 directory
+      notice:Downloading profiles for io.sentry.calculatorapp from 1 directory
+    
+    Merging 2 profiles using llvm-profdata (2100.3.33.1.0)
+    
+    Pre-processing target built products
+    
+    Processing source file data
+      notice:Archived line-level coverage for 3 file(s):
+      notice:Skipped 6 file(s) with no executable lines:
+    
+    Generating target entries
+      notice:Generating entry for target CalculatorApp.app
+      notice:Generating entry for target CalculatorAppFeatureTests
+      notice:Generating entry for target CalculatorAppTests.xctest
+    
+  Testing Test Scheme Action
+    Test target CalculatorAppFeatureTests
+      xctest (16081)
+        [ConsoleFoundation] Initialization successfulTest Suite 'All tests' started at 2026-09-12 16:47:46.173.
+        Test Suite 'All tests' passed at 2026-09-12 16:47:46.179.
+        	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.006) seconds
+        ◇ Test run started.
+        ↳ Testing Library Version: 2078
+        ↳ Target Platform: arm64-apple-ios17.0-simulator
+        ◇ Suite "Number Input" started.
+        ◇ Suite "Mathematical Operations" started.
+        ◇ Suite "Special Functions" started.
+        ◇ Suite "Edge Cases" started.
+        ◇ Suite "Input Handler Integration" started.
+        ◇ Suite "Error Handling" started.
+        ◇ Suite "Calculator Basic Functionality" started.
+        ◇ Suite "Decimal Edge Cases" started.
+        ◇ Test "Decimal point at start creates 0." started.
+        ◇ Test "Multiple decimal points should be ignored" started.
+        ◇ Test "Adding multiple digit numbers" started.
+        ◇ Test "Adding decimal numbers" started.
+        ◇ Test "Adding single digit numbers" started.
+        ◇ Test "Multiplication operation" started.
+        ◇ Test "Division operation" started.
+        ◇ Test "Subtraction operation" started.
+        ◇ Test "Division by zero returns zero" started.
+        ◇ Test "Addition operation" started.
+        ◇ Test "Toggle sign on zero has no effect" started.
+        ◇ Test "Toggle sign on positive number" started.
+        ◇ Test "Toggle sign on negative number" started.
+        ◇ Test "Percentage calculation" started.
+        ◇ Test "Calculate without setting operation" started.
+        ◇ Test "Setting operation without previous number" started.
+        ◇ Test "Multiple equals presses" started.
+        ◇ Test "Clear input through handler" started.
+        ◇ Test "Operation input through handler" started.
+        ◇ Test "Decimal input through handler" started.
+        ◇ Test "Number input through handler" started.
+        ◇ Test "Large number error handling" started.
+        ◇ Test "Calculator handles invalid input gracefully" started.
+        ◇ Test "Calculator state after multiple clears" started.
+        ◇ Test "Calculator initializes with correct default values" started.
+        ◇ Test "Clear function resets calculator to initial state" started.
+        ◇ Test "This test should fail to verify error reporting" started.
+        ◇ Test "Decimal operations precision" started.
+        ◇ Test "Very small decimal numbers" started.
+        ◇ Test case passing 3 arguments a → 4.0, b → -2.0, expected → -8.0 to "Multiplication operation" started.
+        ​◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → 0.0 to "Multiplication operation" started.
+        ​◇ Test case passing 3 arguments a → 5.0, b → 3.0, expected → 15.0 to "Multiplication operation" started.
+        ◇ Test case passing 3 arguments a → -3.0, b → -7.0, expected → 21.0 to "Multiplication operation" started.
+        ​◇ Test case passing 3 arguments a → 10.0, b → 2.0, expected → 5.0 to "Division operation" started.
+        ​◇ Test case passing 3 arguments a → 15.0, b → 3.0, expected → 5.0 to "Division operation" started.
+        ​​◇ Test case passing 3 arguments a → -8.0, b → 2.0, expected → -4.0 to "Division operation" started.
+        ◇ Test case passing 3 arguments a → 7.0, b → 2.0, expected → 3.5 to "Division operation" started.
+        ◇ Test case passing 3 arguments a → 10.0, b → 3.0, expected → 7.0 to "Subtraction operation" started.
+        ​​◇ Test case passing 3 arguments a → 5.0, b → 8.0, expected → -3.0 to "Subtraction operation" started.
+        ◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → -5.0 to "Subtraction operation" started.
+        ​​◇ Test case passing 3 arguments a → -3.0, b → -7.0, expected → 4.0 to "Subtraction operation" started.
+        ​◇ Test case passing 3 arguments a → 5.0, b → 3.0, expected → 8.0 to "Addition operation" started.
+        ​◇ Test case passing 3 arguments a → 10.0, b → -2.0, expected → 8.0 to "Addition operation" started.
+        ​◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → 5.0 to "Addition operation" started.
+        ​◇ Suite "Calculator Integration Tests" started.
+        ◇ Test case passing 2 arguments input → "100", expected → 1.0 to "Percentage calculation" started.
+        ​◇ Test case passing 2 arguments input → "50", expected → 0.5 to "Percentage calculation" started.
+        ◇ Test case passing 2 arguments input → "25", expected → 0.25 to "Percentage calculation" started.
+        ​​​◇ Test case passing 2 arguments input → "200", expected → 2.0 to "Percentage calculation" started.
+        ​✔ Test "Decimal point at start creates 0." passed after 0.010 seconds.
+        ✔ Test "Multiple decimal points should be ignored" passed after 0.010 seconds.
+        ✔ Test "Adding multiple digit numbers" passed after 0.010 seconds.
+        ✔ Test "Adding decimal numbers" passed after 0.010 seconds.
+        ✔ Test "Adding single digit numbers" passed after 0.010 seconds.
+        ◇ Test case passing 3 arguments a → -3.0, b → -7.0, expected → -10.0 to "Addition operation" started.
+        ​✔ Test "Subtraction operation" with 4 test cases passed after 0.011 seconds.
+        ✘ Test "This test should fail to verify error reporting" recorded an issue at CalculatorServiceTests.swift:37:9: Expectation failed: calculator.display == "999"
+        ↳ // This test is designed to fail to test error reporting
+        ↳ This should fail - display should be 0, not 999
+        ↳ calculator.display == "999" → false
+        ↳   calculator.display → "0"
+        ✔ Test "Division by zero returns zero" passed after 0.011 seconds.
+        ✔ Test "Toggle sign on zero has no effect" passed after 0.010 seconds.
+        ✔ Test "Percentage calculation" with 4 test cases passed after 0.010 seconds.
+        ✔ Test "Toggle sign on negative number" passed after 0.010 seconds.
+        ✔ Test "Setting operation without previous number" passed after 0.010 seconds.
+        ✔ Test "Multiple equals presses" passed after 0.010 seconds.
+        ✔ Test "Operation input through handler" passed after 0.010 seconds.
+        ✔ Test "Toggle sign on positive number" passed after 0.010 seconds.
+        ✔ Test "Large number error handling" passed after 0.010 seconds.
+        ✔ Test "Calculator handles invalid input gracefully" passed after 0.010 seconds.
+        ✔ Test "Calculator initializes with correct default values" passed after 0.010 seconds.
+        ✔ Test "Calculator state after multiple clears" passed after 0.010 seconds.
+        ✔ Test "Clear function resets calculator to initial state" passed after 0.010 seconds.
+        ✔ Test "Decimal operations precision" passed after 0.010 seconds.
+        ✔ Test "Very small decimal numbers" passed after 0.009 seconds.
+        ✔ Test "Decimal input through handler" passed after 0.010 seconds.
+        ✔ Test "Calculate without setting operation" passed after 0.010 seconds.
+        ◇ Test "Complex calculation sequence" started.
+        ◇ Test "Simple addition calculation" started.
+        ◇ Test "Repetitive equals press repeats last operation" started.
+        ✔ Test "Addition operation" with 4 test cases passed after 0.012 seconds.
+        ◇ Test "Chain calculations" started.
+        ◇ Test "Expression display updates correctly" started.
+        ✔ Suite "Number Input" passed after 0.020 seconds.
+        ✔ Suite "Special Functions" passed after 0.017 seconds.
+        ✔ Suite "Error Handling" passed after 0.017 seconds.
+        ✔ Suite "Edge Cases" passed after 0.017 seconds.
+        ✔ Test "Clear input through handler" passed after 0.012 seconds.
+        ✔ Test "Repetitive equals press repeats last operation" passed after 0.001 seconds.
+        ✔ Test "Chain calculations" passed after 0.001 seconds.
+        ✔ Test "Expression display updates correctly" passed after 0.001 seconds.
+        ✘ Test "This test should fail to verify error reporting" failed after 0.011 seconds with 1 issue.
+        ✘ Suite "Calculator Basic Functionality" failed after 0.017 seconds with 1 issue.
+        ↳ // MARK: - Calculator Basic Tests
+      
+        Writing diagnostic log for test runner launch.
+          /Users/ak/Library/Developer/Xcode/DerivedData/CalculatorApp-aznhcahfeeapogbajbgyxvvusrxg/Logs/Test/Test-CalculatorApp-2026.09.12_16-47-36-+0500.xcresult/Staging/1_Test/Diagnostics/CalculatorAppFeatureTests-CBC2930B-F81B-44D6-97D1-2B6CB334DF1A-Configuration-Test Scheme Action-Iteration-1/CalculatorAppFeatureTests-79DFA89D-F7D3-468A-8CD4-775B28279770/Session-CalculatorAppFeatureTests-2026-09-12_164738-BAhhk7.log:notice:/Users/ak/Library/Developer/Xcode/DerivedData/CalculatorApp-aznhcahfeeapogbajbgyxvvusrxg/Logs/Test/Test-CalculatorApp-2026.09.12_16-47-36-+0500.xcresult/Staging/1_Test/Diagnostics/CalculatorAppFeatureTests-CBC2930B-F81B-44D6-97D1-2B6CB334DF1A-Configuration-Test Scheme Action-Iteration-1/CalculatorAppFeatureTests-79DFA89D-F7D3-468A-8CD4-775B28279770/Session-CalculatorAppFeatureTests-2026-09-12_164738-BAhhk7.log
+        
+        Run test suite All tests
+          Summary: Test Suite 'All tests' passed at 2026-09-12 16:47:46.179.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.006) seconds
+
+          [ConsoleFoundation] Initialization successfulTest Suite 'All tests' started at 2026-09-12 16:47:46.173.
+          Test Suite 'All tests' passed at 2026-09-12 16:47:46.179.
+          	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.006) seconds
+        
+        Run test suite NumberInputTests
+          Summary: ✔ Test "Calculator state after multiple clears" passed after 0.010 seconds.
+
+          ◇ Test run started.
+          ↳ Testing Library Version: 2078
+          ↳ Target Platform: arm64-apple-ios17.0-simulator
+          ◇ Suite "Number Input" started.
+          ◇ Test "Decimal point at start creates 0." started.
+          ◇ Test "Multiple decimal points should be ignored" started.
+          ◇ Test "Adding multiple digit numbers" started.
+          ◇ Test "Adding decimal numbers" started.
+          ◇ Test "Adding single digit numbers" started.
+          ◇ Test "Multiplication operation" started.
+          ◇ Test "Division operation" started.
+          ◇ Test "Subtraction operation" started.
+          ◇ Test "Division by zero returns zero" started.
+          ◇ Test "Addition operation" started.
+          ✔ Test "Calculator state after multiple clears" passed after 0.010 seconds.
+        
+          Run test case testDecimalAtStart()
+            Summary: ◇ Test "Multiple decimal points should be ignored" started.
+
+            ◇ Test "Decimal point at start creates 0." started.
+            ◇ Test "Multiple decimal points should be ignored" started.
+          
+          Run test case testMultipleDecimalPoints()
+            Summary: ◇ Test "Adding decimal numbers" started.
+
+            ◇ Test "Adding multiple digit numbers" started.
+            ◇ Test "Adding decimal numbers" started.
+          
+          Run test case testMultipleDigitInput()
+            Summary: ◇ Test "Multiplication operation" started.
+
+            ◇ Test "Adding single digit numbers" started.
+            ◇ Test "Multiplication operation" started.
+          
+          Run test case testDecimalInput()
+            Summary: ◇ Test "Subtraction operation" started.
+
+            ◇ Test "Division operation" started.
+            ◇ Test "Subtraction operation" started.
+          
+          Run test case testSingleDigitInput()
+            Summary: ◇ Test "Addition operation" started.
+
+            ◇ Test "Division by zero returns zero" started.
+            ◇ Test "Addition operation" started.
+          
+        Run test suite OperationTests
+          Summary: ✔ Test "Expression display updates correctly" passed after 0.001 seconds.
+
+          ◇ Suite "Mathematical Operations" started.
+          ◇ Test "Toggle sign on zero has no effect" started.
+          ◇ Test "Toggle sign on positive number" started.
+          ◇ Test "Toggle sign on negative number" started.
+          ◇ Test "Percentage calculation" started.
+          ◇ Test "Calculate without setting operation" started.
+          ◇ Test "Setting operation without previous number" started.
+          ◇ Test "Multiple equals presses" started.
+          ◇ Test "Clear input through handler" started.
+          ◇ Test "Operation input through handler" started.
+          ◇ Test "Decimal input through handler" started.
+          ◇ Test "Number input through handler" started.
+          ◇ Test "Large number error handling" started.
+          ◇ Test "Calculator handles invalid input gracefully" started.
+          ◇ Test "Calculator state after multiple clears" started.
+          ◇ Test "Calculator initializes with correct default values" started.
+          ◇ Test "Clear function resets calculator to initial state" started.
+          ◇ Test "This test should fail to verify error reporting" started.
+          ◇ Test "Decimal operations precision" started.
+          ◇ Test "Very small decimal numbers" started.
+          ◇ Test case passing 3 arguments a → 4.0, b → -2.0, expected → -8.0 to "Multiplication operation" started.
+          ​◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → 0.0 to "Multiplication operation" started.
+          ​◇ Test case passing 3 arguments a → 5.0, b → 3.0, expected → 15.0 to "Multiplication operation" started.
+          ◇ Test case passing 3 arguments a → -3.0, b → -7.0, expected → 21.0 to "Multiplication operation" started.
+          ​◇ Test case passing 3 arguments a → 10.0, b → 2.0, expected → 5.0 to "Division operation" started.
+          ​◇ Test case passing 3 arguments a → 15.0, b → 3.0, expected → 5.0 to "Division operation" started.
+          ​◇ Test case passing 3 arguments a → 5.0, b → 8.0, expected → -3.0 to "Subtraction operation" started.
+          ◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → -5.0 to "Subtraction operation" started.
+          ​✔ Test "Operation input through handler" passed after 0.010 seconds.
+          ✔ Test "Toggle sign on positive number" passed after 0.010 seconds.
+          ✔ Test "Expression display updates correctly" passed after 0.001 seconds.
+        
+          Run test case testMultiplication(a:b:expected:)
+            Summary: ◇ Test "Toggle sign on positive number" started.
+
+            ◇ Test "Toggle sign on zero has no effect" started.
+            ◇ Test "Toggle sign on positive number" started.
+          
+          Run test case testMultiplication(a:b:expected:)
+            Summary: ◇ Test "Percentage calculation" started.
+
+            ◇ Test "Toggle sign on negative number" started.
+            ◇ Test "Percentage calculation" started.
+          
+          Run test case testMultiplication(a:b:expected:)
+            Summary: ◇ Test "Number input through handler" started.
+
+            ◇ Test "Calculate without setting operation" started.
+            ◇ Test "Number input through handler" started.
+          
+          Run test case testMultiplication(a:b:expected:)
+            Summary: ◇ Test "Multiple equals presses" started.
+
+            ◇ Test "Setting operation without previous number" started.
+            ◇ Test "Multiple equals presses" started.
+          
+          Run test case testDivision(a:b:expected:)
+            Summary: ◇ Test "Operation input through handler" started.
+
+            ◇ Test "Clear input through handler" started.
+            ◇ Test "Operation input through handler" started.
+          
+          Run test case testDivision(a:b:expected:)
+            Summary: ◇ Test "Large number error handling" started.
+
+            ◇ Test "Decimal input through handler" started.
+            ◇ Test "Large number error handling" started.
+          
+          Run test case testDivision(a:b:expected:)
+            Summary: ◇ Test "Clear function resets calculator to initial state" started.
+
+            ◇ Test "Calculator handles invalid input gracefully" started.
+            ◇ Test "Clear function resets calculator to initial state" started.
+          
+          Run test case testDivision(a:b:expected:)
+            Summary: ◇ Test case passing 3 arguments a → 5.0, b → 8.0, expected → -3.0 to "Subtraction operation" started.
+◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → -5.0 to "Subtraction operation" started.
+
+            ◇ Test "Calculator state after multiple clears" started.
+            ◇ Test case passing 3 arguments a → 5.0, b → 8.0, expected → -3.0 to "Subtraction operation" started.
+            ◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → -5.0 to "Subtraction operation" started.
+          
+          Run test case testSubtraction(a:b:expected:)
+            Summary: ◇ Test "This test should fail to verify error reporting" started.
+
+            ◇ Test "Calculator initializes with correct default values" started.
+            ◇ Test "This test should fail to verify error reporting" started.
+          
+          Run test case testSubtraction(a:b:expected:)
+            Summary: ​
+            ◇ Test "Decimal operations precision" started.
+          
+          Run test case testSubtraction(a:b:expected:)
+            Summary: ◇ Test case passing 3 arguments a → 4.0, b → -2.0, expected → -8.0 to "Multiplication operation" started.
+
+            ◇ Test "Very small decimal numbers" started.
+            ◇ Test case passing 3 arguments a → 4.0, b → -2.0, expected → -8.0 to "Multiplication operation" started.
+          
+          Run test case testSubtraction(a:b:expected:)
+            Summary: ◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → 0.0 to "Multiplication operation" started.
+
+            ◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → 0.0 to "Multiplication operation" started.
+          
+          Run test case testDivisionByZero()
+            Summary: ◇ Test case passing 3 arguments a → 5.0, b → 3.0, expected → 15.0 to "Multiplication operation" started.
+
+            ◇ Test case passing 3 arguments a → 5.0, b → 3.0, expected → 15.0 to "Multiplication operation" started.
+          
+          Run test case testAddition(a:b:expected:)
+            Summary: ​
+            ◇ Test case passing 3 arguments a → -3.0, b → -7.0, expected → 21.0 to "Multiplication operation" started.
+          
+          Run test case testAddition(a:b:expected:)
+            Summary: ​
+            ◇ Test case passing 3 arguments a → 10.0, b → 2.0, expected → 5.0 to "Division operation" started.
+          
+          Run test case testAddition(a:b:expected:)
+            Summary: ​
+            ◇ Test case passing 3 arguments a → 15.0, b → 3.0, expected → 5.0 to "Division operation" started.
+          
+          Run test case testAddition(a:b:expected:)
+            Summary: ✔ Test "Toggle sign on positive number" passed after 0.010 seconds.
+
+            ✔ Test "Operation input through handler" passed after 0.010 seconds.
+            ✔ Test "Toggle sign on positive number" passed after 0.010 seconds.
+          
+        Run test suite SpecialFunctionsTests
+          Summary: ◇ Test "Simple addition calculation" started.
+
+          ◇ Suite "Special Functions" started.
+          ​◇ Test case passing 3 arguments a → 7.0, b → 2.0, expected → 3.5 to "Division operation" started.
+          ◇ Test case passing 3 arguments a → 10.0, b → 3.0, expected → 7.0 to "Subtraction operation" started.
+          ​​​◇ Test case passing 3 arguments a → -3.0, b → -7.0, expected → 4.0 to "Subtraction operation" started.
+          ​◇ Test case passing 3 arguments a → 5.0, b → 3.0, expected → 8.0 to "Addition operation" started.
+          ​◇ Test case passing 2 arguments input → "25", expected → 0.25 to "Percentage calculation" started.
+          ​​✔ Test "Adding multiple digit numbers" passed after 0.010 seconds.
+          ◇ Test "Simple addition calculation" started.
+        
+          Run test case testToggleSignZero()
+            Summary: ◇ Test case passing 3 arguments a → 7.0, b → 2.0, expected → 3.5 to "Division operation" started.
+
+            ◇ Test case passing 3 arguments a → 7.0, b → 2.0, expected → 3.5 to "Division operation" started.
+          
+          Run test case testToggleSignPositive()
+            Summary: ◇ Test case passing 2 arguments input → "25", expected → 0.25 to "Percentage calculation" started.
+
+            ◇ Test case passing 3 arguments a → 10.0, b → 3.0, expected → 7.0 to "Subtraction operation" started.
+            ◇ Test case passing 2 arguments input → "25", expected → 0.25 to "Percentage calculation" started.
+          
+          Run test case testToggleSignNegative()
+            Summary: ​
+          
+          Run test case testPercentage(input:expected:)
+            Summary: ◇ Test case passing 3 arguments a → 5.0, b → 3.0, expected → 8.0 to "Addition operation" started.
+
+            ◇ Test case passing 3 arguments a → 5.0, b → 3.0, expected → 8.0 to "Addition operation" started.
+          
+          Run test case testPercentage(input:expected:)
+            Summary: ​
+          
+          Run test case testPercentage(input:expected:)
+            Summary: ✔ Test "Adding multiple digit numbers" passed after 0.010 seconds.
+
+            ◇ Test case passing 3 arguments a → -3.0, b → -7.0, expected → 4.0 to "Subtraction operation" started.
+            ✔ Test "Adding multiple digit numbers" passed after 0.010 seconds.
+          
+          Run test case testPercentage(input:expected:)
+            Summary: ​
+          
+        Run test suite EdgeCaseTests
+          Summary: ✔ Suite "Number Input" passed after 0.020 seconds.
+
+          ◇ Suite "Edge Cases" started.
+          ◇ Test case passing 3 arguments a → 10.0, b → -2.0, expected → 8.0 to "Addition operation" started.
+          ​◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → 5.0 to "Addition operation" started.
+          ​​✔ Test "Decimal point at start creates 0." passed after 0.010 seconds.
+          ✔ Suite "Number Input" passed after 0.020 seconds.
+        
+          Run test case testOperationWithoutPreviousNumber()
+            Summary: ​
+            ◇ Test case passing 3 arguments a → 10.0, b → -2.0, expected → 8.0 to "Addition operation" started.
+          
+          Run test case testMultipleEquals()
+            Summary: ​
+            ◇ Test case passing 3 arguments a → 0.0, b → 5.0, expected → 5.0 to "Addition operation" started.
+          
+          Run test case testCalculateWithoutOperation()
+            Summary: ✔ Test "Decimal point at start creates 0." passed after 0.010 seconds.
+
+            ✔ Test "Decimal point at start creates 0." passed after 0.010 seconds.
+          
+        Run test suite InputHandlerTests
+          Summary: ✘ Suite "Calculator Basic Functionality" failed after 0.017 seconds with 1 issue.
+↳ // MARK: - Calculator Basic Tests
+
+          ◇ Suite "Input Handler Integration" started.
+          ◇ Suite "Calculator Integration Tests" started.
+          ◇ Test case passing 2 arguments input → "100", expected → 1.0 to "Percentage calculation" started.
+          ​◇ Test case passing 2 arguments input → "50", expected → 0.5 to "Percentage calculation" started.
+          ✔ Test "Large number error handling" passed after 0.010 seconds.
+          ✔ Test "Calculator handles invalid input gracefully" passed after 0.010 seconds.
+          ✔ Test "Very small decimal numbers" passed after 0.009 seconds.
+          ✘ Test "This test should fail to verify error reporting" failed after 0.011 seconds with 1 issue.
+          ✘ Suite "Calculator Basic Functionality" failed after 0.017 seconds with 1 issue.
+          ↳ // MARK: - Calculator Basic Tests
+        
+          Run test case testClearInputThroughHandler()
+            Summary: ✔ Test "Very small decimal numbers" passed after 0.009 seconds.
+
+            ◇ Suite "Calculator Integration Tests" started.
+            ✔ Test "Very small decimal numbers" passed after 0.009 seconds.
+          
+          Run test case testOperationInputThroughHandler()
+            Summary: ​
+            ◇ Test case passing 2 arguments input → "100", expected → 1.0 to "Percentage calculation" started.
+          
+          Run test case testDecimalInputThroughHandler()
+            Summary: ✔ Test "Calculator handles invalid input gracefully" passed after 0.010 seconds.
+
+            ◇ Test case passing 2 arguments input → "50", expected → 0.5 to "Percentage calculation" started.
+            ✔ Test "Calculator handles invalid input gracefully" passed after 0.010 seconds.
+          
+          Run test case testNumberInputThroughHandler()
+            Summary: ✘ Test "This test should fail to verify error reporting" failed after 0.011 seconds with 1 issue.
+
+            ✔ Test "Large number error handling" passed after 0.010 seconds.
+            ✘ Test "This test should fail to verify error reporting" failed after 0.011 seconds with 1 issue.
+          
+        Run test suite ErrorHandlingTests
+          Summary: ◇ Test "Expression display updates correctly" started.
+
+          ◇ Suite "Error Handling" started.
+          ◇ Test case passing 2 arguments input → "200", expected → 2.0 to "Percentage calculation" started.
+          ​✔ Test "Multiple decimal points should be ignored" passed after 0.010 seconds.
+          ✔ Test "Adding decimal numbers" passed after 0.010 seconds.
+          ✔ Test "Adding single digit numbers" passed after 0.010 seconds.
+          ✘ Test "This test should fail to verify error reporting" recorded an issue at CalculatorServiceTests.swift:37:9: Expectation failed: calculator.display == "999"
+          ↳ // This test is designed to fail to test error reporting
+          ↳ This should fail - display should be 0, not 999
+          ↳ calculator.display == "999" → false
+          ↳   calculator.display → "0"
+          ◇ Test "Expression display updates correctly" started.
+        
+          Run test case testLargeNumberError()
+            Summary: ​
+            ◇ Test case passing 2 arguments input → "200", expected → 2.0 to "Percentage calculation" started.
+          
+          Run test case testInvalidInputHandling()
+            Summary: ✔ Test "Adding single digit numbers" passed after 0.010 seconds.
+
+            ✔ Test "Multiple decimal points should be ignored" passed after 0.010 seconds.
+            ✔ Test "Adding single digit numbers" passed after 0.010 seconds.
+          
+          Run test case testMultipleClearOperations()
+            Summary: ✘ Test "This test should fail to verify error reporting" recorded an issue at CalculatorServiceTests.swift:37:9: Expectation failed: calculator.display == "999"
+↳ // This test is designed to fail to test error reporting
+↳ This should fail - display should be 0, not 999
+↳ calculator.display == "999" → false
+↳   calculator.display → "0"
+
+            ✔ Test "Adding decimal numbers" passed after 0.010 seconds.
+            ✘ Test "This test should fail to verify error reporting" recorded an issue at CalculatorServiceTests.swift:37:9: Expectation failed: calculator.display == "999"
+            ↳ // This test is designed to fail to test error reporting
+            ↳ This should fail - display should be 0, not 999
+            ↳ calculator.display == "999" → false
+            ↳   calculator.display → "0"
+          
+        Run test suite CalculatorBasicTests
+          Summary: ✔ Suite "Edge Cases" passed after 0.017 seconds.
+
+          ◇ Suite "Calculator Basic Functionality" started.
+          ◇ Test case passing 3 arguments a → -3.0, b → -7.0, expected → -10.0 to "Addition operation" started.
+          ​✔ Test "Subtraction operation" with 4 test cases passed after 0.011 seconds.
+          ✔ Test "Division by zero returns zero" passed after 0.011 seconds.
+          ✔ Test "Toggle sign on zero has no effect" passed after 0.010 seconds.
+          ✔ Test "Calculator initializes with correct default values" passed after 0.010 seconds.
+          ✔ Suite "Error Handling" passed after 0.017 seconds.
+          ✔ Suite "Edge Cases" passed after 0.017 seconds.
+        
+          Run test case testInitialState()
+            Summary: ​
+            ◇ Test case passing 3 arguments a → -3.0, b → -7.0, expected → -10.0 to "Addition operation" started.
+          
+          Run test case testClear()
+            Summary: ✔ Test "Toggle sign on zero has no effect" passed after 0.010 seconds.
+
+            ✔ Test "Subtraction operation" with 4 test cases passed after 0.011 seconds.
+            ✔ Test "Toggle sign on zero has no effect" passed after 0.010 seconds.
+          
+          Run test case testIntentionalFailure()
+            Summary: ✔ Suite "Error Handling" passed after 0.017 seconds.
+
+            ✔ Test "Division by zero returns zero" passed after 0.011 seconds.
+            ✔ Test "Calculator initializes with correct default values" passed after 0.010 seconds.
+            ✔ Suite "Error Handling" passed after 0.017 seconds.
+            /project/CalculatorAppPackage/Tests/CalculatorAppFeatureTests/CalculatorServiceTests.swift:test failure:Expectation failed: calculator.display == "999"
+          
+        Run test suite DecimalEdgeCaseTests
+          Summary: ✔ Test "Repetitive equals press repeats last operation" passed after 0.001 seconds.
+
+          ◇ Suite "Decimal Edge Cases" started.
+          ✔ Test "Percentage calculation" with 4 test cases passed after 0.010 seconds.
+          ✔ Test "Toggle sign on negative number" passed after 0.010 seconds.
+          ✔ Test "Setting operation without previous number" passed after 0.010 seconds.
+          ✔ Test "Multiple equals presses" passed after 0.010 seconds.
+          ✔ Test "Repetitive equals press repeats last operation" passed after 0.001 seconds.
+        
+          Run test case testDecimalPrecision()
+            Summary: ✔ Test "Toggle sign on negative number" passed after 0.010 seconds.
+
+            ✔ Test "Percentage calculation" with 4 test cases passed after 0.010 seconds.
+            ✔ Test "Toggle sign on negative number" passed after 0.010 seconds.
+          
+          Run test case testVerySmallDecimals()
+            Summary: ✔ Test "Multiple equals presses" passed after 0.010 seconds.
+
+            ✔ Test "Setting operation without previous number" passed after 0.010 seconds.
+            ✔ Test "Multiple equals presses" passed after 0.010 seconds.
+          
+        Run test suite CalculatorIntegrationTests
+          Summary: ✔ Test "Chain calculations" passed after 0.001 seconds.
+
+          ◇ Test case passing 3 arguments a → -8.0, b → 2.0, expected → -4.0 to "Division operation" started.
+          ✔ Test "Clear function resets calculator to initial state" passed after 0.010 seconds.
+          ✔ Test "Decimal operations precision" passed after 0.010 seconds.
+          ✔ Test "Decimal input through handler" passed after 0.010 seconds.
+          ✔ Test "Calculate without setting operation" passed after 0.010 seconds.
+          ◇ Test "Complex calculation sequence" started.
+          ◇ Test "Repetitive equals press repeats last operation" started.
+          ✔ Test "Addition operation" with 4 test cases passed after 0.012 seconds.
+          ◇ Test "Chain calculations" started.
+          ✔ Suite "Special Functions" passed after 0.017 seconds.
+          ✔ Test "Clear input through handler" passed after 0.012 seconds.
+          ✔ Test "Chain calculations" passed after 0.001 seconds.
+        
+          Run test case testSimpleAddition()
+            Summary: ✔ Test "Clear input through handler" passed after 0.012 seconds.
+
+            ✔ Test "Clear function resets calculator to initial state" passed after 0.010 seconds.
+            ✔ Test "Clear input through handler" passed after 0.012 seconds.
+          
+          Run test case testComplexCalculation()
+            Summary: ◇ Test "Chain calculations" started.
+
+            ✔ Test "Decimal operations precision" passed after 0.010 seconds.
+            ◇ Test "Chain calculations" started.
+          
+          Run test case testRepetitiveEquals()
+            Summary: ✔ Test "Calculate without setting operation" passed after 0.010 seconds.
+
+            ✔ Test "Decimal input through handler" passed after 0.010 seconds.
+            ✔ Test "Calculate without setting operation" passed after 0.010 seconds.
+          
+          Run test case testChainCalculations()
+            Summary: ✔ Test "Addition operation" with 4 test cases passed after 0.012 seconds.
+
+            ◇ Test "Complex calculation sequence" started.
+            ✔ Test "Addition operation" with 4 test cases passed after 0.012 seconds.
+          
+          Run test case testExpressionDisplay()
+            Summary: ✔ Suite "Special Functions" passed after 0.017 seconds.
+
+            ◇ Test "Repetitive equals press repeats last operation" started.
+            ✔ Suite "Special Functions" passed after 0.017 seconds.
+          
+    Test target CalculatorAppTests
+      CalculatorApp (16173)
+        [ConsoleFoundation] Initialization successful2026-09-12 16:48:07.232641+0500 [16173:19503353] [General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+        2026-09-12 16:48:07.244149+0500 [16173:19502097] [lifecycle] Calculator app launched
+        Test Suite 'All tests' started at 2026-09-12 16:48:07.293.
+        Test Suite 'CalculatorAppTests.xctest' started at 2026-09-12 16:48:07.293.
+        Test Suite 'CalculatorAppTests' started at 2026-09-12 16:48:07.293.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testAddition]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testAddition]' passed (0.003 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testAppLaunch]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testAppLaunch]' passed (0.039 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' started.
+        
+        2026-09-12 16:48:07.379911+0500 [16173:19503348] [General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+        /project/CalculatorAppTests/CalculatorAppTests.swift:209: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' measured [Time, seconds] average: 0.007, relative standard deviation: 1.662%, values: [0.006632, 0.006538, 0.006336, 0.006627, 0.006583, 0.006540, 0.006599, 0.006558, 0.006425, 0.006325], performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.100, maxStandardDeviation: 0.100
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' passed (0.350 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorOperationsEnum]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorOperationsEnum]' passed (0.000 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceBasicOperation]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceBasicOperation]' passed (0.000 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceChainedOperations]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceChainedOperations]' passed (0.001 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceClear]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceClear]' passed (0.000 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceCreation]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceCreation]' passed (0.000 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' started.
+        /project/CalculatorAppTests/CalculatorAppTests.swift:52: error: -[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure] : XCTAssertEqual failed: ("0") is not equal to ("999") - This test should fail - display should be 0, not 999
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' failed (0.002 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicInterface]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicInterface]' passed (0.000 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicProperties]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicProperties]' passed (0.000 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testComplexCalculationWorkflow]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testComplexCalculationWorkflow]' passed (0.005 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testContentViewInitialization]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testContentViewInitialization]' passed (0.009 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testDivisionByZero]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testDivisionByZero]' passed (0.001 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' started.
+        /project/CalculatorAppTests/CalculatorAppTests.swift:224: Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' measured [Time, seconds] average: 0.000, relative standard deviation: 94.505%, values: [0.000041, 0.000009, 0.000008, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007], performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.100, maxStandardDeviation: 0.100
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' passed (0.252 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumbers]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumbers]' passed (0.000 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testMultipleDecimalPointsHandling]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testMultipleDecimalPointsHandling]' passed (0.000 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testPercentageCalculation]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testPercentageCalculation]' passed (0.000 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testRepeatedEquals]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testRepeatedEquals]' passed (0.000 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testSignToggle]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testSignToggle]' passed (0.000 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyAfterOperations]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyAfterOperations]' passed (0.001 seconds).
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyWithDecimalNumbers]' started.
+        Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyWithDecimalNumbers]' passed (0.000 seconds).
+        Test Suite 'CalculatorAppTests' failed at 2026-09-12 16:48:07.964.
+        	 Executed 22 tests, with 1 failure (0 unexpected) in 0.666 (0.671) seconds
+        Test Suite 'IntentionalFailureTests' started at 2026-09-12 16:48:07.964.
+        Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' started.
+        /project/CalculatorAppTests/CalculatorAppTests.swift:286: error: -[CalculatorAppTests.IntentionalFailureTests test] : XCTAssertTrue failed - This test should fail to verify error reporting
+        Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' failed (0.001 seconds).
+        Test Suite 'IntentionalFailureTests' failed at 2026-09-12 16:48:07.966.
+        	 Executed 1 test, with 1 failure (0 unexpected) in 0.001 (0.001) seconds
+        Test Suite 'CalculatorAppTests.xctest' failed at 2026-09-12 16:48:07.966.
+        	 Executed 23 tests, with 2 failures (0 unexpected) in 0.667 (0.672) seconds
+        Test Suite 'All tests' failed at 2026-09-12 16:48:07.966.
+        	 Executed 23 tests, with 2 failures (0 unexpected) in 0.667 (0.673) seconds
+      
+        Writing diagnostic log for test runner launch.
+          /Users/ak/Library/Developer/Xcode/DerivedData/CalculatorApp-aznhcahfeeapogbajbgyxvvusrxg/Logs/Test/Test-CalculatorApp-2026.09.12_16-47-36-+0500.xcresult/Staging/1_Test/Diagnostics/CalculatorAppTests-AAD8B87D-CD41-49AF-9F1C-010C84FC6FBC-Configuration-Test Scheme Action-Iteration-1/CalculatorAppTests-9A619CF5-47B5-4BDA-9E12-600EEA8F3592/Session-CalculatorAppTests-2026-09-12_164746-zoZ4Ib.log:notice:/Users/ak/Library/Developer/Xcode/DerivedData/CalculatorApp-aznhcahfeeapogbajbgyxvvusrxg/Logs/Test/Test-CalculatorApp-2026.09.12_16-47-36-+0500.xcresult/Staging/1_Test/Diagnostics/CalculatorAppTests-AAD8B87D-CD41-49AF-9F1C-010C84FC6FBC-Configuration-Test Scheme Action-Iteration-1/CalculatorAppTests-9A619CF5-47B5-4BDA-9E12-600EEA8F3592/Session-CalculatorAppTests-2026-09-12_164746-zoZ4Ib.log
+        
+        Run test suite All tests
+          Summary: Test Suite 'All tests' failed at 2026-09-12 16:48:07.966.
+	 Executed 23 tests, with 2 failures (0 unexpected) in 0.667 (0.673) seconds
+
+          [ConsoleFoundation] Initialization successful2026-09-12 16:48:07.232641+0500 [16173:19503353] [General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+          2026-09-12 16:48:07.244149+0500 [16173:19502097] [lifecycle] Calculator app launched
+          Test Suite 'All tests' started at 2026-09-12 16:48:07.293.
+          Test Suite 'CalculatorAppTests.xctest' started at 2026-09-12 16:48:07.293.
+          Test Suite 'CalculatorAppTests' started at 2026-09-12 16:48:07.293.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testAddition]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testAddition]' passed (0.003 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testAppLaunch]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testAppLaunch]' passed (0.039 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' started.
+          
+          2026-09-12 16:48:07.379911+0500 [16173:19503348] [General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+          /project/CalculatorAppTests/CalculatorAppTests.swift:209: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' measured [Time, seconds] average: 0.007, relative standard deviation: 1.662%, values: [0.006632, 0.006538, 0.006336, 0.006627, 0.006583, 0.006540, 0.006599, 0.006558, 0.006425, 0.006325], performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.100, maxStandardDeviation: 0.100
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' passed (0.350 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorOperationsEnum]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorOperationsEnum]' passed (0.000 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceBasicOperation]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceBasicOperation]' passed (0.000 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceChainedOperations]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceChainedOperations]' passed (0.001 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceClear]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceClear]' passed (0.000 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceCreation]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceCreation]' passed (0.000 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' started.
+          /project/CalculatorAppTests/CalculatorAppTests.swift:52: error: -[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure] : XCTAssertEqual failed: ("0") is not equal to ("999") - This test should fail - display should be 0, not 999
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' failed (0.002 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicInterface]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicInterface]' passed (0.000 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicProperties]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicProperties]' passed (0.000 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testComplexCalculationWorkflow]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testComplexCalculationWorkflow]' passed (0.005 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testContentViewInitialization]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testContentViewInitialization]' passed (0.009 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testDivisionByZero]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testDivisionByZero]' passed (0.001 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' started.
+          /project/CalculatorAppTests/CalculatorAppTests.swift:224: Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' measured [Time, seconds] average: 0.000, relative standard deviation: 94.505%, values: [0.000041, 0.000009, 0.000008, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007], performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.100, maxStandardDeviation: 0.100
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' passed (0.252 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumbers]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumbers]' passed (0.000 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testMultipleDecimalPointsHandling]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testMultipleDecimalPointsHandling]' passed (0.000 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testPercentageCalculation]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testPercentageCalculation]' passed (0.000 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testRepeatedEquals]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testRepeatedEquals]' passed (0.000 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testSignToggle]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testSignToggle]' passed (0.000 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyAfterOperations]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyAfterOperations]' passed (0.001 seconds).
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyWithDecimalNumbers]' started.
+          Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyWithDecimalNumbers]' passed (0.000 seconds).
+          Test Suite 'CalculatorAppTests' failed at 2026-09-12 16:48:07.964.
+          	 Executed 22 tests, with 1 failure (0 unexpected) in 0.666 (0.671) seconds
+          Test Suite 'IntentionalFailureTests' started at 2026-09-12 16:48:07.964.
+          Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' started.
+          /project/CalculatorAppTests/CalculatorAppTests.swift:286: error: -[CalculatorAppTests.IntentionalFailureTests test] : XCTAssertTrue failed - This test should fail to verify error reporting
+          Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' failed (0.001 seconds).
+          Test Suite 'IntentionalFailureTests' failed at 2026-09-12 16:48:07.966.
+          	 Executed 1 test, with 1 failure (0 unexpected) in 0.001 (0.001) seconds
+          Test Suite 'CalculatorAppTests.xctest' failed at 2026-09-12 16:48:07.966.
+          	 Executed 23 tests, with 2 failures (0 unexpected) in 0.667 (0.672) seconds
+          Test Suite 'All tests' failed at 2026-09-12 16:48:07.966.
+          	 Executed 23 tests, with 2 failures (0 unexpected) in 0.667 (0.673) seconds
+        
+          Run test suite CalculatorAppTests.xctest
+            Summary: Test Suite 'CalculatorAppTests.xctest' failed at 2026-09-12 16:48:07.966.
+	 Executed 23 tests, with 2 failures (0 unexpected) in 0.667 (0.672) seconds
+
+            Test Suite 'CalculatorAppTests.xctest' started at 2026-09-12 16:48:07.293.
+            Test Suite 'CalculatorAppTests' started at 2026-09-12 16:48:07.293.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testAddition]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testAddition]' passed (0.003 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testAppLaunch]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testAppLaunch]' passed (0.039 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' started.
+            
+            2026-09-12 16:48:07.379911+0500 [16173:19503348] [General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+            /project/CalculatorAppTests/CalculatorAppTests.swift:209: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' measured [Time, seconds] average: 0.007, relative standard deviation: 1.662%, values: [0.006632, 0.006538, 0.006336, 0.006627, 0.006583, 0.006540, 0.006599, 0.006558, 0.006425, 0.006325], performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.100, maxStandardDeviation: 0.100
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' passed (0.350 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorOperationsEnum]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorOperationsEnum]' passed (0.000 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceBasicOperation]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceBasicOperation]' passed (0.000 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceChainedOperations]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceChainedOperations]' passed (0.001 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceClear]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceClear]' passed (0.000 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceCreation]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceCreation]' passed (0.000 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' started.
+            /project/CalculatorAppTests/CalculatorAppTests.swift:52: error: -[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure] : XCTAssertEqual failed: ("0") is not equal to ("999") - This test should fail - display should be 0, not 999
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' failed (0.002 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicInterface]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicInterface]' passed (0.000 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicProperties]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicProperties]' passed (0.000 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testComplexCalculationWorkflow]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testComplexCalculationWorkflow]' passed (0.005 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testContentViewInitialization]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testContentViewInitialization]' passed (0.009 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testDivisionByZero]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testDivisionByZero]' passed (0.001 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' started.
+            /project/CalculatorAppTests/CalculatorAppTests.swift:224: Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' measured [Time, seconds] average: 0.000, relative standard deviation: 94.505%, values: [0.000041, 0.000009, 0.000008, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007], performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.100, maxStandardDeviation: 0.100
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' passed (0.252 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumbers]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumbers]' passed (0.000 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testMultipleDecimalPointsHandling]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testMultipleDecimalPointsHandling]' passed (0.000 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testPercentageCalculation]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testPercentageCalculation]' passed (0.000 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testRepeatedEquals]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testRepeatedEquals]' passed (0.000 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testSignToggle]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testSignToggle]' passed (0.000 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyAfterOperations]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyAfterOperations]' passed (0.001 seconds).
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyWithDecimalNumbers]' started.
+            Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyWithDecimalNumbers]' passed (0.000 seconds).
+            Test Suite 'CalculatorAppTests' failed at 2026-09-12 16:48:07.964.
+            	 Executed 22 tests, with 1 failure (0 unexpected) in 0.666 (0.671) seconds
+            Test Suite 'IntentionalFailureTests' started at 2026-09-12 16:48:07.964.
+            Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' started.
+            /project/CalculatorAppTests/CalculatorAppTests.swift:286: error: -[CalculatorAppTests.IntentionalFailureTests test] : XCTAssertTrue failed - This test should fail to verify error reporting
+            Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' failed (0.001 seconds).
+            Test Suite 'IntentionalFailureTests' failed at 2026-09-12 16:48:07.966.
+            	 Executed 1 test, with 1 failure (0 unexpected) in 0.001 (0.001) seconds
+            Test Suite 'CalculatorAppTests.xctest' failed at 2026-09-12 16:48:07.966.
+            	 Executed 23 tests, with 2 failures (0 unexpected) in 0.667 (0.672) seconds
+          
+            Run test suite CalculatorAppTests
+              Summary: Test Suite 'CalculatorAppTests' failed at 2026-09-12 16:48:07.964.
+	 Executed 22 tests, with 1 failure (0 unexpected) in 0.666 (0.671) seconds
+
+              Test Suite 'CalculatorAppTests' started at 2026-09-12 16:48:07.293.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testAddition]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testAddition]' passed (0.003 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testAppLaunch]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testAppLaunch]' passed (0.039 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' started.
+              
+              2026-09-12 16:48:07.379911+0500 [16173:19503348] [General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+              /project/CalculatorAppTests/CalculatorAppTests.swift:209: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' measured [Time, seconds] average: 0.007, relative standard deviation: 1.662%, values: [0.006632, 0.006538, 0.006336, 0.006627, 0.006583, 0.006540, 0.006599, 0.006558, 0.006425, 0.006325], performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.100, maxStandardDeviation: 0.100
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' passed (0.350 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorOperationsEnum]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorOperationsEnum]' passed (0.000 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceBasicOperation]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceBasicOperation]' passed (0.000 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceChainedOperations]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceChainedOperations]' passed (0.001 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceClear]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceClear]' passed (0.000 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceCreation]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceCreation]' passed (0.000 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' started.
+              /project/CalculatorAppTests/CalculatorAppTests.swift:52: error: -[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure] : XCTAssertEqual failed: ("0") is not equal to ("999") - This test should fail - display should be 0, not 999
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' failed (0.002 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicInterface]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicInterface]' passed (0.000 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicProperties]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicProperties]' passed (0.000 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testComplexCalculationWorkflow]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testComplexCalculationWorkflow]' passed (0.005 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testContentViewInitialization]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testContentViewInitialization]' passed (0.009 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testDivisionByZero]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testDivisionByZero]' passed (0.001 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' started.
+              /project/CalculatorAppTests/CalculatorAppTests.swift:224: Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' measured [Time, seconds] average: 0.000, relative standard deviation: 94.505%, values: [0.000041, 0.000009, 0.000008, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007], performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.100, maxStandardDeviation: 0.100
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' passed (0.252 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumbers]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumbers]' passed (0.000 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testMultipleDecimalPointsHandling]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testMultipleDecimalPointsHandling]' passed (0.000 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testPercentageCalculation]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testPercentageCalculation]' passed (0.000 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testRepeatedEquals]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testRepeatedEquals]' passed (0.000 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testSignToggle]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testSignToggle]' passed (0.000 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyAfterOperations]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyAfterOperations]' passed (0.001 seconds).
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyWithDecimalNumbers]' started.
+              Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyWithDecimalNumbers]' passed (0.000 seconds).
+              Test Suite 'CalculatorAppTests' failed at 2026-09-12 16:48:07.964.
+              	 Executed 22 tests, with 1 failure (0 unexpected) in 0.666 (0.671) seconds
+            
+              Run test case testAddition()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testAddition]' passed (0.003 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testAddition]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testAddition]' passed (0.003 seconds).
+              
+              Run test case testAppLaunch()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testAppLaunch]' passed (0.039 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testAppLaunch]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testAppLaunch]' passed (0.039 seconds).
+              
+              Run test case testCalculationPerformance()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' passed (0.350 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' started.
+                
+                2026-09-12 16:48:07.379911+0500 [16173:19503348] [General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+                /project/CalculatorAppTests/CalculatorAppTests.swift:209: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' measured [Time, seconds] average: 0.007, relative standard deviation: 1.662%, values: [0.006632, 0.006538, 0.006336, 0.006627, 0.006583, 0.006540, 0.006599, 0.006558, 0.006425, 0.006325], performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.100, maxStandardDeviation: 0.100
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculationPerformance]' passed (0.350 seconds).
+                notice:Time average: 0.007 seconds, relative standard deviation: 1.7%
+              
+              Run test case testCalculatorOperationsEnum()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorOperationsEnum]' passed (0.000 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorOperationsEnum]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorOperationsEnum]' passed (0.000 seconds).
+              
+              Run test case testCalculatorServiceBasicOperation()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceBasicOperation]' passed (0.000 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceBasicOperation]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceBasicOperation]' passed (0.000 seconds).
+              
+              Run test case testCalculatorServiceChainedOperations()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceChainedOperations]' passed (0.001 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceChainedOperations]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceChainedOperations]' passed (0.001 seconds).
+              
+              Run test case testCalculatorServiceClear()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceClear]' passed (0.000 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceClear]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceClear]' passed (0.000 seconds).
+              
+              Run test case testCalculatorServiceCreation()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceCreation]' passed (0.000 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceCreation]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceCreation]' passed (0.000 seconds).
+              
+              Run test case testCalculatorServiceFailure()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' failed (0.002 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' started.
+                /project/CalculatorAppTests/CalculatorAppTests.swift:52: error: -[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure] : XCTAssertEqual failed: ("0") is not equal to ("999") - This test should fail - display should be 0, not 999
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' failed (0.002 seconds).
+                /project/CalculatorAppTests/CalculatorAppTests.swift:test failure:XCTAssertEqual failed: ("0") is not equal to ("999") - This test should fail - display should be 0, not 999
+              
+              Run test case testCalculatorServicePublicInterface()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicInterface]' passed (0.000 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicInterface]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicInterface]' passed (0.000 seconds).
+              
+              Run test case testCalculatorServicePublicProperties()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicProperties]' passed (0.000 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicProperties]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServicePublicProperties]' passed (0.000 seconds).
+              
+              Run test case testComplexCalculationWorkflow()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testComplexCalculationWorkflow]' passed (0.005 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testComplexCalculationWorkflow]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testComplexCalculationWorkflow]' passed (0.005 seconds).
+              
+              Run test case testContentViewInitialization()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testContentViewInitialization]' passed (0.009 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testContentViewInitialization]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testContentViewInitialization]' passed (0.009 seconds).
+              
+              Run test case testDivisionByZero()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testDivisionByZero]' passed (0.001 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testDivisionByZero]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testDivisionByZero]' passed (0.001 seconds).
+              
+              Run test case testLargeNumberInputPerformance()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' passed (0.252 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' started.
+                /project/CalculatorAppTests/CalculatorAppTests.swift:224: Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' measured [Time, seconds] average: 0.000, relative standard deviation: 94.505%, values: [0.000041, 0.000009, 0.000008, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007, 0.000007], performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.100, maxStandardDeviation: 0.100
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumberInputPerformance]' passed (0.252 seconds).
+                notice:Time average: 0.000 seconds, relative standard deviation: 94.5%
+              
+              Run test case testLargeNumbers()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumbers]' passed (0.000 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumbers]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testLargeNumbers]' passed (0.000 seconds).
+              
+              Run test case testMultipleDecimalPointsHandling()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testMultipleDecimalPointsHandling]' passed (0.000 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testMultipleDecimalPointsHandling]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testMultipleDecimalPointsHandling]' passed (0.000 seconds).
+              
+              Run test case testPercentageCalculation()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testPercentageCalculation]' passed (0.000 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testPercentageCalculation]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testPercentageCalculation]' passed (0.000 seconds).
+              
+              Run test case testRepeatedEquals()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testRepeatedEquals]' passed (0.000 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testRepeatedEquals]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testRepeatedEquals]' passed (0.000 seconds).
+              
+              Run test case testSignToggle()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testSignToggle]' passed (0.000 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testSignToggle]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testSignToggle]' passed (0.000 seconds).
+              
+              Run test case testStateConsistencyAfterOperations()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyAfterOperations]' passed (0.001 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyAfterOperations]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyAfterOperations]' passed (0.001 seconds).
+              
+              Run test case testStateConsistencyWithDecimalNumbers()
+                Summary: Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyWithDecimalNumbers]' passed (0.000 seconds).
+
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyWithDecimalNumbers]' started.
+                Test Case '-[CalculatorAppTests.CalculatorAppTests testStateConsistencyWithDecimalNumbers]' passed (0.000 seconds).
+              
+            Run test suite IntentionalFailureTests
+              Summary: Test Suite 'IntentionalFailureTests' failed at 2026-09-12 16:48:07.966.
+	 Executed 1 test, with 1 failure (0 unexpected) in 0.001 (0.001) seconds
+
+              Test Suite 'IntentionalFailureTests' started at 2026-09-12 16:48:07.964.
+              Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' started.
+              /project/CalculatorAppTests/CalculatorAppTests.swift:286: error: -[CalculatorAppTests.IntentionalFailureTests test] : XCTAssertTrue failed - This test should fail to verify error reporting
+              Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' failed (0.001 seconds).
+              Test Suite 'IntentionalFailureTests' failed at 2026-09-12 16:48:07.966.
+              	 Executed 1 test, with 1 failure (0 unexpected) in 0.001 (0.001) seconds
+            
+              Run test case test()
+                Summary: Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' failed (0.001 seconds).
+
+                Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' started.
+                /project/CalculatorAppTests/CalculatorAppTests.swift:286: error: -[CalculatorAppTests.IntentionalFailureTests test] : XCTAssertTrue failed - This test should fail to verify error reporting
+                Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' failed (0.001 seconds).
+                /project/CalculatorAppTests/CalculatorAppTests.swift:test failure:XCTAssertTrue failed - This test should fail to verify error reporting
+              
+** TEST FINISHED **
