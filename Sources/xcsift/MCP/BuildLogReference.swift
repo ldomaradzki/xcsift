@@ -28,15 +28,18 @@ enum BuildLogReference {
     /// found in prose follow in order of appearance. The caller tries them in turn, so the order
     /// only decides which log is examined first.
     ///
-    /// - Parameter homeDirectory: Used to expand a leading `~`.
-    static func logPaths(in text: String, homeDirectory: String) -> [String] {
+    /// - Parameters:
+    ///   - json: `text` parsed as JSON, when it is JSON. A server may answer with it rather than
+    ///     prose — Xcode's own reports the build transcript as a `fullLogPath` string value — and
+    ///     the caller asks more than one question of that structure, so it parses once and passes
+    ///     the answer in.
+    ///   - homeDirectory: Used to expand a leading `~`.
+    static func logPaths(in text: String, json: JSONValue?, homeDirectory: String) -> [String] {
         var paths: [String] = []
         var seen: Set<String> = []
         var baseDirectory: String?
 
-        // A server may answer with JSON rather than prose — Xcode's own server reports the build
-        // transcript as a `fullLogPath` string value — so read the structure when there is one.
-        if let json = JSONValue.parse(Data(text.utf8)) {
+        if let json {
             collect(from: json, homeDirectory: homeDirectory, into: &paths, seen: &seen)
         }
 
@@ -79,6 +82,11 @@ enum BuildLogReference {
         }
 
         return paths
+    }
+
+    /// Parses `text` itself. For a caller with no other use for the structure.
+    static func logPaths(in text: String, homeDirectory: String) -> [String] {
+        logPaths(in: text, json: JSONValue.parse(Data(text.utf8)), homeDirectory: homeDirectory)
     }
 
     private static func collect(

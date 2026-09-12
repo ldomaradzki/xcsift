@@ -326,6 +326,10 @@ The codebase follows a modular architecture:
      sifter substitutes the parsed result for it — 31 108 bytes of a measured run became 1 069,
      exact at 69 passed and 3 failed. Parsing is refused unless `Total Results` and the blocks
      agree, because a skipped block is a test that disappears
+   - One JSON parse per content block: a summarising server answers in JSON, and both the
+     log-path search and the enumerated-results gate read that structure. `BuildOutputSifter`
+     parses it once and passes the value to `BuildLogReference.logPaths(in:json:homeDirectory:)`
+     and `enumeratesTestResults(_:)`
    - `BuildLogReference.swift`: recovers build-log paths from JSON (`fullLogPath`) and from a
      rendered file tree (ANSI codes, box-drawing glyphs, `~`, base directory + indented children,
      with the base scoped to the lines nested under it)

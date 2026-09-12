@@ -122,20 +122,30 @@ struct BuildOutputSifter {
 
         let classification = classify(text, trust: trust)
 
+        // A summarising server may answer in JSON — Xcode's own does — and two questions get asked
+        // of that structure: which logs it names, and whether it enumerates the tests it ran. One
+        // parse answers both; a text that is not JSON costs the decoder its first byte.
+        let consultsTheText = trust == .buildShaped && classification != .transcript
+        let json = consultsTheText ? JSONValue.parse(Data(text.utf8)) : nil
+
         // A text that points at a build log on disk is a summary *of* a build, even when it quotes
         // the transcript's terminal marker — servers echo `** BUILD FAILED **` into their own
         // summaries. Replacing such a text with a parse of the fragment it quotes would drop both
         // the server's fields and the path that leads to everything it left out, so only a text
         // carrying the transcript itself outranks a log it mentions.
         let referencedLogs =
-            trust == .buildShaped && classification != .transcript
-            ? BuildLogReference.logPaths(in: text, homeDirectory: fileSystem.homeDirectoryForCurrentUser.path)
+            consultsTheText
+            ? BuildLogReference.logPaths(
+                in: text,
+                json: json,
+                homeDirectory: fileSystem.homeDirectoryForCurrentUser.path
+            )
             : []
 
         if !referencedLogs.isEmpty {
             guard settings.summaryStrategy != .off else { return .unchanged }
 
-            let outcome = siftReferencedLogs(referencedLogs, summarisedIn: text)
+            let outcome = siftReferencedLogs(referencedLogs, summarisedIn: text, json: json)
             if outcome.changesContent { return outcome }
 
             // Not one referenced path held a usable log, so the text was no summary of one: a
@@ -163,7 +173,7 @@ struct BuildOutputSifter {
         }
     }
 
-    private func siftReferencedLogs(_ paths: [String], summarisedIn text: String) -> Outcome {
+    private func siftReferencedLogs(_ paths: [String], summarisedIn text: String, json: JSONValue?) -> Outcome {
         var notes: [String] = []
 
         for path in paths {
@@ -184,7 +194,7 @@ struct BuildOutputSifter {
                     return Outcome(replacement: rendered, additions: ["Build log: \(path)"], notes: notes)
                 }
 
-                guard adds(result, beyond: text) else {
+                guard adds(result, beyond: text, json: json) else {
                     // Another referenced log may still carry something: Xcode reports a console
                     // log and a build log together, and only one of them holds the warnings.
                     notes.append("xcsift: \(path): nothing the response did not already carry")
@@ -331,7 +341,7 @@ struct BuildOutputSifter {
     ///
     /// This is a gate, not a filter: when it opens, the whole sifted result is appended, so a
     /// response missing one warning gets the complete result, known errors included.
-    private func adds(_ result: BuildResult, beyond text: String) -> Bool {
+    private func adds(_ result: BuildResult, beyond text: String, json: JSONValue?) -> Bool {
         if settings.parse.buildInfo, result.buildInfo != nil { return true }
         if result.warnings.contains(where: { !alreadySaid($0.message, in: text) }) { return true }
         if result.errors.contains(where: { !alreadySaid($0.message, in: text) }) { return true }
@@ -342,7 +352,7 @@ struct BuildOutputSifter {
         // reported, and those numbers are not offered against a server's own. Xcode's text
         // enumeration is parsed exactly instead, at the top of `sift`; this gate is what is left
         // for the JSON shape, whose field names are the server's to choose.
-        guard !enumeratesTestResults(text) else { return false }
+        guard !enumeratesTestResults(json) else { return false }
 
         return result.failedTests.contains {
             !mentions($0.test, in: text) && !mentions($0.message, in: text)
@@ -350,10 +360,8 @@ struct BuildOutputSifter {
     }
 
     /// Detects a JSON response carrying an array of per-test results.
-    private func enumeratesTestResults(_ text: String) -> Bool {
-        guard let json = JSONValue.parse(Data(text.utf8)), let object = json.objectValue else {
-            return false
-        }
+    private func enumeratesTestResults(_ json: JSONValue?) -> Bool {
+        guard let object = json?.objectValue else { return false }
 
         let stateKeys: Set<String> = ["state", "status", "result", "outcome"]
         for (_, value) in object {

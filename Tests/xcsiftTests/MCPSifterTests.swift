@@ -286,6 +286,21 @@ final class BuildLogReferenceTests: XCTestCase {
         )
     }
 
+    /// The sifter asks the same payload two questions, so it parses once and passes the answer in.
+    /// Both spellings must find the same paths.
+    func testTakesAPreParsedPayload() {
+        let text = #"{"fullConsoleLogsPath":"/tmp/console.txt","fullLogPath":"/tmp/build.txt"}"#
+
+        XCTAssertEqual(
+            BuildLogReference.logPaths(
+                in: text,
+                json: JSONValue.parse(Data(text.utf8)),
+                homeDirectory: "/Users/me"
+            ),
+            BuildLogReference.logPaths(in: text, homeDirectory: "/Users/me")
+        )
+    }
+
     func testTrimsSurroundingPunctuation() {
         let text = "Wrote log to \"/tmp/logs/build.log\"."
         XCTAssertEqual(BuildLogReference.logPaths(in: text, homeDirectory: "/Users/me"), ["/tmp/logs/build.log"])
