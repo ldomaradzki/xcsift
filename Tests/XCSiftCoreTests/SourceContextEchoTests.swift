@@ -139,3 +139,40 @@ final class SourceContextEchoTests: XCTestCase {
         XCTAssertEqual(result.summary.errors, 2)
     }
 }
+
+// MARK: - Indented diagnostics (Xcode build logs)
+
+/// Xcode's own build log nests diagnostics under the task that emitted them. The indentation is
+/// presentation, not part of the path.
+final class IndentedDiagnosticTests: XCTestCase {
+
+    func testIndentedWarningKeepsACleanFilePath() {
+        let output = """
+            Build CalculatorApp
+                Compile ContentView.swift
+                    /project/Sources/ContentView.swift:84:17: warning: unused variable 'x'
+            ** BUILD SUCCEEDED **
+            """
+
+        let result = OutputParser().parse(input: output, printWarnings: true)
+
+        XCTAssertEqual(result.warnings.count, 1)
+        XCTAssertEqual(result.warnings.first?.file, "/project/Sources/ContentView.swift")
+        XCTAssertEqual(result.warnings.first?.line, 84)
+    }
+
+    func testIndentedErrorKeepsACleanFilePath() {
+        let output = """
+            Build CalculatorApp
+                Planning Swift module CalculatorAppFeature (arm64)
+                        /project/Sources/ContentView.swift:3:1: error: Multiple incompatible access-level modifiers specified
+            ** BUILD FAILED **
+            """
+
+        let result = OutputParser().parse(input: output)
+
+        XCTAssertEqual(result.errors.count, 1)
+        XCTAssertEqual(result.errors.first?.file, "/project/Sources/ContentView.swift")
+        XCTAssertEqual(result.errors.first?.line, 3)
+    }
+}

@@ -94,6 +94,16 @@ public struct LineParser: Sendable {
 
     // MARK: - Test suite tracking
     private var lastCompletedXCTestSuiteName: String?
+    /// Suite completions already counted, keyed by suite name and timestamp. Xcode's own console
+    /// log repeats each completion — inline, under `Summary:`, sometimes again — with the identical
+    /// millisecond timestamp, and counting the repeats inflates the run.
+    ///
+    /// Two genuine completions of one suite within the same millisecond would be indistinguishable
+    /// and the second would be dropped; a completion whose line carries no parseable timestamp is
+    /// always counted, which is the safety valve for formats that omit one (the parallel
+    /// `Test suite 'X' passed on 'Device'` form, for instance).
+    private var seenXCTestSuiteCompletions: Set<String> = []
+    private var lastCompletedXCTestSuiteKey: String?
 
     // MARK: - Dependency graph state
     private var currentDependencyTarget: String?
@@ -107,6 +117,16 @@ public struct LineParser: Sendable {
     /// can carry `: error: ` inside a string literal or a comment, which is not a diagnostic.
     /// Tracking the block keeps indented tool output — `swiftgen: error: …` — reportable.
     private var sourceContextOpen = false
+
+    /// The timestamp in `Test Suite 'X' passed at 2026-09-12 16:47:46.179.`, which is what tells a
+    /// repeated completion from a new one. Formats without one return nil and are never deduped.
+    private func parseXCTestSuiteCompletionTimestamp(_ line: String) -> String? {
+        guard let atRange = line.range(of: "' passed at ") ?? line.range(of: "' failed at ") else {
+            return nil
+        }
+        let timestamp = line[atRange.upperBound...].trimmingCharacters(in: .whitespaces)
+        return timestamp.isEmpty ? nil : timestamp
+    }
 
     // MARK: - xcbeautify
     private let shouldParseXcbeautify: Bool
@@ -542,6 +562,7 @@ public struct LineParser: Sendable {
         // Suite name tracking (state only, no event emitted)
         if candidates.contains(.test), let suiteName = parseCompletedXCTestSuiteName(line) {
             lastCompletedXCTestSuiteName = suiteName
+            lastCompletedXCTestSuiteKey = parseXCTestSuiteCompletionTimestamp(line).map { "\(suiteName)|\($0)" }
         }
 
         // Crash detection
@@ -999,7 +1020,7 @@ public struct LineParser: Sendable {
                 afterKeyword[afterKeyword.index(after: openParen) ..< closeParen]
                 .trimmingCharacters(in: .whitespaces)
                 .replacingOccurrences(of: " seconds", with: "")
-            duration = Double(durationStr)
+            duration = finiteDuration(Double(durationStr))
         }
 
         if passed {
@@ -1064,18 +1085,37 @@ public struct LineParser: Sendable {
         guard let finalColon = prefix.lastIndex(of: ":"),
             let number = Int(prefix[prefix.index(after: finalColon)...])
         else {
-            return (prefix, nil)
+            return (withoutIndentation(prefix), nil)
         }
-        return (prefix[..<finalColon], number)
+        return (withoutIndentation(prefix[..<finalColon]), number)
+    }
+
+    /// Rejects a duration that is not a finite number. `Double("inf")` and `Double("nan")` both
+    /// parse, and a non-finite value cannot be encoded as JSON — it would turn the whole result
+    /// into an encoding error at the very end of a build.
+    private func finiteDuration(_ value: Double?) -> Double? {
+        guard let value, value.isFinite else { return nil }
+        return value
+    }
+
+    /// Drops the indentation in front of a diagnostic's path. Xcode's own build logs nest each
+    /// diagnostic under the task that emitted it, and that leading whitespace is not part of the
+    /// file path — keeping it would hand callers a path nothing can open.
+    private func withoutIndentation(_ file: Substring) -> Substring {
+        var result = file
+        while let first = result.first, first == " " || first == "\t" {
+            result = result.dropFirst()
+        }
+        return result
     }
 
     /// Splits the `file:line:column` prefix that precedes a diagnostic marker.
     private func parseLocation(_ prefix: Substring) -> (file: Substring, line: Int?, column: Int?) {
         let (withoutFinal, finalNumber) = parseFileAndLine(prefix)
-        guard let column = finalNumber else { return (prefix, nil, nil) }
+        guard let column = finalNumber else { return (withoutIndentation(prefix), nil, nil) }
 
         let (file, lineNumber) = parseFileAndLine(withoutFinal)
-        guard let lineNumber else { return (withoutFinal, column, nil) }
+        guard let lineNumber else { return (withoutIndentation(withoutFinal), column, nil) }
         return (file, lineNumber, column)
     }
 
@@ -1282,7 +1322,7 @@ public struct LineParser: Sendable {
             if let lastParen = line.range(of: "(", options: .backwards),
                 let secondsEnd = line.range(of: XcodebuildSymbols.secondsKeyword, options: .backwards)
             {
-                duration = Double(String(line[lastParen.upperBound ..< secondsEnd.lowerBound]))
+                duration = finiteDuration(Double(String(line[lastParen.upperBound ..< secondsEnd.lowerBound])))
             }
             return (testName, duration)
         }
@@ -1294,7 +1334,7 @@ public struct LineParser: Sendable {
             if let afterRange = line.range(of: " after ", range: endQuote.upperBound ..< line.endIndex) {
                 let afterStr = line[afterRange.upperBound...]
                 if let secondsRange = afterStr.range(of: " seconds") {
-                    duration = Double(String(afterStr[..<secondsRange.lowerBound]))
+                    duration = finiteDuration(Double(String(afterStr[..<secondsRange.lowerBound])))
                 }
             }
             return (testName, duration)
@@ -1316,7 +1356,12 @@ public struct LineParser: Sendable {
                 let components = beforeError.split(separator: ":", omittingEmptySubsequences: false)
                 if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
                     let file = components[0 ..< (components.count - 1)].joined(separator: ":")
-                    return FailedTest(test: testName, message: message, file: file, line: lineNum)
+                    return FailedTest(
+                        test: testName,
+                        message: message,
+                        file: String(withoutIndentation(Substring(file))),
+                        line: lineNum
+                    )
                 }
             }
             if let bracketStart = line.range(of: "-["),
@@ -1358,7 +1403,7 @@ public struct LineParser: Sendable {
             if let lastParen = line.range(of: "(", options: .backwards),
                 let secondsEnd = line.range(of: XcodebuildSymbols.secondsKeyword, options: .backwards)
             {
-                duration = Double(String(line[lastParen.upperBound ..< secondsEnd.lowerBound]))
+                duration = finiteDuration(Double(String(line[lastParen.upperBound ..< secondsEnd.lowerBound])))
             }
 
             let message = duration.map { String(format: "%.3f seconds", $0) } ?? "failed"
@@ -1382,7 +1427,7 @@ public struct LineParser: Sendable {
                             omittingEmptySubsequences: false
                         )
                         if parts.count >= 4, let lineNum = Int(parts[1]) {
-                            let file = String(parts[0])
+                            let file = String(withoutIndentation(parts[0]))
                             let message = String(parts[3]).trimmingCharacters(in: .whitespaces)
                             return FailedTest(test: testName, message: message, file: file, line: lineNum)
                         }
@@ -1392,7 +1437,7 @@ public struct LineParser: Sendable {
                         var duration: Double?
                         let afterFailed = line[failedAfter.upperBound...]
                         if let secondsRange = afterFailed.range(of: " seconds") {
-                            duration = Double(String(afterFailed[..<secondsRange.lowerBound]))
+                            duration = finiteDuration(Double(String(afterFailed[..<secondsRange.lowerBound])))
                         }
                         return FailedTest(
                             test: testName,
@@ -1543,11 +1588,21 @@ public struct LineParser: Sendable {
                 } else {
                     durationStr = String(afterIn)
                 }
-                duration = Double(durationStr.trimmingCharacters(in: CharacterSet(charactersIn: ". \t"))) ?? 0
+                duration =
+                    finiteDuration(
+                        Double(durationStr.trimmingCharacters(in: CharacterSet(charactersIn: ". \t")))
+                    ) ?? 0
             }
 
             let suiteName = lastCompletedXCTestSuiteName ?? ""
+            let completionKey = lastCompletedXCTestSuiteKey
             lastCompletedXCTestSuiteName = nil
+            lastCompletedXCTestSuiteKey = nil
+
+            // A repeat of a completion already counted carries no new tests.
+            if let completionKey, !seenXCTestSuiteCompletions.insert(completionKey).inserted {
+                return nil
+            }
 
             if let executed = executedCount {
                 return .testSuiteCompleted(
@@ -1578,7 +1633,10 @@ public struct LineParser: Sendable {
             } else {
                 durationStr = String(afterPassed)
             }
-            let duration = Double(durationStr.trimmingCharacters(in: CharacterSet(charactersIn: ". \t"))) ?? 0
+            let duration =
+                finiteDuration(
+                    Double(durationStr.trimmingCharacters(in: CharacterSet(charactersIn: ". \t")))
+                ) ?? 0
 
             return .swiftTestingCompleted(
                 executed: passedCount + failedCount,
@@ -1649,7 +1707,9 @@ public struct LineParser: Sendable {
                         durationStr = String(afterPassed)
                     }
                     duration =
-                        Double(durationStr.trimmingCharacters(in: CharacterSet(charactersIn: ". \t"))) ?? 0
+                        finiteDuration(
+                            Double(durationStr.trimmingCharacters(in: CharacterSet(charactersIn: ". \t")))
+                        ) ?? 0
                 }
                 return .swiftTestingCompleted(executed: total, failed: 0, duration: duration)
             }
