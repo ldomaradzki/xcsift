@@ -11,13 +11,13 @@ jobs:
     name: Build & Test (macOS)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - name: Select Xcode 16
-        run: sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
+      - name: Select Xcode 16.4
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
 
       - name: Cache SPM packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .build
           key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
@@ -40,12 +40,12 @@ jobs:
     name: Build & Test (Linux)
     runs-on: ubuntu-latest
     container:
-      image: swift:6.1
+      image: swift:6.3-jammy
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Cache SPM packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .build
           key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
