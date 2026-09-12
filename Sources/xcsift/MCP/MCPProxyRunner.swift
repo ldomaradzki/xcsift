@@ -125,7 +125,7 @@ struct MCPProxyRunner {
 
             // Closing the server's stdin is how a well-behaved MCP server learns to shut down.
             toServer.close()
-            Self.shutdown(pid: pid, log: verbose ? toLog : nil)
+            Self.shutdown(pid: pid, isFinished: { activity.serverStreamClosed }, log: verbose ? toLog : nil)
         }
         clientPump.stackSize = 4 * 1024 * 1024
         clientPump.start()
@@ -139,12 +139,14 @@ struct MCPProxyRunner {
             handle: { session.handleServerMessage($0) }
         )
 
+        activity.recordServerStreamClosed()
+
         if case let .readFailed(error, _) = serverEnd {
             toLog.write(
                 Data("xcsift: reading the upstream server's output failed: \(error.localizedDescription)\n".utf8)
             )
             // Nobody is draining the child's stdout any more, so waiting on it could hang forever.
-            Self.shutdown(pid: pid, log: verbose ? toLog : nil)
+            Self.shutdown(pid: pid, isFinished: { false }, gracePeriod: 0, log: verbose ? toLog : nil)
         }
 
         process.waitUntilExit()
@@ -181,39 +183,34 @@ struct MCPProxyRunner {
     /// The shutdown sequence the MCP specification prescribes once the client's stream closes:
     /// give the server time to exit on its own, then SIGTERM, then SIGKILL. Without it a server
     /// that ignores a closed stdin would outlive the client that started it.
+    ///
+    /// Whether the server is finished is decided by `isFinished` — normally "its stdout reached
+    /// end of stream" — rather than by asking the operating system. Reaping the child here with
+    /// `waitpid` would race Foundation's own reaper and can leave `waitUntilExit` waiting for an
+    /// exit status something else already collected.
     static func shutdown(
         pid: pid_t,
+        isFinished: @escaping () -> Bool,
         gracePeriod: TimeInterval = 5,
         terminationPeriod: TimeInterval = 2,
         log: FileDescriptorWriter? = nil
     ) {
-        guard !waitForExit(pid: pid, within: gracePeriod) else { return }
+        guard !wait(until: isFinished, within: gracePeriod) else { return }
         log?.write(Data("xcsift: upstream server did not exit on its own; sending SIGTERM\n".utf8))
         kill(pid, SIGTERM)
 
-        guard !waitForExit(pid: pid, within: terminationPeriod) else { return }
+        guard !wait(until: isFinished, within: terminationPeriod) else { return }
         log?.write(Data("xcsift: upstream server ignored SIGTERM; sending SIGKILL\n".utf8))
         kill(pid, SIGKILL)
     }
 
-    /// `kill(pid, 0)` reports whether the process is still addressable. The child stays a zombie
-    /// until the parent reaps it in `waitUntilExit`, so this polls the child's own exit, which is
-    /// what `ESRCH` or a reaped pid tells us.
-    private static func waitForExit(pid: pid_t, within timeout: TimeInterval) -> Bool {
+    private static func wait(until isFinished: () -> Bool, within timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if hasExited(pid: pid) { return true }
+            if isFinished() { return true }
             Thread.sleep(forTimeInterval: 0.05)
         }
-        return hasExited(pid: pid)
-    }
-
-    private static func hasExited(pid: pid_t) -> Bool {
-        var status: Int32 = 0
-        let reaped = waitpid(pid, &status, WNOHANG)
-        if reaped == pid { return true }
-        // -1 with ECHILD means Foundation's own reaper got there first.
-        return reaped == -1 && errno == ECHILD
+        return isFinished()
     }
 
     /// Finds the upstream executable the way a shell would. Resolving it here rather than handing
@@ -320,6 +317,7 @@ struct MCPProxyRunner {
 private final class ProxyActivity: @unchecked Sendable {
     private let lock = NSLock()
     private var localReplies = 0
+    private var serverFinished = false
 
     func recordLocalReply() {
         lock.lock()
@@ -331,6 +329,20 @@ private final class ProxyActivity: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return localReplies > 0
+    }
+
+    /// Set when the upstream server's stdout reaches end of stream, which is the proxy's own
+    /// evidence that the server is done — no reaping required.
+    func recordServerStreamClosed() {
+        lock.lock()
+        serverFinished = true
+        lock.unlock()
+    }
+
+    var serverStreamClosed: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return serverFinished
     }
 }
 

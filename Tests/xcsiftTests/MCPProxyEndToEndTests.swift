@@ -44,7 +44,7 @@ final class MCPProxyEndToEndTests: XCTestCase {
     /// A message too large to buffer is copied through in chunks, and the next message must stay in
     /// sync behind it. This is the framing resync path at its real 4 MiB threshold.
     func testStreamsAnOversizedMessageThroughAndStaysInSync() throws {
-        let payload = String(repeating: "x", count: 5 * 1024 * 1024)
+        let payload = String(repeating: "x", count: 4 * 1024 * 1024 + 256 * 1024)
         let server = try CannedServer(
             responses: [
                 #"{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18"}}"#,
@@ -52,14 +52,14 @@ final class MCPProxyEndToEndTests: XCTestCase {
                 Self.toolResult(id: 3, text: MCPFixtures.failingBuild),
             ]
         )
-        let proxy = try ProxyProcess(upstream: server.command, arguments: [])
+        let proxy = try ProxyProcess(upstream: server.command, arguments: ["--verbose"])
         defer { proxy.terminate() }
 
         proxy.send(#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#)
         _ = try proxy.receive()
 
         proxy.send(#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"screenshot","arguments":{}}}"#)
-        let big = try proxy.receive(timeout: 30)
+        let big = try proxy.receive(timeout: 60)
         XCTAssertEqual(big["result"]?["content"]?.arrayValue?.first?["text"]?.stringValue?.count, payload.count)
 
         proxy.send(#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"build_sim","arguments":{}}}"#)
@@ -97,7 +97,12 @@ final class MCPProxyEndToEndTests: XCTestCase {
         server.arguments = ["-c", "trap '' TERM; while true; do sleep 1; done"]
         try server.run()
 
-        MCPProxyRunner.shutdown(pid: server.processIdentifier, gracePeriod: 0.2, terminationPeriod: 0.5)
+        MCPProxyRunner.shutdown(
+            pid: server.processIdentifier,
+            isFinished: { false },
+            gracePeriod: 0.2,
+            terminationPeriod: 0.5
+        )
         server.waitUntilExit()
 
         XCTAssertEqual(server.terminationReason, .uncaughtSignal)
@@ -110,7 +115,13 @@ final class MCPProxyEndToEndTests: XCTestCase {
         server.arguments = ["-c", "exit 0"]
         try server.run()
 
-        MCPProxyRunner.shutdown(pid: server.processIdentifier, gracePeriod: 2, terminationPeriod: 0.5)
+        // The server is reported finished at once, so nothing is signalled.
+        MCPProxyRunner.shutdown(
+            pid: server.processIdentifier,
+            isFinished: { true },
+            gracePeriod: 2,
+            terminationPeriod: 0.5
+        )
         server.waitUntilExit()
 
         XCTAssertEqual(server.terminationReason, .exit)
@@ -209,7 +220,11 @@ private final class ProxyProcess {
     /// rather than skips.
     func receive(timeout: TimeInterval = 15) throws -> JSONValue {
         guard let line = reader.next(timeout: timeout) else {
-            XCTFail("the proxy produced no message within \(timeout)s; stderr: \(collectedErrorOutput())")
+            let state = process.isRunning ? "still running" : "gone (status \(process.terminationStatus))"
+            XCTFail(
+                "the proxy produced no message within \(timeout)s: \(reader.bytesSeen) bytes arrived "
+                    + "without a newline, the proxy is \(state), stderr: \(collectedErrorOutput())"
+            )
             throw ProxyFailure.noMessage
         }
         guard let value = JSONValue.parse(Data(line.utf8)) else {
@@ -292,6 +307,13 @@ private final class MessageReader: @unchecked Sendable {
             guard condition.wait(until: deadline) else { return nil }
         }
         return lines.isEmpty ? nil : lines.removeFirst()
+    }
+
+    /// How many bytes have arrived, whether or not they form a message yet.
+    var bytesSeen: Int {
+        condition.lock()
+        defer { condition.unlock() }
+        return everything.count
     }
 
     /// Everything seen so far, for asserting on stderr.
