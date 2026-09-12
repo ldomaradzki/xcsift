@@ -43,6 +43,32 @@ swift build -c release
 cp .build/release/xcsift /usr/local/bin/
 ```
 
+### MCP Proxy
+
+xcsift can sit in front of Xcode's own MCP server (Xcode 26+) and sift the build output
+in its tool results:
+
+```bash
+# Wrap Xcode's built-in MCP server (Xcode 26+) — the default upstream
+xcsift mcp
+xcsift mcp -- xcrun mcpbridge
+
+# Any other stdio Xcode MCP server (Tuist-based wrappers, custom servers, …)
+xcsift mcp -f toon -w -- /usr/local/bin/my-xcode-mcp serve
+
+# Print a client configuration snippet instead of running
+xcsift mcp --print-config
+```
+
+Xcode's own server (`xcrun mcpbridge`) answers only while MCP is enabled (Xcode ▸ Settings ▸
+Intelligence, or `sudo xcrun mcp-server enable`); when it exits without answering, the proxy writes
+that diagnostic to stderr.
+
+Proxy-specific flags: `--on-summary append|replace|off`, `--no-inject-tools`, `--build-tool-pattern`,
+`--min-raw-lines`, `--max-log-size`, `--verbose`. Every parsing/formatting flag (`--format`,
+`--warnings`, `--build-info`, `--executable`, `--slow-threshold`, `--xcbeautify`) is shared with the
+pipeline mode through `SiftingOptions`, and `.xcsift.toml` is honoured.
+
 ### Plugin Installation
 
 xcsift can be integrated with coding assistants via built-in plugin installers:
@@ -262,6 +288,60 @@ The codebase follows a modular architecture:
    - Parses build phases and per-target timing information
    - Parses executable targets from `RegisterWithLaunchServices` and `Validate` lines
 
+2b. **MCP/ (MCP proxy)** - `xcsift mcp`, an MCP server that fronts another Xcode MCP server
+   - `MCPCommand.swift`: the `mcp` subcommand; upstream command comes after `--` (`.postTerminator`,
+     which keeps `xcsift mcp --help` working). `validate()` refuses an uncompilable
+     `--build-tool-pattern` and out-of-range limits, so nothing fails open at runtime
+   - `MCPProxyRunner.swift`: resolves the server on PATH, spawns it, pumps stdio both ways on two
+     threads that share no mutable state, inherits its stderr, mirrors its exit status, and runs the
+     spec's shutdown sequence (close stdin → SIGTERM → SIGKILL, by pid — `Process` is not Sendable)
+     when the client's stream closes. A read error is distinguished from EOF and reported; write
+     failures are reported once and abandon that stream rather than emitting half a message
+   - `MCPProxySession.swift`: protocol-aware routing — tracks in-flight ids in a lock-guarded
+     `PendingRequestTable` (the session itself is immutable), rewrites matching results, adds a
+     `tools` capability to `initialize` when the server declares none, and advertises and serves the
+     injected `xcsift_parse_build_log` tool. Everything else is forwarded byte for byte
+   - `MCPMessageFramer.swift`: newline framing. A message is buffered up to 4 MiB; past that its
+     bytes pass through in chunks, the last one flagged so the writer can hold the stream
+     exclusively for the whole message (both pumps write to stdout — an injected reply landing
+     mid-message would desynchronise framing)
+   - `JSONValue.swift`: JSON model with single-line serialization; re-serialization sorts keys and
+     normalises numbers, which is why untouched messages are copied rather than re-encoded
+   - `BuildOutputSifter.swift`: decides what happens to one text block (`Outcome` carries a
+     replacement, appended blocks and stderr notes). `ToolTrust` says how far a tool's name licenses
+     interpreting its output as a build: an unknown tool needs a terminal phase marker and never has
+     its referenced logs read
+   - `BuildLogReference.swift`: recovers build-log paths from JSON (`fullLogPath`) and from a
+     rendered file tree (ANSI codes, box-drawing glyphs, `~`, base directory + indented children,
+     with the base scoped to the lines nested under it)
+   - `MCPDefaults` (in `BuildOutputSifter.swift`): every default the flags and the types share, so a
+     documented default lives in one place
+
+   **Two upstream shapes:** raw `xcodebuild`/SPM transcripts are *replaced* with the sifted result;
+   already-summarised responses that reference a log on disk keep their text and get the sifted
+   result *appended* (`--on-summary`). Anything else is untouched — the proxy never degrades a
+   response it does not understand.
+
+   **Appending is gated, not filtered.** `BuildOutputSifter.adds(_:beyond:)` compares the parsed
+   log with the server's own text and opens the gate only when the log carries something the
+   response does not; the whole result is then appended. That is what makes the proxy useful against
+   Xcode's server — `BuildProject` returned structured errors but never warnings, as observed on
+   Xcode 27 — and what keeps a failing build from being restated twice. Case and target attribution
+   (`… (in target 'A' …)`) are normalised before comparing. A response enumerating per-test results
+   is left alone: the server that ran the tests counts more accurately than an Xcode console
+   transcript can be aggregated (known gap, see `Sources/xcsift/xcsift.docc/MCPProxy.md` → Limits).
+
+   **Xcode's server approves agents by binary + code signature**, so with the proxy the agent is
+   `xcsift`, and an ad-hoc rebuild is a new agent needing re-approval (`xcrun mcp-server status`
+   lists permitted agents and folders).
+
+2c. **SiftingOptions.swift** / **ResultRenderer.swift** - Shared between both modes
+   - `SiftingOptions` is an `@OptionGroup` declared by *both* the root command and `mcp`. This is
+     required, not cosmetic: ArgumentParser lets the root command consume its own options wherever
+     they appear, so a subcommand that re-declares `--warnings` never sees it. Sharing one
+     `ParsableArguments` type makes the root's parsed value flow to the subcommand.
+   - `ResultRenderer` encodes a `BuildResult` as JSON/TOON/annotations for both modes
+
 3. **CoverageParser.swift** - Code coverage parsing
    - `CoverageParser` struct with dependency injection for testability
    - Auto-detects and converts `.profraw` (SPM) and `.xcresult` (xcodebuild) formats
@@ -283,6 +363,23 @@ The codebase follows a modular architecture:
 2. Raw text → `OutputParser.parse()` → line-by-line regex matching
 3. Parsed data → `BuildResult` struct
 4. Output formatting (JSON or TOON) → stdout
+
+### Xcode Console Logs
+
+Xcode's own build/test transcript (what its MCP server writes and reports as `fullLogPath` /
+`fullConsoleLogsPath`) differs from piped `xcodebuild` output in two ways the parser handles
+explicitly:
+
+- **Diagnostics are indented** under the task that emitted them. `LineParser.withoutIndentation`
+  strips that whitespace from parsed file paths — otherwise every reported path is unopenable.
+- **Suite completions repeat** (inline, under `Summary:`, sometimes again) with identical
+  millisecond timestamps. `LineParser` keys counted completions by suite name + timestamp, so a
+  repeat adds no tests. Two genuine completions of one suite in the same millisecond would be
+  indistinguishable, and a completion line with no timestamp is always counted.
+  `Tests/XCSiftCoreTests/XcodeConsoleLogTests.swift` uses `.xctest` suite names on purpose: only
+  bundle-level totals accumulate, so a fixture without that suffix would pass without the fix.
+- **A non-finite duration** (`Double("inf")` parses) cannot be encoded, and would turn a finished
+  build into an encoding error. `LineParser.finiteDuration` drops it.
 
 ### Multi-line Context Pattern
 - `parseLine()` processes each line in isolation (no access to neighboring lines)
@@ -499,6 +596,20 @@ Test cases cover:
     - Empty coverage path treated as nil
     - Zero flatten depth treated as unlimited
   - ConfigError description tests
+- **MCP proxy** (100 tests in `Tests/xcsiftTests/MCP*.swift`):
+  - `MCPMessageTests`: JSON model round-trips, single-line serialization, newline framing,
+    oversized-message passthrough and its final-chunk flag, truncation reporting
+  - `MCPSifterTests`: build-log path recovery (prose trees and JSON), transcript replacement, trust
+    gating, append/replace/off strategies, size limits, "nothing to add" cases, declined-log notes
+  - `MCPProxySessionTests`: verbatim forwarding (non-JSON, batches, notifications, server-initiated
+    requests, untracked ids, errors), result rewriting with sibling keys preserved, every id shape,
+    the build-tool gate failing closed, tool injection and capability declaration, injected tool
+    calls and their argument validation, pending-request eviction
+  - `MCPCommandTests`: the configuration snippet (completeness, escaping, terminators) and every
+    validation refusal
+  - `MCPProxyEndToEndTests`: the built binary proxying a canned POSIX-shell MCP server, a 5 MB
+    passthrough followed by an in-sync sift, launch failure, a server that never answers, and
+    shutdown escalation to SIGKILL
 - **xcbeautify parsing** (22 tests in `Tests/XcbeautifyTests.swift`):
   - ASCII and emoji error/warning markers (`[x]`, `❌`, `[!]`, `⚠️`)
   - Test status markers (`✔`, `✖`)
@@ -811,6 +922,7 @@ Error: Type mismatch at 'warnings': expected Bool, found String
 
 Documentation files to update:
 - `xcsift.md` - Main overview and Topics structure
+- `MCPProxy.md` - `xcsift mcp` reference
 - `GettingStarted.md` - Installation and basic usage
 - `Usage.md` - CLI flags and options reference
 - `OutputFormats.md` - JSON/TOON/GitHub Actions format details

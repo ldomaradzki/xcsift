@@ -5,21 +5,23 @@ import Foundation
 /// Resolved configuration after merging file config with CLI arguments.
 /// All values are concrete (non-optional) after merge.
 struct ResolvedConfig: Sendable {
-    let format: FormatType
-    let warnings: Bool
-    let warningsAsErrors: Bool
-    let quiet: Bool
-    let coverage: Bool
-    let coverageDetails: Bool
-    let coveragePath: String?
-    let slowThreshold: Double?
-    let buildInfo: Bool
-    let executable: Bool
-    let exitOnFailure: Bool
-    let xcbeautify: Bool
-    let toonDelimiter: TOONDelimiterType
-    let toonKeyFolding: TOONKeyFoldingType
-    let toonFlattenDepth: Int?
+    // `var` on purpose: the MCP proxy overrides a few of these per tool call, and a hand-written
+    // field-by-field copy would silently reset whatever is added here next.
+    var format: FormatType
+    var warnings: Bool
+    var warningsAsErrors: Bool
+    var quiet: Bool
+    var coverage: Bool
+    var coverageDetails: Bool
+    var coveragePath: String?
+    var slowThreshold: Double?
+    var buildInfo: Bool
+    var executable: Bool
+    var exitOnFailure: Bool
+    var xcbeautify: Bool
+    var toonDelimiter: TOONDelimiterType
+    var toonKeyFolding: TOONKeyFoldingType
+    var toonFlattenDepth: Int?
 }
 
 // MARK: - Config Merger
