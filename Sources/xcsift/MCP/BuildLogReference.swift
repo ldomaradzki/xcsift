@@ -1,4 +1,5 @@
 import Foundation
+import XCSiftCore
 
 /// Finds build-log paths that an upstream MCP server mentions in its tool output.
 ///
@@ -41,9 +42,9 @@ enum BuildLogReference {
 
         var baseIndent = 0
 
-        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
+        for rawLine in TextLines.split(text) {
             let indent = indentation(of: rawLine)
-            let line = stripDecoration(String(rawLine))
+            let line = stripDecoration(rawLine)
             guard !line.isEmpty else { continue }
 
             // A base directory governs only the lines nested under it. Once the text steps back
@@ -114,7 +115,7 @@ enum BuildLogReference {
 
     /// Leading whitespace only: the box-drawing glyphs that follow it are decoration, and how
     /// deeply a line is nested is what says whether it is a child of the line above.
-    private static func indentation(of line: Substring) -> Int {
+    private static func indentation(of line: String) -> Int {
         line.prefix { $0 == " " || $0 == "\t" }.count
     }
 
@@ -156,7 +157,9 @@ enum BuildLogReference {
             pending = iterator.next()
         }
 
-        return result.trimmingCharacters(in: .whitespaces)
+        // Newlines are trimmed along with the spaces: a CRLF line arrives with its `\r` attached,
+        // and a path at the end of one would otherwise stop looking like a `.log`.
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static let treeGlyphs: Set<Unicode.Scalar> = ["│", "├", "└", "─", "┃", "┣", "┗", "━", "•"]

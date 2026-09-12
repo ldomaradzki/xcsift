@@ -361,6 +361,7 @@ final class FileDescriptorWriter: @unchecked Sendable {
     // each individual write.
     private let lock = NSRecursiveLock()
     private var isClosed = false
+    private var didCloseOwner = false
     private var didReportFailure = false
 
     init(borrowing descriptor: Int32) {
@@ -419,8 +420,12 @@ final class FileDescriptorWriter: @unchecked Sendable {
     func close() {
         lock.lock()
         defer { lock.unlock() }
-        guard !isClosed, let owner else { return }
+        // Closing is tracked apart from `isClosed`: a write failure stops further writes, and if
+        // that also counted as closed the descriptor would stay open. The child would then wait on
+        // an EOF that never arrives, and shutdown would fall back to the grace period and SIGTERM.
         isClosed = true
+        guard !didCloseOwner, let owner else { return }
+        didCloseOwner = true
         try? owner.close()
     }
 

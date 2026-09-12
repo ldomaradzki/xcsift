@@ -169,3 +169,37 @@ final class MCPMessageFramerTests: XCTestCase {
         XCTAssertEqual(truncations(events), [])
     }
 }
+
+// MARK: - Writing
+
+final class FileDescriptorWriterTests: XCTestCase {
+
+    /// A failed write abandons the stream but must not pass for a close: the upstream server waits
+    /// on the EOF that closing stdin delivers, and without it shutdown falls back to the grace
+    /// period and SIGTERM.
+    func testCloseStillClosesAfterAWriteFailure() throws {
+        signal(SIGPIPE, SIG_IGN)
+
+        let pipe = Pipe()
+        let descriptor = pipe.fileHandleForWriting.fileDescriptor
+        let writer = FileDescriptorWriter(owning: pipe.fileHandleForWriting)
+
+        // With no reader left, the next write fails with EPIPE.
+        try pipe.fileHandleForReading.close()
+        writer.write(Data("{\"jsonrpc\":\"2.0\"}\n".utf8))
+
+        writer.close()
+        XCTAssertEqual(fcntl(descriptor, F_GETFD), -1, "the descriptor is abandoned but never closed")
+        XCTAssertEqual(errno, EBADF)
+    }
+
+    func testCloseIsIdempotent() throws {
+        let pipe = Pipe()
+        let writer = FileDescriptorWriter(owning: pipe.fileHandleForWriting)
+
+        writer.close()
+        writer.close()
+
+        XCTAssertEqual(try pipe.fileHandleForReading.readToEnd(), nil, "closing must deliver EOF exactly once")
+    }
+}

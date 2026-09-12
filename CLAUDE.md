@@ -300,7 +300,11 @@ The codebase follows a modular architecture:
    - `MCPProxySession.swift`: protocol-aware routing — tracks in-flight ids in a lock-guarded
      `PendingRequestTable` (the session itself is immutable), rewrites matching results, adds a
      `tools` capability to `initialize` when the server declares none, and advertises and serves the
-     injected `xcsift_parse_build_log` tool. Everything else is forwarded byte for byte
+     injected `xcsift_parse_build_log` tool. Everything else is forwarded byte for byte.
+     Declaring that capability makes the listing the proxy's to answer: it serves `tools/list`
+     itself, and — because the two pumps have no ordering between them, so the client's request can
+     overtake the initialize response — also answers a `-32601` rejection of `tools/list` with the
+     injected tool. Any other error is still the server's to report
    - `MCPMessageFramer.swift`: newline framing. A message is buffered up to 4 MiB; past that its
      bytes pass through in chunks, the last one flagged so the writer can hold the stream
      exclusively for the whole message (both pumps write to stdout — an injected reply landing
@@ -321,6 +325,15 @@ The codebase follows a modular architecture:
    already-summarised responses that reference a log on disk keep their text and get the sifted
    result *appended* (`--on-summary`). Anything else is untouched — the proxy never degrades a
    response it does not understand.
+
+   **Which shape a text is** is `BuildOutputSifter.classify`. A terminal phase marker
+   (`** BUILD FAILED **`) settles that the text is build output, but not that it *is* the
+   transcript: servers quote the marker into their own summaries. So a text that carries the
+   marker alone and also names a log on disk is treated as a summary of that log — otherwise
+   replacing it would drop the server's fields, the error count and the path itself. Only
+   corroborated transcripts outrank a log they mention, and a replacement carries the path forward
+   either way. When no referenced path holds a usable log, the text is sifted as build output after
+   all, so a transcript that merely names a `.txt` file is not left alone.
 
    **Appending is gated, not filtered.** `BuildOutputSifter.adds(_:beyond:)` compares the parsed
    log with the server's own text and opens the gate only when the log carries something the
@@ -378,6 +391,11 @@ explicitly:
   indistinguishable, and a completion line with no timestamp is always counted.
   `Tests/XCSiftCoreTests/XcodeConsoleLogTests.swift` uses `.xctest` suite names on purpose: only
   bundle-level totals accumulate, so a fixture without that suffix would pass without the fix.
+- **CRLF line endings.** `String.split(separator: "\n")` never matches one, because Swift reads
+  `\r\n` as a single `Character`. `TextLines.split` (XCSiftCore) splits on the newline *byte*
+  instead, and every path that takes whole text rather than a stream goes through it: `OutputParser`,
+  the MCP sifter's classification and parsing, and `BuildLogReference`.
+
 - **A non-finite duration** (`Double("inf")` parses) cannot be encoded, and would turn a finished
   build into an encoding error. `LineParser.finiteDuration` drops it.
 

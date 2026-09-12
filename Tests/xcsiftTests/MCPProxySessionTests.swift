@@ -270,12 +270,88 @@ final class MCPProxySessionTests: XCTestCase {
         XCTAssertTrue(logs(actions).contains { $0.contains("paginated") })
     }
 
-    func testDoesNotAdvertiseWhenThereIsNoToolsArray() throws {
+    /// A server that declares a tools capability and then answers with a bare object still leaves
+    /// the client asking what tools there are. The proxy has one, so the answer is a list of one.
+    func testAdvertisesIntoAListingWithNoToolsArray() throws {
         let session = makeSession()
         _ = session.handleClientMessage(message(#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#))
         let response = #"{"jsonrpc":"2.0","id":2,"result":{"nothing":true}}"#
 
+        let result = try XCTUnwrap(toClient(session.handleServerMessage(message(response))).first?["result"])
+        XCTAssertEqual(
+            result["tools"]?.arrayValue?.compactMap { $0["name"]?.stringValue },
+            [MCPProxySession.injectedToolName]
+        )
+        XCTAssertEqual(result["nothing"]?.boolValue, true, "the server's own fields must survive")
+    }
+
+    /// A `tools` value that is not an array is a shape the proxy does not understand, and it does
+    /// not overwrite what it cannot read.
+    func testLeavesANonArrayToolsValueAlone() throws {
+        let session = makeSession(verbose: true)
+        _ = session.handleClientMessage(message(#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#))
+        let response = #"{"jsonrpc":"2.0","id":2,"result":{"tools":"soon"}}"#
+
+        let actions = session.handleServerMessage(message(response))
+        XCTAssertEqual(passedThrough(actions), response)
+        XCTAssertTrue(logs(actions).contains { $0.contains("not an array") })
+    }
+
+    /// Declaring a tools capability the server does not have leaves the proxy owning the listing
+    /// that capability promises: forwarding `tools/list` to a server with no tools returns
+    /// method-not-found, and the client would see a protocol error instead of the injected tool.
+    func testAnswersToolsListItselfWhenTheServerDeclaresNoTools() throws {
+        let session = makeSession()
+        _ = session.handleClientMessage(message(#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#))
+        _ = session.handleServerMessage(
+            message(#"{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"resources":{}}}}"#)
+        )
+
+        let actions = session.handleClientMessage(
+            message(#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#)
+        )
+
+        XCTAssertEqual(toServer(actions), [], "a server with no tools must not be asked for a listing")
+        let result = try XCTUnwrap(toClient(actions).first?["result"])
+        XCTAssertEqual(
+            result["tools"]?.arrayValue?.compactMap { $0["name"]?.stringValue },
+            [MCPProxySession.injectedToolName]
+        )
+    }
+
+    /// The client may get its `tools/list` out before the proxy has seen the initialize response —
+    /// two pumps, no ordering between them — so the rejection is handled from the server side too.
+    func testAnswersAnUnsupportedToolsListWithTheInjectedTool() throws {
+        let session = makeSession()
+        _ = session.handleClientMessage(message(#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#))
+        let response = #"{"jsonrpc":"2.0","id":2,"error":{"code":-32601,"message":"Method not found"}}"#
+
+        let result = try XCTUnwrap(toClient(session.handleServerMessage(message(response))).first?["result"])
+        XCTAssertEqual(
+            result["tools"]?.arrayValue?.compactMap { $0["name"]?.stringValue },
+            [MCPProxySession.injectedToolName]
+        )
+    }
+
+    /// Any other failure is the server's to report, and substituting a result would hide it.
+    func testPassesOtherToolsListErrorsThrough() {
+        let session = makeSession()
+        _ = session.handleClientMessage(message(#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#))
+        let response = #"{"jsonrpc":"2.0","id":2,"error":{"code":-32603,"message":"Internal error"}}"#
+
         XCTAssertEqual(passedThrough(session.handleServerMessage(message(response))), response)
+    }
+
+    /// A server that declares tools of its own still owns its listing.
+    func testForwardsToolsListWhenTheServerDeclaresTools() throws {
+        let session = makeSession()
+        _ = session.handleClientMessage(message(#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#))
+        _ = session.handleServerMessage(
+            message(#"{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"tools":{}}}}"#)
+        )
+
+        let request = #"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#
+        XCTAssertEqual(toServer(session.handleClientMessage(message(request))), [request])
     }
 
     func testInjectionCanBeDisabled() throws {

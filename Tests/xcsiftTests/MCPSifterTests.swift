@@ -102,6 +102,20 @@ enum MCPFixtures {
         """
     }
 
+    /// A summary that quotes the transcript's terminal marker before pointing at the log. Xcode's
+    /// own `BuildProject` answers this shape, and the marker must not make it look like the
+    /// transcript itself.
+    static func summaryQuotingTerminalMarker(referencing logPath: String) -> String {
+        """
+        Build failed with 2 errors.
+
+        ** BUILD FAILED **
+
+          └ Files:
+             └── \(logPath) — Build Logs
+        """
+    }
+
     /// Reads a field out of a sifted JSON payload, so tests assert on values rather than on the
     /// encoder's whitespace.
     static func field(_ key: String, of json: String) -> JSONValue? {
@@ -193,6 +207,21 @@ final class BuildLogReferenceTests: XCTestCase {
         XCTAssertEqual(
             Set(BuildLogReference.logPaths(in: text, homeDirectory: "/Users/me")),
             ["/tmp/console.txt", "/tmp/build.txt"]
+        )
+    }
+
+    /// A tree written with CRLF endings yields the same paths: `split(separator: "\n")` matches
+    /// nothing in one, because Swift reads `\r\n` as a single `Character`.
+    func testFindsPathsInACRLFTree() {
+        let text = "  └ Files:\r\n     └── /tmp/logs/build.log\r\n"
+        XCTAssertEqual(BuildLogReference.logPaths(in: text, homeDirectory: "/Users/me"), ["/tmp/logs/build.log"])
+    }
+
+    func testJoinsChildPathsToBaseDirectoryAcrossCRLF() {
+        let text = "  └── /tmp/workspace-a/\r\n      ├── logs/build.log — Build Logs\r\n"
+        XCTAssertEqual(
+            BuildLogReference.logPaths(in: text, homeDirectory: "/Users/me"),
+            ["/tmp/workspace-a/logs/build.log"]
         )
     }
 
@@ -483,5 +512,127 @@ final class BuildOutputSifterTests: XCTestCase {
 
         let outcome = makeSifter(maximumLogBytes: 1024, fileSystem: fileSystem).parseLog(atPath: "/tmp/logs/build.log")
         XCTAssertEqual(outcome, .failure(.tooLarge(bytes: 10_000, cap: 1024)))
+    }
+    // MARK: A summary that quotes the terminal marker
+
+    /// The marker says "this text is about a build", not "this text *is* the build". A summary
+    /// that quotes one still points at the log holding what it left out, and replacing the whole
+    /// block with a parse of the quoted fragment would lose the server's fields and that path.
+    func testSummaryQuotingATerminalMarkerKeepsItsTextAndGainsTheLog() throws {
+        let fileSystem = MCPFixtures.fileSystem()
+        fileSystem.fileContents["/tmp/logs/build.log"] = MCPFixtures.failingBuild
+
+        let outcome = makeSifter(fileSystem: fileSystem)
+            .sift(text: MCPFixtures.summaryQuotingTerminalMarker(referencing: "/tmp/logs/build.log"))
+
+        XCTAssertNil(outcome.replacement, "the server's own summary must survive")
+        let appended = try XCTUnwrap(outcome.additions.first)
+        XCTAssertEqual(MCPFixtures.field("errors", of: appended)?.arrayValue?.count, 1)
+    }
+
+    func testOnSummaryOffProtectsASummaryQuotingATerminalMarker() {
+        let fileSystem = MCPFixtures.fileSystem()
+        fileSystem.fileContents["/tmp/logs/build.log"] = MCPFixtures.failingBuild
+
+        XCTAssertEqual(
+            makeSifter(strategy: .off, fileSystem: fileSystem)
+                .sift(text: MCPFixtures.summaryQuotingTerminalMarker(referencing: "/tmp/logs/build.log")),
+            .unchanged
+        )
+    }
+
+    func testSummaryQuotingATerminalMarkerIsReplacedWithTheLogPathKept() throws {
+        let fileSystem = MCPFixtures.fileSystem()
+        fileSystem.fileContents["/tmp/logs/build.log"] = MCPFixtures.failingBuild
+
+        let outcome = makeSifter(strategy: .replace, fileSystem: fileSystem)
+            .sift(text: MCPFixtures.summaryQuotingTerminalMarker(referencing: "/tmp/logs/build.log"))
+
+        XCTAssertEqual(MCPFixtures.field("errors", of: try XCTUnwrap(outcome.replacement))?.arrayValue?.count, 1)
+        XCTAssertEqual(outcome.additions, ["Build log: /tmp/logs/build.log"])
+    }
+
+    /// Preferring a referenced log must not cost the text that names it: when no referenced path
+    /// holds a usable log, the block was build output after all and is sifted as such — keeping
+    /// the path, which the replacement would otherwise take with it.
+    func testFallsBackToSiftingWhenAReferencedLogIsUnusable() throws {
+        let fileSystem = MCPFixtures.fileSystem()
+        fileSystem.fileContents["/tmp/notes.txt"] = "shopping list"
+        let text = """
+            ** BUILD FAILED **
+            /project/Sources/A.swift:1:1: error: cannot find 'boom' in scope
+            See /tmp/notes.txt
+            """
+
+        let outcome = makeSifter(fileSystem: fileSystem).sift(text: text)
+
+        XCTAssertEqual(MCPFixtures.field("status", of: try XCTUnwrap(outcome.replacement))?.stringValue, "failed")
+        XCTAssertEqual(outcome.additions, ["Build log: /tmp/notes.txt"], "the path must survive the replacement")
+        XCTAssertTrue(try XCTUnwrap(outcome.notes.first).contains("does not read like"))
+    }
+
+    // MARK: Line endings
+
+    /// `String.split(separator: "\n")` never matches CRLF, because Swift reads `\r\n` as one
+    /// `Character`. A log written that way parsed as a single line — that is, as nothing.
+    func testParsesALogWithCRLFLineEndings() throws {
+        let fileSystem = MCPFixtures.fileSystem()
+        fileSystem.fileContents["/tmp/logs/build.log"] =
+            MCPFixtures.failingBuild.replacingOccurrences(of: "\n", with: "\r\n")
+
+        let outcome = makeSifter(fileSystem: fileSystem)
+            .sift(text: MCPFixtures.summary(referencing: "/tmp/logs/build.log"))
+
+        XCTAssertEqual(
+            MCPFixtures.field("summary", of: try XCTUnwrap(outcome.additions.first))?["errors"]?.intValue,
+            1
+        )
+    }
+
+    func testReplacesARawTranscriptWithCRLFLineEndings() throws {
+        let crlf = MCPFixtures.failingBuild.replacingOccurrences(of: "\n", with: "\r\n")
+        let replacement = try XCTUnwrap(makeSifter().sift(text: crlf).replacement)
+
+        XCTAssertEqual(MCPFixtures.field("errors", of: replacement)?.arrayValue?.count, 1)
+    }
+
+    // MARK: The size cap
+
+    /// The cap is settled on the bytes that were read, so a size the file system reported for some
+    /// other file — a symlink's own, or a stale one — cannot walk a log past it.
+    func testCapIsEnforcedOnWhatWasActuallyRead() {
+        let fileSystem = MCPFixtures.fileSystem()
+        let log = String(repeating: "x", count: 4096) + "\n" + MCPFixtures.failingBuild
+        fileSystem.fileContents["/tmp/logs/build.log"] = log
+        fileSystem.fileAttributes["/tmp/logs/build.log"] = [.size: NSNumber(value: 12)]
+
+        let outcome = makeSifter(maximumLogBytes: 1024, fileSystem: fileSystem)
+            .parseLog(atPath: "/tmp/logs/build.log")
+
+        XCTAssertEqual(outcome, .failure(.tooLarge(bytes: log.utf8.count, cap: 1024)))
+    }
+
+    /// `attributesOfItem` reports on the link, not its destination, so a symlink used to be a way
+    /// around `--max-log-size`. Run against the real file system: the mock cannot hold a link.
+    func testSymlinkDoesNotEvadeTheSizeCap() throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("xcsift-symlink-cap-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let log = directory.appendingPathComponent("build.log")
+        let link = directory.appendingPathComponent("link.log")
+        try (String(repeating: "x", count: 4096) + "\n" + MCPFixtures.failingBuild)
+            .write(to: log, atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: log)
+
+        let sifter = BuildOutputSifter(
+            settings: BuildOutputSifter.Settings(config: MCPFixtures.resolvedConfig(), maximumLogBytes: 1024)
+        )
+
+        guard case let .failure(reason) = sifter.parseLog(atPath: link.path) else {
+            return XCTFail("a symlink to an oversized log must be refused like the log itself")
+        }
+        XCTAssertTrue(reason.description.contains("--max-log-size"), reason.description)
     }
 }

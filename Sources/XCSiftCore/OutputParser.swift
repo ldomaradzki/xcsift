@@ -506,8 +506,7 @@ public class OutputParser {
     /// Splits on the newline byte. `String.split(separator: "\n")` never matches a CRLF line
     /// ending, because Swift treats `\r\n` as one `Character`.
     private static func lines(of input: String) -> [String] {
-        input.utf8.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: false)
-            .map { String(decoding: $0, as: UTF8.self) }
+        TextLines.split(input)
     }
 
     /// Parses raw xcodebuild or SPM output and returns a structured ``BuildResult``.

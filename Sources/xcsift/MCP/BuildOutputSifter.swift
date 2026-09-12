@@ -106,23 +106,53 @@ struct BuildOutputSifter {
     ///     path that merely appears in its output, so only an unmistakable transcript is sifted and
     ///     no log is read from disk.
     func sift(text: String, trust: ToolTrust = .buildShaped) -> Outcome {
-        if isRawBuildOutput(text, trust: trust) {
-            let result = parse(text)
-            guard isUsable(result) else { return .unchanged }
-            switch render(result) {
-            case let .success(rendered):
-                return .replaced(rendered)
-            case let .failure(reason):
-                return Outcome(notes: ["xcsift: \(reason.description)"])
-            }
+        let classification = classify(text, trust: trust)
+
+        // A text that points at a build log on disk is a summary *of* a build, even when it quotes
+        // the transcript's terminal marker — servers echo `** BUILD FAILED **` into their own
+        // summaries. Replacing such a text with a parse of the fragment it quotes would drop both
+        // the server's fields and the path that leads to everything it left out, so only a text
+        // carrying the transcript itself outranks a log it mentions.
+        let referencedLogs =
+            trust == .buildShaped && classification != .transcript
+            ? BuildLogReference.logPaths(in: text, homeDirectory: fileSystem.homeDirectoryForCurrentUser.path)
+            : []
+
+        if !referencedLogs.isEmpty {
+            guard settings.summaryStrategy != .off else { return .unchanged }
+
+            let outcome = siftReferencedLogs(referencedLogs, summarisedIn: text)
+            if outcome.changesContent { return outcome }
+
+            // Not one referenced path held a usable log, so the text was no summary of one: a
+            // transcript that merely names a `.txt` file lands here, and is still worth sifting.
+            guard classification.isRawBuildOutput else { return outcome }
+            return siftRawOutput(text, referencing: referencedLogs, notes: outcome.notes)
         }
 
-        guard trust == .buildShaped, settings.summaryStrategy != .off else { return .unchanged }
+        guard classification.isRawBuildOutput else { return .unchanged }
+        return siftRawOutput(text, referencing: [], notes: [])
+    }
 
-        let home = fileSystem.homeDirectoryForCurrentUser.path
+    /// Replaces a raw transcript with its parse, carrying forward any log path the text held: the
+    /// replacement is the whole content block, so a path left in it is a path the agent loses.
+    private func siftRawOutput(_ text: String, referencing logs: [String], notes: [String]) -> Outcome {
+        let result = parse(text)
+        guard isUsable(result) else { return Outcome(notes: notes) }
+
+        switch render(result) {
+        case let .success(rendered):
+            let carried = logs.first.map { ["Build log: \($0)"] } ?? []
+            return Outcome(replacement: rendered, additions: carried, notes: notes)
+        case let .failure(reason):
+            return Outcome(notes: notes + ["xcsift: \(reason.description)"])
+        }
+    }
+
+    private func siftReferencedLogs(_ paths: [String], summarisedIn text: String) -> Outcome {
         var notes: [String] = []
 
-        for path in BuildLogReference.logPaths(in: text, homeDirectory: home) {
+        for path in paths {
             switch readBuildOutput(atPath: path) {
             case let .failure(reason):
                 notes.append("xcsift: \(path): \(reason.description)")
@@ -137,7 +167,7 @@ struct BuildOutputSifter {
                     }
                     // Replacing the summary would otherwise take the log path with it, and that
                     // path is what the agent needs to read the raw output or call the parse tool.
-                    return .replaced(rendered, carrying: ["Build log: \(path)"])
+                    return Outcome(replacement: rendered, additions: ["Build log: \(path)"], notes: notes)
                 }
 
                 guard adds(result, beyond: text) else {
@@ -190,8 +220,8 @@ struct BuildOutputSifter {
             xcbeautify: config.xcbeautify
         )
 
-        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            parser.feed(String(line))
+        for line in TextLines.split(text) {
+            parser.feed(line)
         }
 
         var coverage: CodeCoverage?
@@ -216,10 +246,8 @@ struct BuildOutputSifter {
     }
 
     private func readBuildOutput(atPath path: String) -> Result<String, LogFailure> {
-        if let size = (try? fileSystem.attributesOfItem(atPath: path))?[.size] as? NSNumber,
-            size.intValue > settings.maximumLogBytes
-        {
-            return .failure(.tooLarge(bytes: size.intValue, cap: settings.maximumLogBytes))
+        if let size = sizeOfFile(atPath: path), size > settings.maximumLogBytes {
+            return .failure(.tooLarge(bytes: size, cap: settings.maximumLogBytes))
         }
 
         let contents: String
@@ -231,8 +259,34 @@ struct BuildOutputSifter {
             return .failure(.unreadable(error.localizedDescription))
         }
 
-        guard isRawBuildOutput(contents, trust: .buildShaped) else { return .failure(.notBuildOutput) }
+        // The cap governs what gets parsed, so it is settled on what was actually read: a size the
+        // file system reported is some other file's size as soon as a link or a race is involved.
+        let bytes = contents.utf8.count
+        guard bytes <= settings.maximumLogBytes else {
+            return .failure(.tooLarge(bytes: bytes, cap: settings.maximumLogBytes))
+        }
+
+        guard classify(contents, trust: .buildShaped).isRawBuildOutput else {
+            return .failure(.notBuildOutput)
+        }
         return .success(contents)
+    }
+
+    /// The size of what reading `path` would yield.
+    ///
+    /// `attributesOfItem` reports on a symbolic link itself, whose own few bytes would wave a log
+    /// of any size past `--max-log-size`; the destination is what the parser would be handed.
+    private func sizeOfFile(atPath path: String) -> Int? {
+        guard let attributes = try? fileSystem.attributesOfItem(atPath: path) else { return nil }
+        guard (attributes[.type] as? FileAttributeType) == .typeSymbolicLink else {
+            return (attributes[.size] as? NSNumber)?.intValue
+        }
+
+        let destination = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        guard destination != path, let resolved = try? fileSystem.attributesOfItem(atPath: destination) else {
+            return nil
+        }
+        return (resolved[.size] as? NSNumber)?.intValue
     }
 
     // MARK: - Classification
@@ -305,21 +359,37 @@ struct BuildOutputSifter {
         !word.isEmpty && text.range(of: word, options: .caseInsensitive) != nil
     }
 
-    /// Recognises verbose `xcodebuild`/SPM transcripts.
-    ///
-    /// A terminal phase marker (`** BUILD FAILED **`) is conclusive on its own — a text that quotes
-    /// one is quoting a transcript — and it is the *only* thing accepted from a tool that is not
-    /// build-shaped. Everything weaker is a guess, and a guess is how a source file that quotes
-    /// `: error: ` would get replaced by a parse of itself.
-    private func isRawBuildOutput(_ text: String, trust: ToolTrust = .buildShaped) -> Bool {
+    /// How strongly a text reads as a verbose `xcodebuild`/SPM transcript.
+    enum Classification {
+        /// Carries the transcript: conclusive markers over enough lines, or enough corroboration.
+        case transcript
+        /// A terminal phase marker with nothing corroborating it. That is a transcript quoted from
+        /// somewhere — which a short real build output and a server's own summary both are.
+        case quotesTerminalMarker
+        case notBuildOutput
+
+        /// Both marker cases are build output as far as substitution is concerned; they differ
+        /// only in whether a log the text mentions is the better source.
+        var isRawBuildOutput: Bool { self != .notBuildOutput }
+    }
+
+    /// A terminal phase marker (`** BUILD FAILED **`) settles that the text *is* build output, and
+    /// it is the only thing accepted from a tool that is not build-shaped. Everything weaker is a
+    /// guess, and a guess is how a source file that quotes `: error: ` would get replaced by a
+    /// parse of itself.
+    private func classify(_ text: String, trust: ToolTrust = .buildShaped) -> Classification {
         var lineCount = 0
+        var sawTerminalMarker = false
         var sawConclusiveMarker = false
         var corroboratingMarkers = 0
 
-        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+        for line in TextLines.split(text) {
             lineCount += 1
 
-            if isTerminalPhaseMarker(line) { return true }
+            if isTerminalPhaseMarker(line) {
+                sawTerminalMarker = true
+                continue
+            }
             guard trust == .buildShaped else { continue }
 
             if Self.conclusiveMarkers.contains(where: { line.contains($0) }) {
@@ -330,13 +400,17 @@ struct BuildOutputSifter {
             }
         }
 
-        guard trust == .buildShaped else { return false }
-        if sawConclusiveMarker, lineCount >= Self.minimumConclusiveLines { return true }
-        return lineCount >= settings.minimumRawLines && corroboratingMarkers >= 2
+        guard trust == .buildShaped else {
+            return sawTerminalMarker ? .quotesTerminalMarker : .notBuildOutput
+        }
+        if sawConclusiveMarker, lineCount >= Self.minimumConclusiveLines { return .transcript }
+        if lineCount >= settings.minimumRawLines, corroboratingMarkers >= 2 { return .transcript }
+        if sawTerminalMarker { return corroboratingMarkers >= 2 ? .transcript : .quotesTerminalMarker }
+        return .notBuildOutput
     }
 
     /// `** BUILD SUCCEEDED **`, `** TEST FAILED **`, `** ARCHIVE SUCCEEDED **`, …
-    private func isTerminalPhaseMarker(_ line: Substring) -> Bool {
+    private func isTerminalPhaseMarker(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard trimmed.hasPrefix("** ") else { return false }
         return trimmed.contains(" SUCCEEDED **") || trimmed.contains(" FAILED **")

@@ -125,6 +125,16 @@ struct MCPProxySession: @unchecked Sendable {
 
         case "tools/list":
             guard options.injectTools, let id else { break }
+
+            // A server that declared no tools of its own answers `tools/list` with a
+            // method-not-found error, and forwarding that on leaves the client with a protocol
+            // failure and no sight of the injected tool. The capability was the proxy's to
+            // declare, so the listing is the proxy's to answer. A server that declares tools owns
+            // the listing as before, injected tool appended to it.
+            if pending.injectedToolsCapability {
+                return note("answered tools/list here; the server declares no tools capability")
+                    + [.toClient(Self.injectedToolsListResult(id: id))]
+            }
             return remember(.toolsList, for: id) + [.toServer(data)]
 
         case "initialize":
@@ -150,9 +160,20 @@ struct MCPProxySession: @unchecked Sendable {
         // purpose: an error response must clear its entry too.
         guard object["method"] == nil,
             let id = RequestID(object["id"]),
-            let request = pending.forget(id),
-            var result = object["result"], result.objectValue != nil
+            let request = pending.forget(id)
         else {
+            return [.toClient(data)]
+        }
+
+        guard var result = object["result"], result.objectValue != nil else {
+            // An error for a tracked request. One of them is worth answering rather than passing
+            // on: a server with no tools of its own rejects `tools/list` as an unknown method, and
+            // the client would take that for a protocol failure and never see the injected tool.
+            // Only "method not found" is answered — any other failure is the server's to report.
+            if case .toolsList = request, options.injectTools, object["error"]?["code"]?.intValue == -32601 {
+                return note("the server does not implement tools/list; answered with \(Self.injectedToolName)")
+                    + [.toClient(Self.injectedToolsListResult(id: id))]
+            }
             return [.toClient(data)]
         }
 
@@ -251,8 +272,14 @@ struct MCPProxySession: @unchecked Sendable {
         guard result["nextCursor"] == nil else {
             return RewriteOutcome(notes: ["paginated page, \(Self.injectedToolName) not advertised here"])
         }
-        guard var tools = result["tools"]?.arrayValue else {
-            return RewriteOutcome(notes: ["no tools array, \(Self.injectedToolName) not advertised"])
+        guard let listing = result["tools"] else {
+            // A server that declares the capability may still answer with a bare object. The
+            // client asked what tools exist; the proxy has one, so the answer is a list of one.
+            result["tools"] = .array([Self.injectedToolDescriptor])
+            return RewriteOutcome(changed: true, notes: ["advertised \(Self.injectedToolName) into an empty listing"])
+        }
+        guard var tools = listing.arrayValue else {
+            return RewriteOutcome(notes: ["tools is not an array, \(Self.injectedToolName) not advertised"])
         }
 
         if tools.contains(where: { $0["name"]?.stringValue == Self.injectedToolName }) {
@@ -275,6 +302,8 @@ struct MCPProxySession: @unchecked Sendable {
 
         capabilities["tools"] = .object([:])
         result["capabilities"] = capabilities
+        // Remembered because the proxy now has to serve the listing that capability promises.
+        pending.recordInjectedToolsCapability()
         return RewriteOutcome(changed: true, notes: ["declared a tools capability for \(Self.injectedToolName)"])
     }
 
@@ -379,6 +408,15 @@ struct MCPProxySession: @unchecked Sendable {
         return overridden
     }
 
+    /// The listing for a server that has no tools of its own: the injected tool, alone.
+    private static func injectedToolsListResult(id: RequestID) -> Data {
+        JSONValue.object([
+            "jsonrpc": .string("2.0"),
+            "id": id.json,
+            "result": .object(["tools": .array([injectedToolDescriptor])]),
+        ]).serialized()
+    }
+
     private static func textResult(id: RequestID, text: String) -> Data {
         JSONValue.object([
             "jsonrpc": .string("2.0"),
@@ -431,6 +469,7 @@ private final class PendingRequestTable: @unchecked Sendable {
     private var entries: [MCPProxySession.RequestID: Entry] = [:]
     private var nextSequence: UInt64 = 0
     private var upstreamOwnsName = false
+    private var injectedCapability = false
 
     init(capacity: Int) {
         self.capacity = max(1, capacity)
@@ -459,6 +498,19 @@ private final class PendingRequestTable: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return entries.removeValue(forKey: id)?.request
+    }
+
+    func recordInjectedToolsCapability() {
+        lock.lock()
+        injectedCapability = true
+        lock.unlock()
+    }
+
+    /// Whether the proxy, not the server, is the reason the client believes there are tools.
+    var injectedToolsCapability: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return injectedCapability
     }
 
     func recordUpstreamOwnsInjectedName() {
