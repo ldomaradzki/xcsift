@@ -366,9 +366,8 @@ struct MCPProxySession: @unchecked Sendable {
             format = parsed
         }
 
-        var settings = options.settings
-        settings.config = Self.overriding(
-            settings.config,
+        let settings = Self.overriding(
+            options.settings,
             format: format,
             warnings: arguments?["warnings"]?.boolValue,
             buildInfo: arguments?["build_info"]?.boolValue
@@ -395,16 +394,18 @@ struct MCPProxySession: @unchecked Sendable {
         return (home.hasSuffix("/") ? String(home.dropLast()) : home) + path.dropFirst(1)
     }
 
+    /// The tool's arguments reach one half each: `format` is how the result is written, `warnings`
+    /// and `build_info` are what the parser keeps.
     private static func overriding(
-        _ config: ResolvedConfig,
+        _ settings: BuildOutputSifter.Settings,
         format: FormatType?,
         warnings: Bool?,
         buildInfo: Bool?
-    ) -> ResolvedConfig {
-        var overridden = config
-        if let format { overridden.format = format }
-        if let warnings { overridden.warnings = warnings }
-        if let buildInfo { overridden.buildInfo = buildInfo }
+    ) -> BuildOutputSifter.Settings {
+        var overridden = settings
+        if let format { overridden.render.format = format }
+        if let warnings { overridden.parse.warnings = warnings }
+        if let buildInfo { overridden.parse.buildInfo = buildInfo }
         return overridden
     }
 

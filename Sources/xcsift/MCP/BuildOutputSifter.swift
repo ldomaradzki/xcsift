@@ -22,21 +22,27 @@ struct BuildOutputSifter {
         case off
     }
 
+    /// The two halves of a resolved configuration, and the proxy's own limits. `quiet` and
+    /// `exit_on_failure` are absent rather than ignored: neither has a meaning over MCP, and a
+    /// value that cannot arrive cannot be mishandled.
     struct Settings: Sendable {
-        var config: ResolvedConfig
+        var parse: ParseConfig
+        var render: RenderConfig
         var summaryStrategy: SummaryStrategy = .append
         var minimumRawLines: Int = MCPDefaults.minimumRawLines
         var maximumLogBytes: Int = MCPDefaults.maximumLogBytes
 
         init(
-            config: ResolvedConfig,
+            parse: ParseConfig,
+            render: RenderConfig,
             summaryStrategy: SummaryStrategy = .append,
             minimumRawLines: Int = MCPDefaults.minimumRawLines,
             maximumLogBytes: Int = MCPDefaults.maximumLogBytes
         ) {
             precondition(minimumRawLines > 0, "minimumRawLines must be greater than zero")
             precondition(maximumLogBytes > 0, "maximumLogBytes must be greater than zero")
-            self.config = config
+            self.parse = parse
+            self.render = render
             self.summaryStrategy = summaryStrategy
             self.minimumRawLines = minimumRawLines
             self.maximumLogBytes = maximumLogBytes
@@ -216,7 +222,7 @@ struct BuildOutputSifter {
         // A referenced artefact may be the test enumeration rather than a build transcript.
         if let results = XcodeTestResults.parse(text) { return results }
 
-        let config = settings.config
+        let config = settings.parse
         var parser = StreamingOutputParser(
             printWarnings: config.warnings,
             // Warning models are always retained, whether or not they are rendered: `adds` needs
@@ -250,7 +256,7 @@ struct BuildOutputSifter {
     /// the encoder's error message.
     private func render(_ result: BuildResult) -> Result<String, LogFailure> {
         do {
-            return .success(try ResultRenderer.render(result, config: settings.config))
+            return .success(try ResultRenderer.render(result, config: settings.render))
         } catch {
             return .failure(.notRenderable(String(describing: error)))
         }
@@ -326,7 +332,7 @@ struct BuildOutputSifter {
     /// This is a gate, not a filter: when it opens, the whole sifted result is appended, so a
     /// response missing one warning gets the complete result, known errors included.
     private func adds(_ result: BuildResult, beyond text: String) -> Bool {
-        if settings.config.buildInfo, result.buildInfo != nil { return true }
+        if settings.parse.buildInfo, result.buildInfo != nil { return true }
         if result.warnings.contains(where: { !alreadySaid($0.message, in: text) }) { return true }
         if result.errors.contains(where: { !alreadySaid($0.message, in: text) }) { return true }
         if result.linkerErrors.contains(where: { !mentions($0.symbol, in: text) }) { return true }

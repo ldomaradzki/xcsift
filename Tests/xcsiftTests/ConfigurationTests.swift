@@ -389,7 +389,7 @@ final class ConfigMergerTests: XCTestCase {
             cliToonFlattenDepth: nil
         )
 
-        XCTAssertEqual(resolved.format, .json)
+        XCTAssertEqual(resolved.render.format, .json)
     }
 
     func testCLIBooleanFlagsOverrideConfig() {
@@ -415,7 +415,7 @@ final class ConfigMergerTests: XCTestCase {
             cliToonFlattenDepth: nil
         )
 
-        XCTAssertEqual(resolved.warnings, true)
+        XCTAssertEqual(resolved.parse.warnings, true)
         XCTAssertEqual(resolved.quiet, true)  // Config value because CLI false = "not set"
     }
 
@@ -444,9 +444,9 @@ final class ConfigMergerTests: XCTestCase {
             cliToonFlattenDepth: 3  // CLI should override
         )
 
-        XCTAssertEqual(resolved.toonDelimiter, .pipe)
-        XCTAssertEqual(resolved.toonKeyFolding, .safe)
-        XCTAssertEqual(resolved.toonFlattenDepth, 3)
+        XCTAssertEqual(resolved.render.toonDelimiter, .pipe)
+        XCTAssertEqual(resolved.render.toonKeyFolding, .safe)
+        XCTAssertEqual(resolved.render.toonFlattenDepth, 3)
     }
 
     // MARK: - Config Used When CLI Not Set
@@ -478,12 +478,12 @@ final class ConfigMergerTests: XCTestCase {
             cliToonFlattenDepth: nil
         )
 
-        XCTAssertEqual(resolved.format, .toon)
-        XCTAssertEqual(resolved.warnings, true)
-        XCTAssertEqual(resolved.warningsAsErrors, true)
+        XCTAssertEqual(resolved.render.format, .toon)
+        XCTAssertEqual(resolved.parse.warnings, true)
+        XCTAssertEqual(resolved.parse.warningsAsErrors, true)
         XCTAssertEqual(resolved.quiet, true)
-        XCTAssertEqual(resolved.coverage, true)
-        XCTAssertEqual(resolved.slowThreshold, 2.5)
+        XCTAssertEqual(resolved.parse.coverage, true)
+        XCTAssertEqual(resolved.parse.slowThreshold, 2.5)
     }
 
     func testConfigTOONUsedWhenCLINotSet() {
@@ -511,9 +511,9 @@ final class ConfigMergerTests: XCTestCase {
             cliToonFlattenDepth: nil  // Not set
         )
 
-        XCTAssertEqual(resolved.toonDelimiter, .tab)
-        XCTAssertEqual(resolved.toonKeyFolding, .safe)
-        XCTAssertEqual(resolved.toonFlattenDepth, 10)
+        XCTAssertEqual(resolved.render.toonDelimiter, .tab)
+        XCTAssertEqual(resolved.render.toonKeyFolding, .safe)
+        XCTAssertEqual(resolved.render.toonFlattenDepth, 10)
     }
 
     // MARK: - Defaults When Neither Set
@@ -537,20 +537,20 @@ final class ConfigMergerTests: XCTestCase {
             cliToonFlattenDepth: nil
         )
 
-        XCTAssertEqual(resolved.format, .json)
-        XCTAssertEqual(resolved.warnings, false)
-        XCTAssertEqual(resolved.warningsAsErrors, false)
+        XCTAssertEqual(resolved.render.format, .json)
+        XCTAssertEqual(resolved.parse.warnings, false)
+        XCTAssertEqual(resolved.parse.warningsAsErrors, false)
         XCTAssertEqual(resolved.quiet, false)
-        XCTAssertEqual(resolved.coverage, false)
-        XCTAssertEqual(resolved.coverageDetails, false)
-        XCTAssertNil(resolved.coveragePath)
-        XCTAssertNil(resolved.slowThreshold)
-        XCTAssertEqual(resolved.buildInfo, false)
-        XCTAssertEqual(resolved.executable, false)
+        XCTAssertEqual(resolved.parse.coverage, false)
+        XCTAssertEqual(resolved.parse.coverageDetails, false)
+        XCTAssertNil(resolved.parse.coveragePath)
+        XCTAssertNil(resolved.parse.slowThreshold)
+        XCTAssertEqual(resolved.parse.buildInfo, false)
+        XCTAssertEqual(resolved.parse.executable, false)
         XCTAssertEqual(resolved.exitOnFailure, false)
-        XCTAssertEqual(resolved.toonDelimiter, .comma)
-        XCTAssertEqual(resolved.toonKeyFolding, .disabled)
-        XCTAssertNil(resolved.toonFlattenDepth)
+        XCTAssertEqual(resolved.render.toonDelimiter, .comma)
+        XCTAssertEqual(resolved.render.toonKeyFolding, .disabled)
+        XCTAssertNil(resolved.render.toonFlattenDepth)
     }
 
     // MARK: - Empty Coverage Path
@@ -577,7 +577,7 @@ final class ConfigMergerTests: XCTestCase {
             cliToonFlattenDepth: nil
         )
 
-        XCTAssertNil(resolved.coveragePath)
+        XCTAssertNil(resolved.parse.coveragePath)
     }
 
     func testNonEmptyCoveragePathPreserved() {
@@ -602,7 +602,7 @@ final class ConfigMergerTests: XCTestCase {
             cliToonFlattenDepth: nil
         )
 
-        XCTAssertEqual(resolved.coveragePath, "/custom/path")
+        XCTAssertEqual(resolved.parse.coveragePath, "/custom/path")
     }
 
     // MARK: - Zero Flatten Depth
@@ -630,7 +630,7 @@ final class ConfigMergerTests: XCTestCase {
             cliToonFlattenDepth: nil
         )
 
-        XCTAssertNil(resolved.toonFlattenDepth)  // 0 becomes nil (unlimited)
+        XCTAssertNil(resolved.render.toonFlattenDepth)  // 0 becomes nil (unlimited)
     }
 }
 
@@ -822,7 +822,7 @@ final class ExitOnFailureTests: XCTestCase {
             cliToonFlattenDepth: nil
         )
 
-        XCTAssertTrue(resolved.warningsAsErrors)
+        XCTAssertTrue(resolved.parse.warningsAsErrors)
         XCTAssertTrue(resolved.exitOnFailure)
 
         let shouldExitWithFailure = resolved.exitOnFailure && result.status != "success"
@@ -945,7 +945,7 @@ final class XcbeautifyConfigTests: XCTestCase {
             cliXcbeautify: true
         )
 
-        XCTAssertTrue(resolved.xcbeautify)
+        XCTAssertTrue(resolved.parse.xcbeautify)
     }
 
     func testMergeXcbeautifyConfigTrue() {
@@ -971,7 +971,7 @@ final class XcbeautifyConfigTests: XCTestCase {
             cliXcbeautify: false
         )
 
-        XCTAssertTrue(resolved.xcbeautify)
+        XCTAssertTrue(resolved.parse.xcbeautify)
     }
 
     func testMergeXcbeautifyBothFalse() {
@@ -994,7 +994,7 @@ final class XcbeautifyConfigTests: XCTestCase {
             cliXcbeautify: false
         )
 
-        XCTAssertFalse(resolved.xcbeautify)
+        XCTAssertFalse(resolved.parse.xcbeautify)
     }
 
     // MARK: - Template

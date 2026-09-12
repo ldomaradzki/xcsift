@@ -18,7 +18,7 @@ final class MCPProxySessionTests: XCTestCase {
     ) -> MCPProxySession {
         MCPProxySession(
             options: MCPProxySession.Options(
-                settings: BuildOutputSifter.Settings(config: config),
+                settings: BuildOutputSifter.Settings(parse: config.parse, render: config.render),
                 injectTools: injectTools,
                 buildToolPattern: buildToolPattern,
                 verbose: verbose,

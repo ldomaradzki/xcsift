@@ -144,7 +144,7 @@ struct MCPProxyCommand: ParsableCommand {
 
         let resolved = try resolveConfig()
 
-        guard resolved.format != .githubActions else {
+        guard resolved.render.format != .githubActions else {
             throw ValidationError(
                 """
                 --format github-actions is for CI annotations and has no meaning over MCP. Use json \
@@ -166,8 +166,11 @@ struct MCPProxyCommand: ParsableCommand {
             return
         }
 
+        // The halves go in separately: `quiet` and `exit_on_failure` have no meaning over MCP, and
+        // a proxy that is not handed them cannot act on them.
         let settings = BuildOutputSifter.Settings(
-            config: resolved,
+            parse: resolved.parse,
+            render: resolved.render,
             summaryStrategy: onSummary,
             minimumRawLines: minRawLines,
             maximumLogBytes: maxLogSize * 1024 * 1024

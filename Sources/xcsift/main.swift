@@ -199,15 +199,15 @@ struct XCSift: ParsableCommand {
         }
 
         var parser = StreamingOutputParser(
-            printWarnings: resolved.warnings,
-            retainWarnings: resolved.warnings || resolved.warningsAsErrors,
-            warningsAsErrors: resolved.warningsAsErrors,
-            printCoverageDetails: resolved.coverageDetails,
-            slowThreshold: resolved.slowThreshold,
-            printBuildInfo: resolved.buildInfo,
-            printExecutables: resolved.executable,
-            discoverTestedTarget: resolved.coverage,
-            xcbeautify: resolved.xcbeautify
+            printWarnings: resolved.parse.warnings,
+            retainWarnings: resolved.parse.warnings || resolved.parse.warningsAsErrors,
+            warningsAsErrors: resolved.parse.warningsAsErrors,
+            printCoverageDetails: resolved.parse.coverageDetails,
+            slowThreshold: resolved.parse.slowThreshold,
+            printBuildInfo: resolved.parse.buildInfo,
+            printExecutables: resolved.parse.executable,
+            discoverTestedTarget: resolved.parse.coverage,
+            xcbeautify: resolved.parse.xcbeautify
         )
         var inputSource = POSIXInputSource(fileDescriptor: STDIN_FILENO)
         var lineReader = StreamingLineReader()
@@ -238,8 +238,8 @@ struct XCSift: ParsableCommand {
 
         // Parse coverage if requested
         var coverageData: CodeCoverage? = nil
-        if resolved.coverage {
-            let path = resolved.coveragePath ?? ""
+        if resolved.parse.coverage {
+            let path = resolved.parse.coveragePath ?? ""
             let targetFilter = parser.testedTarget
             coverageData = CoverageParser.parseCoverageFromPath(path, targetFilter: targetFilter)
 
@@ -296,7 +296,7 @@ struct XCSift: ParsableCommand {
             return
         }
 
-        switch resolved.format {
+        switch resolved.render.format {
         case .githubActions:
             // Explicit github-actions format: only annotations
             outputGitHubActions(result)
@@ -325,7 +325,7 @@ struct XCSift: ParsableCommand {
 
     private func outputTOON(_ result: BuildResult, resolved: ResolvedConfig) {
         do {
-            print(try ResultRenderer.toon(result, config: resolved))
+            print(try ResultRenderer.toon(result, config: resolved.render))
         } catch ResultRenderer.RenderError.invalidUTF8 {
             writeToStderr("Error: TOON data is not valid UTF-8\n")
         } catch {

@@ -15,22 +15,29 @@ enum MCPFixtures {
         buildInfo: Bool = false
     ) -> ResolvedConfig {
         ResolvedConfig(
-            format: format,
+            parse: parseConfig(warnings: warnings, buildInfo: buildInfo),
+            render: renderConfig(format: format),
+            quiet: false,
+            exitOnFailure: false
+        )
+    }
+
+    static func parseConfig(warnings: Bool = false, buildInfo: Bool = false) -> ParseConfig {
+        ParseConfig(
             warnings: warnings,
             warningsAsErrors: false,
-            quiet: false,
             coverage: false,
             coverageDetails: false,
             coveragePath: nil,
             slowThreshold: nil,
             buildInfo: buildInfo,
             executable: false,
-            exitOnFailure: false,
-            xcbeautify: false,
-            toonDelimiter: .comma,
-            toonKeyFolding: .disabled,
-            toonFlattenDepth: nil
+            xcbeautify: false
         )
+    }
+
+    static func renderConfig(format: FormatType = .json) -> RenderConfig {
+        RenderConfig(format: format, toonDelimiter: .comma, toonKeyFolding: .disabled, toonFlattenDepth: nil)
     }
 
     /// A mock file system with a stable home directory, so `~` expansion is testable.
@@ -298,7 +305,8 @@ final class BuildOutputSifterTests: XCTestCase {
     ) -> BuildOutputSifter {
         BuildOutputSifter(
             settings: BuildOutputSifter.Settings(
-                config: config,
+                parse: config.parse,
+                render: config.render,
                 summaryStrategy: strategy,
                 minimumRawLines: minimumRawLines,
                 maximumLogBytes: maximumLogBytes
@@ -681,7 +689,11 @@ final class BuildOutputSifterTests: XCTestCase {
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: log)
 
         let sifter = BuildOutputSifter(
-            settings: BuildOutputSifter.Settings(config: MCPFixtures.resolvedConfig(), maximumLogBytes: 1024)
+            settings: BuildOutputSifter.Settings(
+                parse: MCPFixtures.parseConfig(),
+                render: MCPFixtures.renderConfig(),
+                maximumLogBytes: 1024
+            )
         )
 
         guard case let .failure(reason) = sifter.parseLog(atPath: link.path) else {

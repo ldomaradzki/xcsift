@@ -364,7 +364,14 @@ The codebase follows a modular architecture:
    `xcsift`, and an ad-hoc rebuild is a new agent needing re-approval (`xcrun mcp-server status`
    lists permitted agents and folders).
 
-2c. **SiftingOptions.swift** / **ResultRenderer.swift** - Shared between both modes
+2c. **SiftingOptions.swift** / **ConfigMerger.swift** / **ResultRenderer.swift** - Shared between both modes
+   - A resolved configuration is two halves and a remainder: `ParseConfig` (what changes the result
+     a build's output is found to *be* — warnings, coverage, slow threshold, build info, xcbeautify),
+     `RenderConfig` (format and the TOON options, which change nothing about what the result says),
+     and `quiet` / `exit_on_failure`, which belong to neither and are the pipeline's own. What a
+     consumer is handed says what it can do: `ResultRenderer` takes a `RenderConfig`, the MCP proxy
+     takes both halves and never sees `quiet` or `exit_on_failure` — the two values documented as
+     meaningless over MCP, now by construction
    - `SiftingOptions` is an `@OptionGroup` declared by *both* the root command and `mcp`. This is
      required, not cosmetic: ArgumentParser lets the root command consume its own options wherever
      they appear, so a subcommand that re-declares `--warnings` never sees it. Sharing one

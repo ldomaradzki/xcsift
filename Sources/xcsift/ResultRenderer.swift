@@ -12,7 +12,7 @@ enum ResultRenderer {
     ///
     /// This throws rather than returning the encoder's error text: over MCP the returned string
     /// *is* the tool result, and an error message must never take the place of a build's output.
-    static func render(_ result: BuildResult, config: ResolvedConfig) throws -> String {
+    static func render(_ result: BuildResult, config: RenderConfig) throws -> String {
         switch config.format {
         case .json:
             return try json(result)
@@ -38,7 +38,7 @@ enum ResultRenderer {
         return string
     }
 
-    static func toon(_ result: BuildResult, config: ResolvedConfig) throws -> String {
+    static func toon(_ result: BuildResult, config: RenderConfig) throws -> String {
         let encoder = TOONEncoder()
         encoder.indent = 2
         encoder.delimiter = config.toonDelimiter.toonDelimiter
