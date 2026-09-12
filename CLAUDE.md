@@ -321,6 +321,11 @@ The codebase follows a modular architecture:
      replacement, appended blocks and stderr notes). `ToolTrust` says how far a tool's name licenses
      interpreting its output as a build: an unknown tool needs a terminal phase marker and never has
      its referenced logs read
+   - `XcodeTestResults.swift` (XCSiftCore): reads the enumeration Xcode's server answers a test run
+     with (`TEST RESULTS SUMMARY`, one block per test). It is the authority on the run, so the
+     sifter substitutes the parsed result for it — 31 108 bytes of a measured run became 1 069,
+     exact at 69 passed and 3 failed. Parsing is refused unless `Total Results` and the blocks
+     agree, because a skipped block is a test that disappears
    - `BuildLogReference.swift`: recovers build-log paths from JSON (`fullLogPath`) and from a
      rendered file tree (ANSI codes, box-drawing glyphs, `~`, base directory + indented children,
      with the base scoped to the lines nested under it)
@@ -516,6 +521,8 @@ Real-world output samples are stored in `Tests/Fixtures/` for integration tests:
 - **linker-error-output.txt** - Real linker error output with undefined symbols
 - **xcode-console-test-run.txt** (~94KB) - Xcode's own console transcript for a 72-test run of two
   frameworks, with every block repeated under `Summary:` and five Swift Testing outcomes missing
+- **xcode-test-results-summary.txt** (~31KB) - what Xcode's MCP server answered for that same run:
+  72 blocks, 69 passed, 3 failed. The pair is what makes the transcript's shortfall measurable
 
 To add new fixtures:
 1. Create the file in `Tests/Fixtures/`
@@ -648,7 +655,8 @@ Test cases cover:
   - `MCPMessageTests`: JSON model round-trips, single-line serialization, newline framing,
     oversized-message passthrough and its final-chunk flag, truncation reporting
   - `MCPSifterTests`: build-log path recovery (prose trees and JSON), transcript replacement, trust
-    gating, append/replace/off strategies, size limits, "nothing to add" cases, declined-log notes
+    gating, append/replace/off strategies, size limits, "nothing to add" cases, declined-log notes,
+    and Xcode's test enumeration being replaced rather than passed through
   - `MCPProxySessionTests`: verbatim forwarding (non-JSON, batches, notifications, server-initiated
     requests, untracked ids, errors), result rewriting with sibling keys preserved, every id shape,
     the build-tool gate failing closed, tool injection and capability declaration, injected tool

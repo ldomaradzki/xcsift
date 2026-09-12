@@ -133,15 +133,15 @@ only in the log. Measured on a real Xcode 27 build of an iOS app:
 |----------|-------|--------|
 | Build succeeded, 2 warnings in the log | appends | both warnings with file and line (+1 059 chars) |
 | Build failed, error already in the response | untouched | nothing to add |
-| `RunAllTests`, per-test results enumerated | untouched | the server ran the tests; it is the authority |
+| `RunAllTests`, per-test results enumerated | replaces | 31 108 → 1 069 bytes, exact: 69 passed, 3 failed with file and line |
 
 Appending is gated, not filtered: xcsift appends the sifted result only when the log carries at
 least one diagnostic the response does not, so a response that already says everything is left
 alone — but a response missing one warning receives the whole result, known errors included. Two
 differences are normalised before that comparison, both observed against Xcode's server: it
 capitalises the compiler's message, and xcsift attributes a diagnostic to its target
-(`… (in target 'A' from project 'B')`). A response that enumerates per-test results is left alone
-entirely (see **Limits**).
+(`… (in target 'A' from project 'B')`). A response that enumerates per-test results *in JSON* is
+left alone entirely (see **Limits**).
 
 Use `--on-summary` to change that:
 
@@ -150,6 +150,27 @@ Use `--on-summary` to change that:
 | `append` | Keep the response, append the sifted result when the log adds something (default) |
 | `replace` | Replace the response with the sifted result, keeping the log path |
 | `off` | Never read referenced logs |
+
+### Xcode's test enumeration is replaced, not appended to
+
+Xcode's server answers a test run with a block per test — `TEST_RESULT_INDEX: 1/72`, its target,
+identifier, state, file and issues — and for a run of any size that is the largest thing the proxy
+sees. It is also the authority on the run: it is what the test bundles reported, not what a console
+transcript managed to print. So xcsift parses it and substitutes the result:
+
+```text
+TEST RESULTS SUMMARY … Total Results: 72        31 108 bytes
+  ↓
+{"status":"failed","summary":{"passed_tests":69,"failed_tests":3},"failed_tests":[…]}   1 069 bytes
+```
+
+The three failures keep their identifier, file, line and message; what goes is the enumeration of
+the 69 tests that passed. The format names itself, so no tool name has to vouch for it, and nothing
+is read from disk to recognise it. A count that disagrees with the blocks the text carries is
+refused rather than guessed at — a block the parser skipped would be a test that disappeared.
+
+The same parser handles the enumeration written to disk, so `xcsift_parse_build_log` accepts one of
+those artefacts as readily as a build log.
 
 ## The xcsift_parse_build_log tool
 
@@ -198,10 +219,14 @@ status` lists the permitted agents and folders.
 
 ## Limits
 
-- **Test aggregates from a console transcript are not offered against a server's own counts.**
-  Xcode's console log interleaves XCTest and Swift Testing events across several bundles, and
-  xcsift's totals for that shape do not yet match the run. Failures parsed from a log are still
-  appended when the response says nothing about tests.
+- **A console transcript cannot be counted up to a server's own enumeration.** Xcode's console log
+  interleaves XCTest and Swift Testing across bundles, and it drops lines: for one measured 72-test
+  run it printed `started` for 34 Swift Testing tests and an outcome for 29, losing 11 test cases.
+  xcsift counts both frameworks and reports what it was shown (58 passed, all 3 failures) together
+  with `unreported_tests`, the number of tests whose outcome the log never carried — so the
+  difference is explainable rather than silent. Against a response that *enumerates* per-test
+  results in JSON, those counts are still not offered: the server that ran the tests is the
+  authority, and its own enumeration is parsed exactly instead (above).
 - **A message too large to buffer is never decoded**, so a raw transcript returned inline above
   4 MiB passes through unsifted. Sifting resumes with the next message.
 - **Only unmistakable transcripts are sifted from tools that are not build-shaped.** A tool whose

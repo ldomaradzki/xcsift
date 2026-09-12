@@ -116,6 +116,60 @@ enum MCPFixtures {
         """
     }
 
+    /// Xcode's own test enumeration, trimmed to three tests. One block per test is what makes the
+    /// real thing tens of kilobytes.
+    static let testResultsEnumeration = """
+        ================================================================================
+        TEST RESULTS SUMMARY
+        ================================================================================
+        Generated: 2026-09-12T11:48:08Z
+        Total Results: 3
+        ================================================================================
+
+        --------------------------------------------------------------------------------
+        TEST_RESULT_INDEX: 1/3
+        TEST_TARGET: MyAppTests
+        TEST_IDENTIFIER: MyTests/testOne()
+        TEST_DISPLAY_NAME: testOne()
+        TEST_STATE: Passed
+        TEST_FILE_PATH: (not available)
+        TEST_LINE_NUMBER: (not available)
+        TEST_TAGS: (none)
+
+        TEST_ISSUE_COUNT: 0
+
+        --------------------------------------------------------------------------------
+        TEST_RESULT_INDEX: 2/3
+        TEST_TARGET: MyAppTests
+        TEST_IDENTIFIER: MyTests/testTwo()
+        TEST_DISPLAY_NAME: testTwo()
+        TEST_STATE: Passed
+        TEST_FILE_PATH: (not available)
+        TEST_LINE_NUMBER: (not available)
+        TEST_TAGS: (none)
+
+        TEST_ISSUE_COUNT: 0
+
+        --------------------------------------------------------------------------------
+        TEST_RESULT_INDEX: 3/3
+        TEST_TARGET: MyAppTests
+        TEST_IDENTIFIER: MyTests/testThree()
+        TEST_DISPLAY_NAME: testThree()
+        TEST_STATE: Failed
+        TEST_FILE_PATH: App/Tests/MyTests.swift
+        TEST_LINE_NUMBER: 12
+        TEST_TAGS: (none)
+
+        TEST_ISSUE_COUNT: 1
+
+        TEST_ISSUES:
+            App/Tests/MyTests.swift:13 MyTests/testThree(): XCTAssertEqual failed: ("1") is not equal to ("2")
+
+        ================================================================================
+        END OF TEST RESULTS SUMMARY
+        ================================================================================
+        """
+
     /// Reads a field out of a sifted JSON payload, so tests assert on values rather than on the
     /// encoder's whitespace.
     static func field(_ key: String, of json: String) -> JSONValue? {
@@ -634,5 +688,36 @@ final class BuildOutputSifterTests: XCTestCase {
             return XCTFail("a symlink to an oversized log must be refused like the log itself")
         }
         XCTAssertTrue(reason.description.contains("--max-log-size"), reason.description)
+    }
+    // MARK: Xcode's test enumeration
+
+    /// The enumeration is the authority on a run, and the run's whole story is its failures. This
+    /// is where the proxy's tokens are: the real thing runs to tens of kilobytes of passing tests.
+    func testReplacesXcodesTestEnumeration() throws {
+        let outcome = makeSifter().sift(text: MCPFixtures.testResultsEnumeration)
+        let replacement = try XCTUnwrap(outcome.replacement)
+
+        XCTAssertEqual(MCPFixtures.field("status", of: replacement)?.stringValue, "failed")
+        XCTAssertEqual(MCPFixtures.field("summary", of: replacement)?["passed_tests"]?.intValue, 2)
+        XCTAssertEqual(MCPFixtures.field("failed_tests", of: replacement)?.arrayValue?.count, 1)
+        XCTAssertLessThan(replacement.utf8.count, MCPFixtures.testResultsEnumeration.utf8.count / 2)
+    }
+
+    /// The format names itself, so a tool the pattern does not recognise does not hide it. Nothing
+    /// is read from disk to tell: the text is the evidence.
+    func testReplacesTheEnumerationWhateverToolReturnedIt() {
+        XCTAssertNotNil(makeSifter().sift(text: MCPFixtures.testResultsEnumeration, trust: .unknown).replacement)
+    }
+
+    /// A summary that points at the enumeration on disk gets it parsed like any other artefact.
+    func testParsesAReferencedTestEnumeration() throws {
+        let fileSystem = MCPFixtures.fileSystem()
+        fileSystem.fileContents["/tmp/logs/results.txt"] = MCPFixtures.testResultsEnumeration
+
+        let outcome = makeSifter(fileSystem: fileSystem)
+            .parseLog(atPath: "/tmp/logs/results.txt")
+
+        guard case let .success(rendered) = outcome else { return XCTFail("expected a parse, got \(outcome)") }
+        XCTAssertEqual(MCPFixtures.field("summary", of: rendered)?["failed_tests"]?.intValue, 1)
     }
 }

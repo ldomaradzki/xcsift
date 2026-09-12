@@ -106,6 +106,14 @@ struct BuildOutputSifter {
     ///     path that merely appears in its output, so only an unmistakable transcript is sifted and
     ///     no log is read from disk.
     func sift(text: String, trust: ToolTrust = .buildShaped) -> Outcome {
+        // Xcode's own test enumeration states every test it ran, one block each — tens of
+        // kilobytes whose interesting part is the failures. It is also the authority on that run,
+        // so the sifted result loses nothing but the list of tests that passed. The format names
+        // itself, so no tool name has to vouch for it and no file is read to recognise it.
+        if let results = XcodeTestResults.parse(text), case let .success(rendered) = render(results) {
+            return .replaced(rendered)
+        }
+
         let classification = classify(text, trust: trust)
 
         // A text that points at a build log on disk is a summary *of* a build, even when it quotes
@@ -205,6 +213,9 @@ struct BuildOutputSifter {
     // MARK: - Parsing
 
     private func parse(_ text: String) -> BuildResult {
+        // A referenced artefact may be the test enumeration rather than a build transcript.
+        if let results = XcodeTestResults.parse(text) { return results }
+
         let config = settings.config
         var parser = StreamingOutputParser(
             printWarnings: config.warnings,
@@ -266,7 +277,10 @@ struct BuildOutputSifter {
             return .failure(.tooLarge(bytes: bytes, cap: settings.maximumLogBytes))
         }
 
-        guard classify(contents, trust: .buildShaped).isRawBuildOutput else {
+        guard
+            classify(contents, trust: .buildShaped).isRawBuildOutput
+                || XcodeTestResults.looksLikeTestResults(contents)
+        else {
             return .failure(.notBuildOutput)
         }
         return .success(contents)
@@ -317,9 +331,11 @@ struct BuildOutputSifter {
         if result.errors.contains(where: { !alreadySaid($0.message, in: text) }) { return true }
         if result.linkerErrors.contains(where: { !mentions($0.symbol, in: text) }) { return true }
 
-        // A response that already enumerates per-test results is the authority on the run. xcsift
-        // aggregates an Xcode console transcript across bundles less accurately than the server
-        // that ran the tests, so its test numbers are not offered against one.
+        // A response that already enumerates per-test results is the authority on the run: an
+        // Xcode console transcript drops lines, so counting one up cannot reach what the bundles
+        // reported, and those numbers are not offered against a server's own. Xcode's text
+        // enumeration is parsed exactly instead, at the top of `sift`; this gate is what is left
+        // for the JSON shape, whose field names are the server's to choose.
         guard !enumeratesTestResults(text) else { return false }
 
         return result.failedTests.contains {
