@@ -208,7 +208,7 @@ private final class ProxyProcess {
         process.standardOutput = output
         process.standardError = errorOutput
         reader = MessageReader(handle: output.fileHandleForReading)
-        errorReader = MessageReader(handle: errorOutput.fileHandleForReading)
+        errorReader = MessageReader(handle: errorOutput.fileHandleForReading, retainingEverything: true)
         try process.run()
     }
 
@@ -275,14 +275,22 @@ private final class ProxyProcess {
 }
 
 /// Collects newline-delimited messages from a pipe so tests can wait on them with a deadline.
+///
+/// Only the bytes appended since the last search are scanned for a newline: a pipe hands over small
+/// chunks, and re-scanning the whole buffer each time made a multi-megabyte message take half a
+/// minute on CI.
 private final class MessageReader: @unchecked Sendable {
     private let condition = NSCondition()
+    private let retainsEverything: Bool
     private var lines: [String] = []
     private var buffer = Data()
+    private var scanned = 0
     private var everything = Data()
+    private var receivedBytes = 0
     private var isClosed = false
 
-    init(handle: FileHandle) {
+    init(handle: FileHandle, retainingEverything: Bool = false) {
+        retainsEverything = retainingEverything
         let thread = Thread { [self] in
             while true {
                 let data = handle.availableData
@@ -313,7 +321,7 @@ private final class MessageReader: @unchecked Sendable {
     var bytesSeen: Int {
         condition.lock()
         defer { condition.unlock() }
-        return everything.count
+        return receivedBytes
     }
 
     /// Everything seen so far, for asserting on stderr.
@@ -327,13 +335,19 @@ private final class MessageReader: @unchecked Sendable {
         condition.lock()
         defer { condition.unlock() }
 
-        everything.append(data)
+        receivedBytes += data.count
+        if retainsEverything { everything.append(data) }
         buffer.append(data)
-        while let newline = buffer.firstIndex(of: UInt8(ascii: "\n")) {
+
+        var searchStart = buffer.index(buffer.startIndex, offsetBy: scanned)
+        while let newline = buffer[searchStart...].firstIndex(of: UInt8(ascii: "\n")) {
             let line = String(decoding: buffer[buffer.startIndex ..< newline], as: UTF8.self)
             buffer.removeSubrange(buffer.startIndex ... newline)
             if !line.isEmpty { lines.append(line) }
+            searchStart = buffer.startIndex
         }
+        scanned = buffer.count
+
         condition.broadcast()
     }
 }
