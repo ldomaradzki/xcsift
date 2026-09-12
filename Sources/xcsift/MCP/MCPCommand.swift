@@ -31,6 +31,13 @@ struct MCPProxyCommand: ParsableCommand {
 
             Print a client configuration snippet instead of running:
               xcsift mcp --print-config
+
+            Register the proxy with Claude Code, or take it back out. The registration records
+            the flags given alongside it, so it runs exactly what the same command would:
+              xcsift mcp --install -f toon --warnings
+              xcsift mcp --uninstall
+            Both act on the server name `xcode` (--server-name) in whichever scope holds it
+            (--scope), so a server registered by hand with `claude mcp add` is removed too.
             """
     )
 
@@ -69,6 +76,21 @@ struct MCPProxyCommand: ParsableCommand {
     @Flag(name: .long, help: "Print an MCP client configuration snippet and exit")
     var printConfig: Bool = false
 
+    @Flag(name: .long, help: "Register the proxy with Claude Code and exit")
+    var install: Bool = false
+
+    @Flag(name: .long, help: "Remove the proxy's Claude Code registration and exit")
+    var uninstall: Bool = false
+
+    @Flag(name: .long, help: "Replace an existing registration of the same name")
+    var force: Bool = false
+
+    @Option(name: .long, help: "The MCP server name to register or remove")
+    var serverName: String = MCPServerInstaller.defaultServerName
+
+    @Option(name: .long, help: "Claude Code configuration scope: local, project or user")
+    var scope: String?
+
     // `.postTerminator` over `.captureForPassthrough`: passthrough would swallow `--help` into
     // `upstream` and break `xcsift mcp --help`. It also keeps the proxy's flags and the server's
     // from colliding — everything the child needs sits after `--`.
@@ -96,9 +118,30 @@ struct MCPProxyCommand: ParsableCommand {
         guard maxLogSize >= 1, maxLogSize <= 4096 else {
             throw ValidationError("--max-log-size must be between 1 and 4096 megabytes.")
         }
+
+        guard [install, uninstall, printConfig].filter({ $0 }).count <= 1 else {
+            throw ValidationError("--install, --uninstall and --print-config each do one thing; pass one.")
+        }
+        if let scope, !Self.scopes.contains(scope) {
+            throw ValidationError("--scope must be one of: \(Self.scopes.joined(separator: ", ")).")
+        }
+        guard !serverName.isEmpty else {
+            throw ValidationError("--server-name must not be empty.")
+        }
     }
 
+    /// Claude Code's own scopes. Left to the CLI to apply; listed here only to refuse a typo
+    /// before it becomes a registration under a scope that does not exist.
+    static let scopes = ["local", "project", "user"]
+
     func run() throws {
+        // Removal comes before anything that can fail: a proxy whose configuration no longer
+        // resolves is exactly the one a user needs to be able to take out.
+        if uninstall {
+            try removeRegistration()
+            return
+        }
+
         let resolved = try resolveConfig()
 
         guard resolved.format != .githubActions else {
@@ -115,6 +158,11 @@ struct MCPProxyCommand: ParsableCommand {
 
         if printConfig {
             print(clientConfigurationSnippet(for: command))
+            return
+        }
+
+        if install {
+            try addRegistration(for: command)
             return
         }
 
@@ -159,10 +207,47 @@ struct MCPProxyCommand: ParsableCommand {
         }
     }
 
-    /// Reproduces the invocation as a client configuration, including every option that changes
-    /// how the proxy behaves. `--verbose` and `--print-config` are left out: one is a diagnostic
-    /// and the other is this command.
-    func clientConfigurationSnippet(for command: [String]) -> String {
+    // MARK: - Registration
+
+    private func addRegistration(for command: [String]) throws {
+        do {
+            let ran = try MCPServerInstaller().install(
+                name: serverName,
+                scope: scope,
+                command: Self.proxyExecutablePath,
+                arguments: proxyArguments(for: command),
+                force: force
+            )
+            print("Registered '\(serverName)' with Claude Code:")
+            print("  \(ran)")
+            print(
+                "Remove it again with: xcsift mcp --uninstall"
+                    + (serverName == MCPServerInstaller.defaultServerName ? "" : " --server-name \(serverName)")
+            )
+        } catch let error as MCPServerInstaller.Failure {
+            FileHandle.standardError.write(Data("Error: \(error.description)\n".utf8))
+            throw ExitCode.failure
+        }
+    }
+
+    private func removeRegistration() throws {
+        do {
+            let removed = try MCPServerInstaller().remove(name: serverName, scope: scope)
+            print(
+                removed
+                    ? "Removed '\(serverName)' from Claude Code."
+                    : "No MCP server named '\(serverName)' was registered; nothing to remove."
+            )
+        } catch let error as MCPServerInstaller.Failure {
+            FileHandle.standardError.write(Data("Error: \(error.description)\n".utf8))
+            throw ExitCode.failure
+        }
+    }
+
+    /// Every option that changes how the proxy behaves, as the argument list that reproduces this
+    /// invocation. `--verbose` is left out as a diagnostic, and so are the flags that select
+    /// printing, registering or removing — those are this command, not the proxy's behaviour.
+    func proxyArguments(for command: [String]) -> [String] {
         var args: [String] = ["mcp"]
 
         if let config = sifting.config { args += ["--config", config] }
@@ -187,6 +272,12 @@ struct MCPProxyCommand: ParsableCommand {
 
         args.append("--")
         args += command
+        return args
+    }
+
+    /// Reproduces the invocation as a client configuration.
+    func clientConfigurationSnippet(for command: [String]) -> String {
+        let args = proxyArguments(for: command)
 
         let encodedArgs = String(decoding: JSONValue.array(args.map(JSONValue.string)).serialized(), as: UTF8.self)
         let encodedCommand = String(decoding: JSONValue.string(Self.proxyExecutablePath).serialized(), as: UTF8.self)

@@ -38,10 +38,12 @@ that tool, which xcsift answers itself.
    `claude mcp add --transport stdio xcode -- xcrun mcpbridge`, use:
 
    ```bash
-   claude mcp add --transport stdio xcode -- xcsift mcp
+   xcsift mcp --install
    ```
 
-   Flags go after `mcp` (`xcsift mcp -f toon -w`); `xcsift mcp --print-config` prints the JSON for
+   That runs `claude mcp add` for you and records the flags given alongside it, so
+   `xcsift mcp --install -f toon -w` registers a proxy that runs with those flags. Flags otherwise
+   go after `mcp` (`xcsift mcp -f toon -w`), and `xcsift mcp --print-config` prints the JSON for
    clients configured by file.
 4. **Approve the agent once.** The first project open or build raises a request for the agent
    `xcsift` and that project's folder — grant it from the Xcode MCP menu bar icon, or with
@@ -70,6 +72,19 @@ xcsift mcp --print-config
   }
 }
 ```
+
+### Removing the proxy
+
+```bash
+xcsift mcp --uninstall
+```
+
+The proxy is configuration, not an installed artefact: what there is to remove is one `mcpServers`
+entry. `--uninstall` runs `claude mcp remove` for the name `xcode` in whichever scope holds it, so a
+registration made by hand with `claude mcp add` is removed by it too. `--server-name` names another
+entry, `--scope local|project|user` confines the change to one scope, and `--install --force`
+replaces an existing registration rather than refusing. For a client configured by file, delete the
+`mcpServers` entry, or point it back at `xcrun mcpbridge` to keep Xcode's server without the sifting.
 
 Any MCP server that builds with `xcodebuild`, `swift build`, `xcbeautify` or Tuist works the same
 way — put its command after `--`:

@@ -136,6 +136,33 @@ final class MCPCommandTests: XCTestCase {
         XCTAssertTrue(try parse(["--inject-tools"]).injectTools)
     }
 
+    // MARK: - Registration flags
+
+    func testRefusesTwoCommandsAtOnce() {
+        XCTAssertThrowsError(try parse(["--install", "--uninstall"]))
+        XCTAssertThrowsError(try parse(["--install", "--print-config"]))
+    }
+
+    func testRejectsAScopeClaudeCodeDoesNotHave() {
+        XCTAssertThrowsError(try parse(["--install", "--scope", "global"])) { error in
+            XCTAssertTrue("\(error)".contains("--scope"), "\(error)")
+        }
+        XCTAssertNoThrow(try parse(["--install", "--scope", "user"]))
+    }
+
+    func testRejectsAnEmptyServerName() {
+        XCTAssertThrowsError(try parse(["--uninstall", "--server-name", ""]))
+    }
+
+    /// A registration must run what the snippet promises, so both come from one argument list.
+    func testRegistrationCarriesTheSameArgumentsAsTheSnippet() throws {
+        let command = try parse(["--install", "--format", "toon", "--on-summary", "replace"])
+        XCTAssertEqual(
+            command.proxyArguments(for: MCPDefaults.upstream),
+            ["mcp", "--format", "toon", "--on-summary", "replace", "--", "xcrun", "mcpbridge"]
+        )
+    }
+
     /// Shared flags are declared once, on the root command's option group, because the root
     /// consumes its own options wherever they appear — a re-declared `--warnings` would read false.
     func testSharedFlagsReachTheSubcommand() throws {
@@ -143,5 +170,131 @@ final class MCPCommandTests: XCTestCase {
 
         XCTAssertTrue(command.sifting.warnings)
         XCTAssertEqual(command.sifting.format, .toon)
+    }
+}
+
+// MARK: - Registering the proxy with Claude Code
+
+final class MCPServerInstallerTests: XCTestCase {
+
+    private func makeInstaller(_ runner: MockInstallShellRunner) -> MCPServerInstaller {
+        MCPServerInstaller(shellRunner: runner)
+    }
+
+    private func addCommand(in runner: MockInstallShellRunner) -> String? {
+        runner.commandHistory.first { $0.hasPrefix("claude mcp add") }
+    }
+
+    func testRegistersTheProxyAsAStdioServer() throws {
+        let runner = MockInstallShellRunner()
+        try makeInstaller(runner).install(
+            name: "xcode",
+            scope: "user",
+            command: "/usr/local/bin/xcsift",
+            arguments: ["mcp", "--format", "toon", "--", "xcrun", "mcpbridge"],
+            force: false
+        )
+
+        XCTAssertEqual(
+            addCommand(in: runner),
+            "claude mcp add --scope 'user' --transport stdio 'xcode' -- '/usr/local/bin/xcsift' "
+                + "'mcp' '--format' 'toon' '--' 'xcrun' 'mcpbridge'"
+        )
+    }
+
+    func testOmitsTheScopeWhenNoneWasAsked() throws {
+        let runner = MockInstallShellRunner()
+        try makeInstaller(runner).install(
+            name: "xcode",
+            scope: nil,
+            command: "xcsift",
+            arguments: ["mcp"],
+            force: false
+        )
+
+        XCTAssertEqual(addCommand(in: runner), "claude mcp add --transport stdio 'xcode' -- 'xcsift' 'mcp'")
+    }
+
+    /// `--build-tool-pattern` is a regular expression, and it reaches `/bin/bash -c` as text.
+    func testQuotesArgumentsTheShellWouldOtherwiseActOn() throws {
+        let runner = MockInstallShellRunner()
+        try makeInstaller(runner).install(
+            name: "xcode",
+            scope: nil,
+            command: "xcsift",
+            arguments: ["mcp", "--build-tool-pattern", #"(build|test) 'x'"#],
+            force: false
+        )
+
+        let command = try XCTUnwrap(addCommand(in: runner))
+        XCTAssertTrue(command.hasSuffix(#"'--build-tool-pattern' '(build|test) '\''x'\'''"#), command)
+    }
+
+    func testSaysWhenTheNameIsTaken() {
+        let runner = MockInstallShellRunner()
+        runner.setExited("which claude")
+        runner.defaultOutcome = .exited(status: 1, stdout: "", stderr: "A server named xcode already exists")
+
+        XCTAssertThrowsError(
+            try makeInstaller(runner).install(
+                name: "xcode",
+                scope: nil,
+                command: "xcsift",
+                arguments: ["mcp"],
+                force: false
+            )
+        ) { error in
+            XCTAssertTrue("\(error)".contains("--force"), "the way out should be in the message: \(error)")
+        }
+    }
+
+    /// Re-registering has to take the old entry out first: `claude mcp add` refuses an existing
+    /// name, and an entry left behind would keep the agent on the old flags.
+    func testForceReplacesTheExistingRegistration() throws {
+        let runner = MockInstallShellRunner()
+        try makeInstaller(runner).install(
+            name: "xcode",
+            scope: nil,
+            command: "xcsift",
+            arguments: ["mcp"],
+            force: true
+        )
+
+        let claudeCommands = runner.commandHistory.filter { $0.hasPrefix("claude mcp") }
+        XCTAssertEqual(claudeCommands.first, "claude mcp remove 'xcode'")
+        XCTAssertTrue(try XCTUnwrap(claudeCommands.last).hasPrefix("claude mcp add"))
+    }
+
+    func testRemovesTheRegistration() throws {
+        let runner = MockInstallShellRunner()
+        XCTAssertTrue(try makeInstaller(runner).remove(name: "xcode", scope: "user"))
+        XCTAssertTrue(runner.commandHistory.contains("claude mcp remove --scope 'user' 'xcode'"))
+    }
+
+    /// Removing what was never registered leaves the end state that was asked for, so it is
+    /// reported rather than thrown — a user tidying up should not have to care which it was.
+    func testRemovingSomethingUnregisteredIsNotAFailure() throws {
+        let runner = MockInstallShellRunner()
+        runner.setExited("claude mcp remove 'xcode'", status: 1, stderr: #"No MCP server named "xcode"."#)
+
+        XCTAssertFalse(try makeInstaller(runner).remove(name: "xcode", scope: nil))
+    }
+
+    func testReportsARemovalThatFailedForAnotherReason() {
+        let runner = MockInstallShellRunner()
+        runner.setExited("claude mcp remove 'xcode'", status: 1, stderr: "config file is read-only")
+
+        XCTAssertThrowsError(try makeInstaller(runner).remove(name: "xcode", scope: nil)) { error in
+            XCTAssertTrue("\(error)".contains("read-only"), "\(error)")
+        }
+    }
+
+    func testNeedsTheClaudeCLI() {
+        let runner = MockInstallShellRunner()
+        runner.setExited("which claude", status: 1)
+
+        XCTAssertThrowsError(try makeInstaller(runner).remove(name: "xcode", scope: nil)) { error in
+            XCTAssertTrue("\(error)".contains("Claude Code"), "\(error)")
+        }
     }
 }

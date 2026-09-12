@@ -76,6 +76,8 @@ By default it wraps Xcode's own MCP server (Xcode 26+), reached through `xcrun m
 
 ```bash
 xcsift mcp --print-config     # Print an MCP client configuration snippet
+xcsift mcp --install          # Register the proxy with Claude Code
+xcsift mcp --uninstall        # Remove that registration again
 xcsift mcp                    # Same as: xcsift mcp -- xcrun mcpbridge
 xcsift mcp -- <any other stdio Xcode MCP server>
 ```
@@ -95,8 +97,11 @@ Setup for a coding agent, in three steps:
 
 1. Enable Xcode's MCP server — Xcode ▸ Settings ▸ Intelligence, or `sudo xcrun mcp-server enable`
    (`xcrun mcp-server status` reports the current state).
-2. Register the proxy instead of the bridge: `claude mcp add --transport stdio xcode -- xcsift mcp`.
+2. Register the proxy instead of the bridge: `xcsift mcp --install` (the same thing as
+   `claude mcp add --transport stdio xcode -- xcsift mcp`, with the flags you pass recorded in it).
 3. Approve the agent `xcsift` when Xcode asks, on the first project open or build.
+
+`xcsift mcp --uninstall` takes the registration back out, whichever way it was made.
 
 Xcode approves an agent by binary and signature, so install xcsift (Homebrew) rather than pointing
 the config at a build directory, and expect one fresh approval after an upgrade.

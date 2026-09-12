@@ -123,6 +123,8 @@ struct XCSift: ParsableCommand {
               xcsift mcp                     # Wrap Xcode's built-in MCP server
               xcsift mcp -f toon -- xcrun mcpbridge
               xcsift mcp --print-config      # Print a client configuration snippet
+              xcsift mcp --install           # Register the proxy with Claude Code
+              xcsift mcp --uninstall         # Remove that registration
 
             Plugin installation:
               xcsift install-claude-code     # Install Claude Code plugin

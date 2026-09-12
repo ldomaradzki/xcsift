@@ -58,6 +58,11 @@ xcsift mcp -f toon -w -- /usr/local/bin/my-xcode-mcp serve
 
 # Print a client configuration snippet instead of running
 xcsift mcp --print-config
+
+# Register the proxy with Claude Code, and remove it again. `--install` records the flags given
+# alongside it; `--uninstall` removes the entry whichever way it was registered.
+xcsift mcp --install -f toon --warnings
+xcsift mcp --uninstall
 ```
 
 Xcode's own server (`xcrun mcpbridge`) answers only while MCP is enabled (Xcode ▸ Settings ▸
@@ -65,7 +70,8 @@ Intelligence, or `sudo xcrun mcp-server enable`); when it exits without answerin
 that diagnostic to stderr.
 
 Proxy-specific flags: `--on-summary append|replace|off`, `--no-inject-tools`, `--build-tool-pattern`,
-`--min-raw-lines`, `--max-log-size`, `--verbose`. Every parsing/formatting flag (`--format`,
+`--min-raw-lines`, `--max-log-size`, `--verbose`, and for registration `--install`, `--uninstall`,
+`--force`, `--server-name`, `--scope`. Every parsing/formatting flag (`--format`,
 `--warnings`, `--build-info`, `--executable`, `--slow-threshold`, `--xcbeautify`) is shared with the
 pipeline mode through `SiftingOptions`, and `.xcsift.toml` is honoured.
 
@@ -320,6 +326,11 @@ The codebase follows a modular architecture:
      with the base scoped to the lines nested under it)
    - `MCPDefaults` (in `BuildOutputSifter.swift`): every default the flags and the types share, so a
      documented default lives in one place
+   - `Install/MCPServerInstaller.swift`: `--install` / `--uninstall`, through `claude mcp add` and
+     `claude mcp remove` rather than by editing JSON. The registration records the same argument
+     list `--print-config` prints (`MCPProxyCommand.proxyArguments(for:)`), so what runs is what
+     the flags said; removal targets the server name in whichever scope holds it, so an entry added
+     by hand is removed by it too
 
    **Two upstream shapes:** raw `xcodebuild`/SPM transcripts are *replaced* with the sifted result;
    already-summarised responses that reference a log on disk keep their text and get the sifted
@@ -623,8 +634,9 @@ Test cases cover:
     requests, untracked ids, errors), result rewriting with sibling keys preserved, every id shape,
     the build-tool gate failing closed, tool injection and capability declaration, injected tool
     calls and their argument validation, pending-request eviction
-  - `MCPCommandTests`: the configuration snippet (completeness, escaping, terminators) and every
-    validation refusal
+  - `MCPCommandTests`: the configuration snippet (completeness, escaping, terminators), every
+    validation refusal, and `MCPServerInstallerTests` — the `claude mcp` commands built for
+    `--install`/`--uninstall`, their shell quoting, and the taken-name and never-registered cases
   - `MCPProxyEndToEndTests`: the built binary proxying a canned POSIX-shell MCP server, a 5 MB
     passthrough followed by an in-sync sift, launch failure, a server that never answers, and
     shutdown escalation to SIGKILL
