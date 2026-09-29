@@ -26,7 +26,6 @@ public struct StreamingOutputParser {
         var failedTests: [FailedTest] = []
         var linkerErrors: [LinkerError] = []
         var failedCommands: [BuildError] = []
-        var seenFailedCommands: Set<String> = []
         var executables: [Executable] = []
         var seenExecutablePaths: Set<String> = []
         var buildTime: String?
@@ -193,20 +192,12 @@ public struct StreamingOutputParser {
             return nil
         }()
 
-        var finalErrors = state.errors
+        // A command whose task reported no error of its own — CodeSign, a validation step, a
+        // compiler that crashed — is the only record of why it failed. A success marker vouches
+        // for the failures before it, so only those after the last one are reported.
+        var finalErrors =
+            state.errors + state.failedCommands.suffix(lineParser.failedCommandsSinceSuccessMarker)
         var finalWarnings = state.warnings
-
-        // A command that failed without a diagnostic of its own — CodeSign, a validation step, a
-        // compiler that crashed — is the only record of why the build failed. It is reported only
-        // when nothing else explains a build that did not succeed: a compiler that failed has said
-        // why already, and its `Command SwiftCompile failed` line would say it again.
-        let explained =
-            !state.errors.isEmpty || !state.linkerErrors.isEmpty || !state.failedTests.isEmpty
-            || totalFailed > 0
-        let succeeded = sawSuccessMarker && !sawFailureMarker
-        if !explained && !succeeded {
-            finalErrors = state.failedCommands
-        }
 
         // If warnings-as-errors is enabled, convert warnings to errors
         if shouldTreatWarningsAsErrors && !state.warnings.isEmpty {
@@ -342,7 +333,8 @@ public struct StreamingOutputParser {
             state.linkerErrors.append(e)
 
         case .commandFailed(let e):
-            guard state.seenFailedCommands.insert(e.message).inserted else { return }
+            // Not deduplicated: two tasks failing alike are two failures, and xcodebuild's own
+            // restatements never arrive as events.
             state.failedCommands.append(e)
 
         case .testStarted:

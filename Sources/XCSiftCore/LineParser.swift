@@ -4,6 +4,9 @@ import RegexBuilder
 // MARK: - Public API
 
 /// An event emitted by ``LineParser`` when a line of build output is recognized.
+///
+/// Switch over it with a `default:` case: cases are added as the parser learns new shapes of
+/// build output.
 public enum ParseEvent: Codable, Sendable {
     // Compile / link
     /// A compiler or tool error was detected.
@@ -12,9 +15,14 @@ public enum ParseEvent: Codable, Sendable {
     case warning(BuildWarning)
     /// A linker error was detected (undefined symbol, duplicate symbol, or missing framework/library).
     case linkerError(LinkerError)
-    /// A build command failed without a diagnostic of its own
-    /// (`Command CodeSign failed with a nonzero exit code`), carrying the output the tool printed
-    /// just before it. It explains a failed build only when nothing else does.
+    /// A build command failed and its task reported no error of its own
+    /// (`Command CodeSign failed with a nonzero exit code`). The message is the failure line,
+    /// preceded by up to three lines the tool printed just before it.
+    ///
+    /// A failed compiler, whose errors were reported already, produces no event, and neither does
+    /// xcodebuild's restatement of a failure under `Testing failed:`.
+    /// `Command PhaseScriptExecution failed` arrives as ``error(_:)`` instead. A later success
+    /// marker vouches for the failures before it; ``StreamingOutputParser`` reports only the rest.
     case commandFailed(BuildError)
 
     // Test lifecycle
@@ -133,7 +141,30 @@ public struct LineParser: Sendable {
 
     // MARK: - Look-ahead / look-back state
     private var pendingRecordedIssueLine: String?
-    private var lookBackBuffer: [String] = []
+
+    /// A processed line kept for look-back. `claimed` says a parser produced an event for it, so it
+    /// is reported on its own and is not another event's context.
+    private struct LookBackLine {
+        let text: String
+        let claimed: Bool
+    }
+
+    /// The last three non-blank lines processed, oldest first.
+    private var lookBackBuffer: [LookBackLine] = []
+
+    // MARK: - Failed build command state
+
+    /// True once the current task reported an error or a linker error. A task begins at its header
+    /// (`… (in target 'X' from project 'Y')`) and ends at its failure line, so a failed compiler
+    /// is known to have said why and a CodeSign failure in the next task is not.
+    private var taskReportedError = false
+
+    /// Every `Command … failed` line seen outside a `Testing failed:` summary, explained or not.
+    /// xcodebuild restates those failures in the summary, and a restatement is not a new failure.
+    private var seenFailedCommands: Set<String> = []
+
+    /// The indentation of an open `Testing failed:` summary; its entries are indented deeper.
+    private var testingFailedSummaryDepth: Int?
 
     /// True while a compiler source-context block is open. A `file:line:col: error:/warning:/note:`
     /// header is followed by the offending source line, indented, then a caret line. Echoed source
@@ -164,7 +195,15 @@ public struct LineParser: Sendable {
 
     /// `true` if a positive terminal success marker was seen
     /// (`** <PHASE> SUCCEEDED **`, `Build complete!`, `Build succeeded in …`).
-    public private(set) var sawSuccessMarker: Bool = false
+    public private(set) var sawSuccessMarker: Bool = false {
+        // Each marker vouches for the failed commands before it: the step it closes succeeded,
+        // so a nested tool's failure that a script tolerated did not fail it.
+        didSet { if sawSuccessMarker { failedCommandsSinceSuccessMarker = 0 } }
+    }
+
+    /// The `.commandFailed` events produced since the last success marker, in order. They are the
+    /// last ones delivered, so ``StreamingOutputParser`` reports that many from the end.
+    private(set) var failedCommandsSinceSuccessMarker = 0
 
     /// `true` if an authoritative terminal failure marker was seen
     /// (`** <PHASE> FAILED **`, `Build failed after …`). This excludes `** TEST FAILED **`, which
@@ -249,8 +288,6 @@ public struct LineParser: Sendable {
     }
 
     // Called when a queued event is being returned; current line must still be processed.
-    // The look-back buffer is updated last, as in `normalFeed`: `processLine` reads it as the
-    // lines *before* this one.
     private mutating func enqueueFromLine(_ line: String) {
         let candidates = Self.relevantCandidates(in: line)
         if candidates.contains(.recordedIssue), line.contains(XcodebuildSymbols.recordedIssue) {
@@ -258,7 +295,6 @@ public struct LineParser: Sendable {
         } else if let event = processLine(line, candidates: candidates) {
             eventQueue.append(event)
         }
-        updateLookBackBuffer(line)
     }
 
     // Path B: holding a buffered recordedIssue line — flush it, possibly amending with comment.
@@ -296,41 +332,15 @@ public struct LineParser: Sendable {
         }
     }
 
-    // Path C: normal processing with look-back enrichment.
+    // Path C: normal processing.
     private mutating func normalFeed(_ line: String) -> LineResult {
         let candidates = Self.relevantCandidates(in: line)
         if candidates.contains(.recordedIssue), line.contains(XcodebuildSymbols.recordedIssue) {
             pendingRecordedIssueLine = line
-            updateLookBackBuffer(line)
             return .buffering
         }
 
-        var event = processLine(line, candidates: candidates)
-
-        // PhaseScriptExecution look-back: enrich the error message with preceding context.
-        if case .error(let error) = event, error.message == line,
-            line.contains("Command PhaseScriptExecution failed with a nonzero exit")
-        {
-            var contextLines: [String] = []
-            for contextLine in lookBackBuffer {
-                let trimmed = contextLine.trimmingCharacters(in: .whitespaces)
-                if trimmed.isEmpty || trimmed.hasPrefix("Warning:")
-                    || trimmed.hasPrefix("Run script build phase")
-                {
-                    continue
-                }
-                if trimmed.contains(": warning:") && !trimmed.contains("error:") {
-                    continue
-                }
-                contextLines.append(trimmed)
-            }
-            if !contextLines.isEmpty {
-                let combined = contextLines.joined(separator: " ") + " " + line
-                event = .error(BuildError(file: nil, line: nil, message: combined, column: nil))
-            }
-        }
-
-        updateLookBackBuffer(line)
+        let event = processLine(line, candidates: candidates)
         return event.map { .consumed($0) } ?? .ignored
     }
 
@@ -372,11 +382,153 @@ public struct LineParser: Sendable {
 
     // MARK: - Look-back buffer
 
-    private mutating func updateLookBackBuffer(_ line: String) {
-        lookBackBuffer.append(line)
+    // Blank lines carry no context, and an overlong line is never parsed, so neither takes a slot.
+    private mutating func updateLookBackBuffer(_ line: String, claimed: Bool) {
+        if line.utf8.count > Self.maximumLineBytes || Self.isBlank(line) { return }
+        lookBackBuffer.append(LookBackLine(text: line, claimed: claimed))
         if lookBackBuffer.count > 3 {
             lookBackBuffer.removeFirst()
         }
+    }
+
+    // MARK: - Failed build commands
+
+    /// A `Command PhaseScriptExecution failed` error, carrying the script's preceding output.
+    private func withScriptContext(_ line: String) -> BuildError {
+        var contextLines: [String] = []
+        for contextLine in lookBackBuffer {
+            let trimmed = contextLine.text.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("Warning:") || trimmed.hasPrefix("Run script build phase") {
+                continue
+            }
+            if trimmed.contains(": warning:") && !trimmed.contains("error:") {
+                continue
+            }
+            contextLines.append(trimmed)
+        }
+        let message = contextLines.isEmpty ? line : contextLines.joined(separator: " ") + " " + line
+        return BuildError(file: nil, line: nil, message: message, column: nil)
+    }
+
+    /// Opens a `Testing failed:` summary on its header and closes it on the next non-blank line
+    /// indented no deeper. Byte checks only: this runs for every line.
+    private mutating func trackTestingFailedSummary(_ line: String) {
+        let depth = Self.indentationWidth(of: line)
+        let content = line.utf8.dropFirst(depth)
+        guard let first = content.first, first != UInt8(ascii: "\r") else { return }
+        if let open = testingFailedSummaryDepth, depth <= open { testingFailedSummaryDepth = nil }
+        if first == UInt8(ascii: "T"), content.starts(with: Self.testingFailedHeaderBytes),
+            content.dropFirst(Self.testingFailedHeaderBytes.count).allSatisfy(Self.isWhitespaceByte)
+        {
+            testingFailedSummaryDepth = depth
+        }
+    }
+
+    /// A task that reported an error explains its own failure; its header starts the next one.
+    private mutating func trackTask(_ event: ParseEvent?, candidates: LineCandidates) {
+        switch event {
+        case .error?, .linkerError?:
+            taskReportedError = true
+        case nil, .buildPhase?:
+            if candidates.contains(.taskHeader) { taskReportedError = false }
+        default:
+            break
+        }
+    }
+
+    /// The `.commandFailed` event for a failure line, or nil when its task already said why.
+    ///
+    /// The reason is what the tool printed just before the failure, which Xcode writes at the
+    /// failure line's own indentation, so the search walks back over lines at that depth only.
+    /// A deeper line is the invocation Xcode echoes under the task header; a shallower one is a
+    /// heading the failure is listed under. A task header, a terminal marker or an earlier failure
+    /// belongs to another step. Lines another parser claimed are reported on their own, and
+    /// neither xcodebuild's log lines nor a crash backtrace's frames say why the command failed.
+    private mutating func failedCommand(_ line: String, failure: String) -> ParseEvent? {
+        if taskReportedError { return nil }
+
+        let depth = Self.indentationWidth(of: line)
+        var output: [String] = []
+        for previous in lookBackBuffer.reversed() {
+            let text = previous.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if Self.indentationWidth(of: previous.text) != depth
+                || text.contains(XcodebuildSymbols.inTarget)
+                || Self.isTerminalMarker(text) || Self.isFailedCommand(text)
+            {
+                break
+            }
+            if previous.claimed || isRuntimeLogNoise(text) || text.firstMatch(of: Self.stackFrameRegex) != nil {
+                continue
+            }
+            output.append(text)
+        }
+        failedCommandsSinceSuccessMarker += 1
+        let message = (output.reversed() + [failure]).joined(separator: " ")
+        return .commandFailed(BuildError(file: nil, line: nil, message: message, column: nil))
+    }
+
+    /// The trimmed text of a `Command <Name> failed with a nonzero exit code` line, or nil.
+    /// The byte checks reject nearly every line before anything is allocated.
+    private static func failedCommandText(_ line: String) -> String? {
+        let bytes = line.utf8
+        guard bytes.count <= maximumLineBytes,
+            bytes.drop(while: isIndentationByte).first == UInt8(ascii: "C"),
+            bytes.reversed().drop(while: isWhitespaceByte).starts(with: failedCommandSuffixBytes.reversed())
+        else { return nil }
+        let text = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        return isFailedCommand(text) ? text : nil
+    }
+
+    /// `text` is trimmed. The command's name is Xcode's rule name, one or more capitalised words
+    /// (`CodeSign`, `SwiftDriver Compilation Requirements`), so prose that merely starts with
+    /// "Command " and ends like the failure line does not match.
+    private static func isFailedCommand(_ text: String) -> Bool {
+        guard text.hasPrefix(XcodebuildSymbols.commandPrefix),
+            text.hasSuffix(XcodebuildSymbols.commandFailedSuffix)
+        else { return false }
+        let name = text.dropFirst(XcodebuildSymbols.commandPrefix.count)
+            .dropLast(XcodebuildSymbols.commandFailedSuffix.count)
+        return name.split(separator: " ", omittingEmptySubsequences: false).allSatisfy { word in
+            guard let first = word.unicodeScalars.first else { return false }
+            return first.properties.isUppercase && first.isASCII
+        }
+    }
+
+    /// `** BUILD SUCCEEDED **`, `** ARCHIVE FAILED ** [12.3 sec]`, …
+    private static func isTerminalMarker(_ text: String) -> Bool {
+        text.hasPrefix("** ")
+            && (text.contains(XcodebuildSymbols.succeededMarkerSuffix)
+                || text.contains(XcodebuildSymbols.failedMarkerSuffix))
+    }
+
+    /// `0  swift-frontend  0x0000000104c8e3e8 llvm::sys::PrintStackTrace(…) + 56`
+    private nonisolated(unsafe) static let stackFrameRegex = Regex {
+        Anchor.startOfSubject
+        OneOrMore(.digit)
+        OneOrMore(.whitespace)
+        OneOrMore(.whitespace.inverted)
+        OneOrMore(.whitespace)
+        "0x"
+        OneOrMore(.hexDigit)
+    }
+
+    private static let failedCommandSuffixBytes = Array(XcodebuildSymbols.commandFailedSuffix.utf8)
+    private static let testingFailedHeaderBytes = Array(XcodebuildSymbols.testingFailedHeader.utf8)
+
+    private static func isIndentationByte(_ byte: UInt8) -> Bool {
+        byte == UInt8(ascii: " ") || byte == UInt8(ascii: "\t")
+    }
+
+    private static func isWhitespaceByte(_ byte: UInt8) -> Bool {
+        isIndentationByte(byte) || byte == UInt8(ascii: "\r")
+    }
+
+    private static func indentationWidth(of line: String) -> Int {
+        line.utf8.prefix(while: isIndentationByte).count
+    }
+
+    private static func isBlank(_ line: String) -> Bool {
+        line.utf8.allSatisfy(isWhitespaceByte)
     }
 
     // MARK: - Core dispatch
@@ -395,10 +547,13 @@ public struct LineParser: Sendable {
         /// `note:` opens a source-context block but is not itself a reported diagnostic, so the
         /// bit stays out of ``parserCategories``.
         static let diagnosticNote = LineCandidates(rawValue: 1 << 8)
+        /// `(in target '`: a task header, which starts a new task for failed-command tracking.
+        /// Not a parser category either.
+        static let taskHeader = LineCandidates(rawValue: 1 << 9)
         static let parserCategories: LineCandidates = [
             .error, .warning, .test, .status, .buildInfo, .executable,
         ]
-        static let all = parserCategories.union(.jsonSyntax)
+        static let all = parserCategories.union([.jsonSyntax, .taskHeader])
     }
 
     private struct UTF8Marker: Sendable {
@@ -466,6 +621,8 @@ public struct LineParser: Sendable {
             add(marker, candidates: .buildInfo)
         }
 
+        add(XcodebuildSymbols.inTarget, candidates: .taskHeader)
+
         return buckets
     }()
 
@@ -504,8 +661,43 @@ public struct LineParser: Sendable {
         return candidates
     }
 
-    /// Returns at most one ParseEvent for a line. Uses if/else if so only one branch fires.
+    /// Returns at most one ParseEvent for a line, and records the line for look-back. Every line
+    /// the parser reads comes through here exactly once, in order, so the look-back buffer holds
+    /// the lines *before* the one being classified, whichever feed path delivered it.
     private mutating func processLine(
+        _ line: String,
+        candidates preclassifiedCandidates: LineCandidates? = nil
+    ) -> ParseEvent? {
+        let candidates = preclassifiedCandidates ?? Self.relevantCandidates(in: line)
+        trackTestingFailedSummary(line)
+
+        var event: ParseEvent?
+        if let failure = Self.failedCommandText(line) {
+            if testingFailedSummaryDepth == nil {
+                seenFailedCommands.insert(failure)
+            } else if seenFailedCommands.contains(failure) {
+                // xcodebuild restating, under `Testing failed:`, a failure it reported above.
+                updateLookBackBuffer(line, claimed: true)
+                return nil
+            }
+            event = classifyLine(line, candidates: candidates)
+            if case .error(let error) = event, error.message == line {
+                event = .error(withScriptContext(line))  // `Command PhaseScriptExecution failed`
+            } else if event == nil {
+                event = failedCommand(line, failure: failure)
+            }
+            taskReportedError = false  // a failure line ends its task
+        } else {
+            event = classifyLine(line, candidates: candidates)
+            trackTask(event, candidates: candidates)
+        }
+
+        updateLookBackBuffer(line, claimed: event != nil)
+        return event
+    }
+
+    /// Returns at most one ParseEvent for a line. Uses if/else if so only one branch fires.
+    private mutating func classifyLine(
         _ line: String,
         candidates preclassifiedCandidates: LineCandidates? = nil
     ) -> ParseEvent? {
@@ -640,12 +832,6 @@ public struct LineParser: Sendable {
                 )
             }
             return .error(error)
-        }
-
-        // A command that failed without a diagnostic of its own. PhaseScriptExecution never gets
-        // here: `parseError` reports it as an error in its own right.
-        if candidates.contains(.error), !insideSourceContext, let failure = parseFailedCommand(line) {
-            return .commandFailed(failure)
         }
 
         // Warning
@@ -1268,51 +1454,6 @@ public struct LineParser: Sendable {
         }
 
         return nil
-    }
-
-    /// `Command <Name> failed with a nonzero exit code`, with the output the tool printed just
-    /// before it prepended as its reason.
-    ///
-    /// Xcode indents a task's invocation (`cd …`, the command line) under the task header and
-    /// prints the tool's own output at the header's level. So the lines above the failure that are
-    /// indented no deeper than it are that output, and the first deeper one is the invocation,
-    /// which ends the search. This holds for Xcode's console transcript too, which indents the
-    /// whole task a level further. An earlier failure ends it as well: what precedes that one is
-    /// another tool's output.
-    private func parseFailedCommand(_ line: String) -> BuildError? {
-        // Cheap gate before trimming allocates: every line mentioning "failed" gets this far.
-        let indented = line.utf8.drop { $0 == UInt8(ascii: " ") || $0 == UInt8(ascii: "\t") }
-        guard indented.first == UInt8(ascii: "C") else { return nil }
-        let failure = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard Self.isFailedCommand(failure) else { return nil }
-
-        let depth = Self.indentationWidth(of: line)
-        var output: [String] = []
-        for previous in lookBackBuffer.reversed() {
-            let text = previous.trimmingCharacters(in: .whitespacesAndNewlines)
-            if text.isEmpty { continue }
-            if Self.indentationWidth(of: previous) > depth || Self.isFailedCommand(text) { break }
-            // A compiler warning is reported as a warning, not as the reason for this failure.
-            if text.contains(XcodebuildSymbols.warningFormat) { continue }
-            output.append(text)
-        }
-        let message = (output.reversed() + [failure]).joined(separator: " ")
-        return BuildError(file: nil, line: nil, message: message, column: nil)
-    }
-
-    /// `text` is trimmed. The command's name is one word, so prose that merely starts with
-    /// "Command " and ends like the failure line does not match.
-    private static func isFailedCommand(_ text: String) -> Bool {
-        guard text.hasPrefix(XcodebuildSymbols.commandPrefix),
-            text.hasSuffix(XcodebuildSymbols.commandFailedSuffix)
-        else { return false }
-        let name = text.dropFirst(XcodebuildSymbols.commandPrefix.count)
-            .dropLast(XcodebuildSymbols.commandFailedSuffix.count)
-        return !name.isEmpty && !name.contains(" ")
-    }
-
-    private static func indentationWidth(of line: String) -> Int {
-        line.utf8.prefix { $0 == UInt8(ascii: " ") || $0 == UInt8(ascii: "\t") }.count
     }
 
     private func parseWarning(_ line: String, checkJSON: Bool) -> BuildWarning? {

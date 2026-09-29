@@ -74,6 +74,8 @@ enum XcodebuildSymbols {
     // exited non-zero. What the tool printed, if anything, comes just before it.
     static let commandPrefix = "Command "
     static let commandFailedSuffix = " failed with a nonzero exit code"
+    // `xcodebuild test` restates the failures that stopped it, indented, under this heading.
+    static let testingFailedHeader = "Testing failed:"
 
     // File extensions
     static let swiftFilePattern = ".swift:"
