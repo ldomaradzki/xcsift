@@ -111,6 +111,39 @@ Each warning includes a `type` field indicating its source:
 
 Warnings, errors, and linker errors are automatically deduplicated. Identical entries (same file, line, and message) appear only once in the output.
 
+### Failed Build Commands
+
+Xcode reports any build command that exits non-zero as
+`Command <Name> failed with a nonzero exit code`.
+A compiler has printed `error:` lines by then,
+but a code-signing failure, a validation step, or a compiler that crashed has not,
+so that line is the only record of why the build failed.
+
+When nothing else explains a build that did not succeed —
+no errors, linker errors, or failed tests —
+each such line becomes an entry in `errors[]`,
+prefixed with the output the tool printed just before it:
+
+```json
+{
+  "status": "failed",
+  "summary": { "errors": 1, "warnings": 0, "failed_tests": 0, "linker_errors": 0 },
+  "errors": [
+    {
+      "message": "/…/Stickers.appex: errSecInternalComponent Command CodeSign failed with a nonzero exit code"
+    }
+  ]
+}
+```
+
+The command's echoed invocation (`cd …`, `/usr/bin/codesign …`),
+which Xcode indents under the task header,
+is not part of the message.
+A failed compiler command is not restated next to the diagnostics that explain it,
+and a build that reports `** … SUCCEEDED **` is not failed by one.
+`Command PhaseScriptExecution failed` is always reported,
+with the script's preceding output, as it was before.
+
 ### Linker Errors
 
 Two types of linker errors are captured:

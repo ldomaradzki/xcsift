@@ -454,6 +454,13 @@ explicitly:
   literal. The block closes on the caret line or on the next line without indentation. Indentation
   alone must never suppress a diagnostic: indented tool output (`swiftgen: error: …`) stays
   reportable.
+- **Failed build commands**: `Command <Name> failed with a nonzero exit code` becomes a
+  `.commandFailed` event carrying the tool output above it:
+  the look-back lines indented no deeper than the failure line,
+  stopping at the deeper-indented echoed invocation or at an earlier failure.
+  `StreamingOutputParser.finish` reports these as errors only when nothing else explains a build
+  that did not succeed — a CodeSign failure has no `error:` line, a failed compiler has one already.
+  `Command PhaseScriptExecution failed` is still a plain `.error`, reported always.
 
 ### Key Features
 - **Error/Warning Parsing**: Multiple regex patterns handle various Xcode error formats

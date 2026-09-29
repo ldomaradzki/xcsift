@@ -70,6 +70,11 @@ enum XcodebuildSymbols {
     static let buildFailedAfterPrefix = "Build failed after "
     static let secondsKeyword = " seconds"
 
+    // `Command <Name> failed with a nonzero exit code` — how Xcode reports any build command that
+    // exited non-zero. What the tool printed, if anything, comes just before it.
+    static let commandPrefix = "Command "
+    static let commandFailedSuffix = " failed with a nonzero exit code"
+
     // File extensions
     static let swiftFilePattern = ".swift:"
     static let objectFileExt = ".o"

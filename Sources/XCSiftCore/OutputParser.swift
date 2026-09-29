@@ -25,6 +25,8 @@ public struct StreamingOutputParser {
         var warnings: [BuildWarning] = []
         var failedTests: [FailedTest] = []
         var linkerErrors: [LinkerError] = []
+        var failedCommands: [BuildError] = []
+        var seenFailedCommands: Set<String> = []
         var executables: [Executable] = []
         var seenExecutablePaths: Set<String> = []
         var buildTime: String?
@@ -149,24 +151,6 @@ public struct StreamingOutputParser {
         let sawFailureMarker = lineParser.sawFailureMarker
         let sawTestRunFailure = state.testRunFailed
 
-        // If warnings-as-errors is enabled, convert warnings to errors
-        var finalErrors = state.errors
-        var finalWarnings = state.warnings
-
-        if shouldTreatWarningsAsErrors && !state.warnings.isEmpty {
-            for warning in state.warnings {
-                finalErrors.append(
-                    BuildError(
-                        file: warning.file,
-                        line: warning.line,
-                        message: warning.message,
-                        column: nil
-                    )
-                )
-            }
-            finalWarnings = []
-        }
-
         // Swift Testing states its own totals when the log carries a run summary. When it does
         // not — Xcode's console transcript frequently does not — the per-test lines are the only
         // record of that framework's tests, and an XCTest bundle counts them as zero. Dropping
@@ -208,6 +192,36 @@ public struct StreamingOutputParser {
             }
             return nil
         }()
+
+        var finalErrors = state.errors
+        var finalWarnings = state.warnings
+
+        // A command that failed without a diagnostic of its own — CodeSign, a validation step, a
+        // compiler that crashed — is the only record of why the build failed. It is reported only
+        // when nothing else explains a build that did not succeed: a compiler that failed has said
+        // why already, and its `Command SwiftCompile failed` line would say it again.
+        let explained =
+            !state.errors.isEmpty || !state.linkerErrors.isEmpty || !state.failedTests.isEmpty
+            || totalFailed > 0
+        let succeeded = sawSuccessMarker && !sawFailureMarker
+        if !explained && !succeeded {
+            finalErrors = state.failedCommands
+        }
+
+        // If warnings-as-errors is enabled, convert warnings to errors
+        if shouldTreatWarningsAsErrors && !state.warnings.isEmpty {
+            for warning in state.warnings {
+                finalErrors.append(
+                    BuildError(
+                        file: warning.file,
+                        line: warning.line,
+                        message: warning.message,
+                        column: nil
+                    )
+                )
+            }
+            finalWarnings = []
+        }
 
         let status: String = {
             let hasActualFailures =
@@ -326,6 +340,10 @@ public struct StreamingOutputParser {
             let key = "\(e.symbol):\(e.message)"
             guard state.seenLinkerErrors.insert(key).inserted else { return }
             state.linkerErrors.append(e)
+
+        case .commandFailed(let e):
+            guard state.seenFailedCommands.insert(e.message).inserted else { return }
+            state.failedCommands.append(e)
 
         case .testStarted:
             break  // crash detection is handled inside LineParser
