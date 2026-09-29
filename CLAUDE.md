@@ -444,9 +444,12 @@ explicitly:
   build into an encoding error. `LineParser.finiteDuration` drops it.
 
 ### Multi-line Context Pattern
-- `parseLine()` processes each line in isolation (no access to neighboring lines)
-- For multi-line context, use **look-ahead/look-back** in the `parse()` loop (has access to `lines` array by index)
-- Existing examples: look-back for `PhaseScriptExecution` context, look-ahead for Swift Testing `#expect` comments
+- `LineParser.processLine` sees one line at a time, plus `lookBackBuffer`:
+  the last three non-blank lines it processed, each marked with whether a parser claimed it.
+  Every line passes through `processLine` exactly once, in order, whichever feed path delivered it.
+- Look-ahead is `pendingRecordedIssueLine`, held until the next line arrives
+- Existing examples: look-back for `PhaseScriptExecution` context and for failed build commands,
+  look-ahead for Swift Testing `#expect` comments
 - `failedTests` are deduplicated by normalized test name — duplicate names get merged, not appended
 - **Source-context echo**: a `file:line:col: error:/warning:/note:` header opens a block that holds
   the indented source line and the caret line. `LineParser.sourceContextOpen` tracks the block and
@@ -454,6 +457,23 @@ explicitly:
   literal. The block closes on the caret line or on the next line without indentation. Indentation
   alone must never suppress a diagnostic: indented tool output (`swiftgen: error: …`) stays
   reportable.
+- **Failed build commands**:
+  `Command <Name> failed with a nonzero exit code` becomes a `.commandFailed` event
+  when its task reported no error or linker error of its own.
+  A task runs from its header (a line with `(in target '`) to its failure line,
+  so a failed compiler is not restated,
+  and a CodeSign failure in the next task still is.
+  - The message is the failure line, preceded by up to three look-back lines as its reason:
+    unclaimed lines at the failure line's own indentation.
+    A deeper line (the echoed invocation), a shallower one (a heading such as `Testing failed:`),
+    a task header, a terminal marker, or an earlier failure ends the search.
+    xcodebuild's log lines and crash backtrace frames are skipped.
+  - `xcodebuild test` restates the failures that stopped it under `Testing failed:`.
+    `seenFailedCommands` recognises those, including `PhaseScriptExecution`, and drops them.
+  - A success marker vouches for the failures before it:
+    `failedCommandsSinceSuccessMarker` resets on every marker,
+    and `StreamingOutputParser.finish` reports that many failed commands from the end.
+  - `Command PhaseScriptExecution failed` is a plain `.error` and is always reported.
 
 ### Key Features
 - **Error/Warning Parsing**: Multiple regex patterns handle various Xcode error formats
@@ -464,6 +484,9 @@ explicitly:
   - Custom runtime warnings default to `type: "runtime"`
   - Included with `--warnings` flag (no separate flag needed)
 - **Linker Error Parsing**: Captures undefined symbols, missing frameworks/libraries, architecture mismatches, and duplicate symbols (with structured conflicting file paths)
+- **Failed Build Commands**: `Command CodeSign failed with a nonzero exit code` and the like become errors,
+  with the tool's own output as the reason, when the failing task reported no error of its own
+  (see "Failed build commands" under the multi-line context pattern)
 - **Test Failure Detection**: XCUnit assertion failures and general test failures
   - **Swift Testing console symbols**: SF Symbols from Private Use Area (macOS) with Unicode fallbacks (Linux)
     - `details` line: `􀄵` U+100135 (macOS) / `↳` U+21B3 (Linux) — carries `#expect` custom comments
@@ -526,7 +549,7 @@ Tests are in `Tests/*.swift` using XCTest framework.
 
 ### Test Fixtures
 
-Real-world output samples are stored in `Tests/Fixtures/` for integration tests:
+Real-world output samples are stored in `Tests/XCSiftCoreTests/Fixtures/` for integration tests:
 - **build.txt** (~2.7MB) - Large successful xcodebuild output for performance testing
 - **swift-testing-output.txt** (~11KB) - Swift Testing output with 23 passed tests
 - **linker-error-output.txt** - Real linker error output with undefined symbols
@@ -536,7 +559,7 @@ Real-world output samples are stored in `Tests/Fixtures/` for integration tests:
   72 blocks, 69 passed, 3 failed. The pair is what makes the transcript's shortfall measurable
 
 To add new fixtures:
-1. Create the file in `Tests/Fixtures/`
+1. Create the file in `Tests/XCSiftCoreTests/Fixtures/`
 2. Add to `Package.swift` resources: `.copy("Fixtures/your-file.txt")`
 3. Load in tests via `Bundle.module.url(forResource: "your-file", withExtension: "txt")`
 
@@ -662,7 +685,12 @@ Test cases cover:
     - Empty coverage path treated as nil
     - Zero flatten depth treated as unlimited
   - ConfigError description tests
-- **MCP proxy** (100 tests in `Tests/xcsiftTests/MCP*.swift`):
+- **Failed build commands** (31 tests in `Tests/XCSiftCoreTests/FailedCommandTests.swift`):
+  the reason and what ends its search, task-local explanation (compiler, linker, script phase,
+  build-system errors), `Testing failed:` restatements, success markers vouching only for earlier
+  failures, multi-word rule names, CRLF and overlong lines, and the `LineParser` and
+  `TrackingLineParser` contract of `.commandFailed`
+- **MCP proxy** (137 tests in `Tests/xcsiftTests/MCP*.swift`):
   - `MCPMessageTests`: JSON model round-trips, single-line serialization, newline framing,
     oversized-message passthrough and its final-chunk flag, truncation reporting
   - `MCPSifterTests`: build-log path recovery (prose trees and JSON), transcript replacement, trust

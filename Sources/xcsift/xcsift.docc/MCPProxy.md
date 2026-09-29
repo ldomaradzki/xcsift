@@ -135,6 +135,12 @@ only in the log. Measured on a real Xcode 27 build of an iOS app:
 | Build failed, error already in the response | untouched | nothing to add |
 | `RunAllTests`, per-test results enumerated | replaces | 31 108 → 1 069 bytes, exact: 69 passed, 3 failed with file and line |
 
+A signing failure leaves the same kind of gap.
+It prints no `error:` line,
+so the response's errors cannot say why the build failed,
+and xcsift appends the tool's own reason from the log
+(see <doc:OutputFormats#Failed-Build-Commands>).
+
 Appending is gated, not filtered: xcsift appends the sifted result only when the log carries at
 least one diagnostic the response does not, so a response that already says everything is left
 alone — but a response missing one warning receives the whole result, known errors included. Two

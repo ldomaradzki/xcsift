@@ -91,6 +91,8 @@ swift build 2>&1 | xcsift -W -E
 Build is considered failed when:
 - Compiler errors are present
 - Linker errors are present
+- A build command failed without an error of its own
+  (`Command CodeSign failed with a nonzero exit code`)
 - Test failures are present
 - Warnings are present (when `--Werror` is also used)
 

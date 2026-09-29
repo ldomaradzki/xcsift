@@ -43,8 +43,8 @@ The default format outputs structured JSON with build status, summary, and detai
 
 | Field | Description |
 |-------|-------------|
-| `status` | `"success"`, `"failed"`, or `"incomplete"` (stream ended without a terminal `** … SUCCEEDED/FAILED **` marker — e.g. a killed/truncated build) |
-| `summary.errors` | Count of compiler errors |
+| `status` | `"success"`, `"failed"`, or `"incomplete"` (stream ended without a terminal `** … SUCCEEDED/FAILED **` marker and without any failure — e.g. a killed/truncated build) |
+| `summary.errors` | Count of errors: compiler and tool diagnostics, script-phase failures, and build commands that failed without an error of their own (see Failed Build Commands below) |
 | `summary.warnings` | Count of warnings |
 | `summary.failed_tests` | Count of failed tests |
 | `summary.linker_errors` | Count of linker errors |
@@ -60,7 +60,10 @@ The default format outputs structured JSON with build status, summary, and detai
 ### Status Values
 
 - `success` — the build/test run completed with no errors, no failed tests, and produced positive evidence of completion (a terminal `** <PHASE> SUCCEEDED **` marker — `BUILD`, `TEST`, `ARCHIVE`, `EXPORT`, `CLEAN` … — a `Build complete!` marker, or passed tests).
-- `failed` — errors, failed tests, linker errors, or a terminal `** … FAILED **` marker were detected. `** TEST FAILED **` is the one exception: xcodebuild also prints it for a run that passes under `-skipMacroValidation`, so passed tests outrank it.
+- `failed` — errors, failed tests, linker errors, a failed build command, or a terminal `** … FAILED **` marker were detected.
+  `** TEST FAILED **` is the one exception:
+  xcodebuild also prints it for a run that passes under `-skipMacroValidation`,
+  so passed tests outrank it.
 - `incomplete` — the stream ended without any terminal marker and without recognizable results. This typically means the build was truncated or killed (e.g. `Killed: 9` on memory pressure) before reporting an outcome. xcsift never reports a truncated run as `success`; combine with `--exit-on-failure` to fail the pipeline on `incomplete`.
 
 > **Migration note:** `incomplete` was introduced alongside the "success requires positive evidence" model. A successful stream lacking a recognizable terminal marker *and* passed tests now reports `incomplete` instead of `success`. Consumers that gate on status should treat anything other than `success` as non-success — checking only `status == "failed"` will miss `incomplete` runs. `--exit-on-failure` and `--quiet` already handle `incomplete` correctly.
@@ -110,6 +113,57 @@ Each warning includes a `type` field indicating its source:
 ### Deduplication
 
 Warnings, errors, and linker errors are automatically deduplicated. Identical entries (same file, line, and message) appear only once in the output.
+
+### Failed Build Commands
+
+Xcode reports any build command that exits non-zero as
+`Command <Name> failed with a nonzero exit code`.
+A compiler has printed `error:` lines by then,
+but a code-signing failure, a validation step, or a compiler that crashed may not have,
+and then that line is the only record of why the build failed.
+
+Such a line becomes an entry in `errors[]` when its task reported no error of its own.
+The message is the failure line,
+preceded by up to three lines the tool printed just before it:
+
+```json
+{
+  "status": "failed",
+  "summary": { "errors": 1, "warnings": 0, "failed_tests": 0, "linker_errors": 0 },
+  "errors": [
+    {
+      "message": "/…/Stickers.appex: errSecInternalComponent Command CodeSign failed with a nonzero exit code"
+    }
+  ]
+}
+```
+
+- **What the reason is.**
+  Only lines at the failure line's own indentation are read.
+  The command's echoed invocation (`cd …`, `/usr/bin/codesign …`),
+  which Xcode indents under the task header,
+  ends the search,
+  and so do the task header, a terminal marker, and an earlier failure.
+  Blank lines, diagnostics reported on their own, xcodebuild's log lines,
+  and the frames of a crash backtrace are skipped.
+- **Which failures are reported.**
+  A task runs from its header (`… (in target 'App' from project 'App')`) to its failure line.
+  A failed compiler has reported its errors within its task,
+  so `Command SwiftCompile failed` is not restated next to them,
+  while a signing failure in another task is still reported.
+  Two tasks that fail alike are two entries.
+- **Restatements.**
+  `xcodebuild test` lists the failures that stopped it under `Testing failed:`.
+  A failure listed there that was reported above is not reported again.
+- **Success markers.**
+  A `** … SUCCEEDED **` marker vouches for the failures before it,
+  so a nested tool's failure that a script tolerated does not fail the build.
+  It says nothing about what follows it:
+  in `xcodebuild clean test`, a signing failure after `** CLEAN SUCCEEDED **` is reported,
+  and a log cut off after that failure is `failed`, not `incomplete`.
+- **Script phases.**
+  `Command PhaseScriptExecution failed` is always reported,
+  with the script's preceding output.
 
 ### Linker Errors
 

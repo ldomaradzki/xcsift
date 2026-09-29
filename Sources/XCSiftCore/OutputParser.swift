@@ -25,6 +25,7 @@ public struct StreamingOutputParser {
         var warnings: [BuildWarning] = []
         var failedTests: [FailedTest] = []
         var linkerErrors: [LinkerError] = []
+        var failedCommands: [BuildError] = []
         var executables: [Executable] = []
         var seenExecutablePaths: Set<String> = []
         var buildTime: String?
@@ -149,24 +150,6 @@ public struct StreamingOutputParser {
         let sawFailureMarker = lineParser.sawFailureMarker
         let sawTestRunFailure = state.testRunFailed
 
-        // If warnings-as-errors is enabled, convert warnings to errors
-        var finalErrors = state.errors
-        var finalWarnings = state.warnings
-
-        if shouldTreatWarningsAsErrors && !state.warnings.isEmpty {
-            for warning in state.warnings {
-                finalErrors.append(
-                    BuildError(
-                        file: warning.file,
-                        line: warning.line,
-                        message: warning.message,
-                        column: nil
-                    )
-                )
-            }
-            finalWarnings = []
-        }
-
         // Swift Testing states its own totals when the log carries a run summary. When it does
         // not — Xcode's console transcript frequently does not — the per-test lines are the only
         // record of that framework's tests, and an XCTest bundle counts them as zero. Dropping
@@ -208,6 +191,28 @@ public struct StreamingOutputParser {
             }
             return nil
         }()
+
+        // A command whose task reported no error of its own — CodeSign, a validation step, a
+        // compiler that crashed — is the only record of why it failed. A success marker vouches
+        // for the failures before it, so only those after the last one are reported.
+        var finalErrors =
+            state.errors + state.failedCommands.suffix(lineParser.failedCommandsSinceSuccessMarker)
+        var finalWarnings = state.warnings
+
+        // If warnings-as-errors is enabled, convert warnings to errors
+        if shouldTreatWarningsAsErrors && !state.warnings.isEmpty {
+            for warning in state.warnings {
+                finalErrors.append(
+                    BuildError(
+                        file: warning.file,
+                        line: warning.line,
+                        message: warning.message,
+                        column: nil
+                    )
+                )
+            }
+            finalWarnings = []
+        }
 
         let status: String = {
             let hasActualFailures =
@@ -326,6 +331,11 @@ public struct StreamingOutputParser {
             let key = "\(e.symbol):\(e.message)"
             guard state.seenLinkerErrors.insert(key).inserted else { return }
             state.linkerErrors.append(e)
+
+        case .commandFailed(let e):
+            // Not deduplicated: two tasks failing alike are two failures, and xcodebuild's own
+            // restatements never arrive as events.
+            state.failedCommands.append(e)
 
         case .testStarted:
             break  // crash detection is handled inside LineParser

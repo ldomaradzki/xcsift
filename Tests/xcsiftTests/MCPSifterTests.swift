@@ -456,6 +456,65 @@ final class BuildOutputSifterTests: XCTestCase {
         XCTAssertEqual(outcome.additions.count, 1)
     }
 
+    /// A signing failure has no `error:` line, so the server's structured errors cannot carry its
+    /// reason; the log does.
+    func testAppendsTheReasonForAFailedCommandMissingFromAJSONBuildResult() throws {
+        let fileSystem = MCPFixtures.fileSystem()
+        fileSystem.fileContents["/tmp/logs/BuildProject-Log.txt"] = Self.codeSignFailure
+
+        let response =
+            #"{"buildResult":"The project failed to build.","elapsedTime":5.11,"errors":[],"#
+            + #""fullLogPath":"/tmp/logs/BuildProject-Log.txt"}"#
+
+        let addition = try XCTUnwrap(makeSifter(fileSystem: fileSystem).sift(text: response).additions.first)
+
+        XCTAssertTrue(addition.contains("errSecInternalComponent"))
+    }
+
+    /// Replacing a raw transcript must not drop the only line that says why it failed.
+    func testReplacingARawTranscriptKeepsTheFailedCommandsReason() throws {
+        let replacement = try XCTUnwrap(makeSifter().sift(text: Self.codeSignFailure).replacement)
+
+        XCTAssertEqual(MCPFixtures.field("status", of: replacement)?.stringValue, "failed")
+        XCTAssertEqual(MCPFixtures.field("errors", of: replacement)?.arrayValue?.count, 1)
+        XCTAssertTrue(replacement.contains("errSecInternalComponent"))
+    }
+
+    /// A failure the summary already states, with nothing else in the log, adds nothing.
+    func testDoesNotAppendAFailedCommandTheSummaryAlreadyStates() {
+        let fileSystem = MCPFixtures.fileSystem()
+        fileSystem.fileContents["/tmp/logs/build.log"] = """
+            ValidateEmbeddedBinary /p/App.app/PlugIns/Widget.appex (in target 'App' from project 'App')
+                cd /src/App
+            Command ValidateEmbeddedBinary failed with a nonzero exit code
+            ** BUILD FAILED **
+            """
+
+        let summary = """
+
+            🔨 Build
+
+            Errors (1):
+
+              ✗ Command ValidateEmbeddedBinary failed with a nonzero exit code
+
+            ❌ Build failed. (⏱️ 3.4s)
+              └ Files:
+                 └── /tmp/logs/build.log — Build Logs
+            """
+
+        XCTAssertFalse(makeSifter(fileSystem: fileSystem).sift(text: summary).changesContent)
+    }
+
+    private static let codeSignFailure = """
+        CodeSign /p/App.app (in target 'App' from project 'App')
+            cd /src/App
+            /usr/bin/codesign --force --sign ABCDEF /p/App.app
+        /p/App.app: errSecInternalComponent
+        Command CodeSign failed with a nonzero exit code
+        ** BUILD FAILED **
+        """
+
     /// Xcode reports a console log and a build log together, and only one of them holds what the
     /// response left out. The first unhelpful log must not end the search.
     func testKeepsLookingAfterALogThatAddsNothing() throws {
