@@ -120,6 +120,9 @@ public struct LineParser: Sendable {
     // no run summary those lines are the only count of that framework's tests there is. Xcode
     // repeats whole blocks of its console log, so an outcome counts once per test name.
     private var seenSwiftTestingOutcomes: Set<String> = []
+    // Run summaries include skipped tests. Deduplicate their lines within each run, not across
+    // completed runs whose totals are accumulated by StreamingOutputParser.
+    private var seenSwiftTestingSkippedTests: Set<String> = []
     private var startedSwiftTestingTests: Set<String> = []
     private var lastCompletedXCTestSuiteKey: String?
 
@@ -129,6 +132,8 @@ public struct LineParser: Sendable {
     public private(set) var swiftTestingPassedCases: Int = 0
     /// Swift Testing test cases the log reported as failing.
     public private(set) var swiftTestingFailedCases: Int = 0
+    /// Observed skipped tests, included in run totals but not in passed or failed counts.
+    private(set) var swiftTestingSkippedCases: Int = 0
     /// Tests Swift Testing said it started and never reported an outcome for. Xcode's console
     /// transcript drops lines under load, so a count taken from it can be short — and saying by
     /// how much is the difference between a number that is wrong and one that is qualified.
@@ -577,6 +582,7 @@ public struct LineParser: Sendable {
         add(XcodebuildSymbols.noteKeyword, candidates: .diagnosticNote)
         add(XcodebuildSymbols.failedKeyword, candidates: [.error, .test, .status])
         add(XcodebuildSymbols.passedKeyword, candidates: .test)
+        add(XcodebuildSymbols.skippedKeyword, candidates: .test)
 
         for marker in [
             "Build succeeded",
@@ -786,7 +792,10 @@ public struct LineParser: Sendable {
         // Swift Testing outcome tallying (state only): the event a line produces says nothing
         // about which framework reported it, and the totals have to be kept apart — an XCTest
         // bundle reports its own count, and Swift Testing tests inside one are counted as zero.
-        if candidates.contains(.test) { tallySwiftTestingOutcome(line) }
+        if candidates.contains(.test), tallySwiftTestingOutcome(line) == .skipped {
+            // A skip reason can mention a failure without reporting one.
+            return nil
+        }
 
         // Crash detection
         if candidates.contains(.test), let event = parseCrashLine(line) { return event }
@@ -851,7 +860,12 @@ public struct LineParser: Sendable {
 
         // Build / test time, XCTest summaries, Swift Testing summaries
         if candidates.contains(.status) || candidates.contains(.test) {
-            if let event = parseBuildAndTestTime(line) { return event }
+            if let event = parseBuildAndTestTime(line) {
+                if case .swiftTestingCompleted = event {
+                    seenSwiftTestingSkippedTests.removeAll(keepingCapacity: true)
+                }
+                return event
+            }
         }
 
         if candidates.contains(.buildInfo) {
@@ -1563,6 +1577,7 @@ public struct LineParser: Sendable {
         case started
         case passed
         case failed
+        case skipped
     }
 
     struct SwiftTestingReport {
@@ -1579,6 +1594,7 @@ public struct LineParser: Sendable {
     ///   ◇ Test "Addition operation" started.
     ///   ✔ Test "Addition operation" with 4 test cases passed after 0.012 seconds.
     ///   ✘ Test "Intentional failure" failed after 0.011 seconds with 1 issue.
+    ///   ➜ Test requiresService() skipped: "Requires an external service."
     /// ```
     ///
     /// The leading glyph varies by platform and Xcode indents the line under the task that emitted
@@ -1595,16 +1611,27 @@ public struct LineParser: Sendable {
         guard !remainder.hasPrefix("run with "), !remainder.lowercased().hasPrefix("case ") else {
             return nil
         }
-        guard remainder.hasPrefix("\"") else { return nil }
-
-        let nameStart = line.index(after: testRange.upperBound)
-        guard let quoteEnd = line[nameStart...].firstIndex(of: "\"") else { return nil }
-        let name = String(line[nameStart ..< quoteEnd])
+        let name: String
+        let tail: String
+        if remainder.hasPrefix("\"") {
+            let nameStart = line.index(after: testRange.upperBound)
+            guard let quoteEnd = line[nameStart...].firstIndex(of: "\"") else { return nil }
+            name = String(line[nameStart ..< quoteEnd])
+            tail = String(line[line.index(after: quoteEnd)...])
+        } else if let skipped = remainder.range(of: XcodebuildSymbols.skippedKeyword) {
+            name = String(remainder[..<skipped.lowerBound])
+            tail = String(remainder[skipped.lowerBound...])
+        } else {
+            return nil
+        }
         guard !name.isEmpty else { return nil }
 
-        let tail = String(line[line.index(after: quoteEnd)...])
+        if tail.hasPrefix(XcodebuildSymbols.skippedKeyword + ".")
+            || tail.hasPrefix(XcodebuildSymbols.skippedKeyword + ":")
+        {
+            return SwiftTestingReport(name: name, outcome: .skipped, cases: 1, duration: nil)
+        }
         let cases = parameterisedCaseCount(in: tail) ?? 1
-
         if tail.contains(" started.") {
             return SwiftTestingReport(name: name, outcome: .started, cases: cases, duration: nil)
         }
@@ -1647,19 +1674,25 @@ public struct LineParser: Sendable {
         return Self.finiteDuration(Double(text[..<secondsRange.lowerBound].trimmingCharacters(in: .whitespaces)))
     }
 
-    private mutating func tallySwiftTestingOutcome(_ line: String) {
-        guard let report = Self.parseSwiftTestingReport(line) else { return }
+    private mutating func tallySwiftTestingOutcome(_ line: String) -> SwiftTestingOutcome? {
+        guard let report = Self.parseSwiftTestingReport(line) else { return nil }
 
         switch report.outcome {
         case .started:
             startedSwiftTestingTests.insert(report.name)
         case .passed:
-            guard seenSwiftTestingOutcomes.insert(report.name).inserted else { return }
+            guard seenSwiftTestingOutcomes.insert(report.name).inserted else { return report.outcome }
             swiftTestingPassedCases += report.cases
         case .failed:
-            guard seenSwiftTestingOutcomes.insert(report.name).inserted else { return }
+            guard seenSwiftTestingOutcomes.insert(report.name).inserted else { return report.outcome }
             swiftTestingFailedCases += report.cases
+        case .skipped:
+            seenSwiftTestingOutcomes.insert(report.name)
+            guard seenSwiftTestingSkippedTests.insert(report.name).inserted else { return report.outcome }
+            swiftTestingSkippedCases += report.cases
+            if lastStartedTestName == report.name { lastStartedTestName = nil }
         }
+        return report.outcome
     }
 
     private func parseFailedTest(_ line: String) -> FailedTest? {

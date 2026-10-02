@@ -48,7 +48,7 @@ The default format outputs structured JSON with build status, summary, and detai
 | `summary.warnings` | Count of warnings |
 | `summary.failed_tests` | Count of failed tests |
 | `summary.linker_errors` | Count of linker errors |
-| `summary.passed_tests` | Count of passed tests (if available) |
+| `summary.passed_tests` | Count of passed tests (if available), excluding observed Swift Testing skips |
 | `summary.build_time` | Build/compilation duration in seconds |
 | `summary.test_time` | Test execution duration in seconds (when tests run) |
 | `summary.coverage_percent` | Line coverage percentage (with `--coverage`) |
