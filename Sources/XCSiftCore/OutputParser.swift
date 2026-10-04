@@ -235,8 +235,8 @@ public struct StreamingOutputParser {
                 return hasPassedTests ? "success" : "failed"
             }
 
-            // Success requires positive evidence: a terminal success marker or passed tests.
-            if sawSuccessMarker || hasPassedTests {
+            // A passing Swift Testing summary also completes a run with only skipped tests.
+            if sawSuccessMarker || hasPassedTests || lineParser.sawSwiftTestingRunSuccess {
                 return "success"
             }
 

@@ -134,6 +134,8 @@ public struct LineParser: Sendable {
     public private(set) var swiftTestingFailedCases: Int = 0
     /// Observed skipped tests, included in run totals but not in passed or failed counts.
     private(set) var swiftTestingSkippedCases: Int = 0
+    /// A passing run summary is completion evidence even when every test was skipped.
+    private(set) var sawSwiftTestingRunSuccess: Bool = false
     /// Tests Swift Testing said it started and never reported an outcome for. Xcode's console
     /// transcript drops lines under load, so a count taken from it can be short — and saying by
     /// how much is the difference between a number that is wrong and one that is qualified.
@@ -1612,19 +1614,25 @@ public struct LineParser: Sendable {
             return nil
         }
         let name: String
-        let tail: String
+        var tail: String
         if remainder.hasPrefix("\"") {
             let nameStart = line.index(after: testRange.upperBound)
             guard let quoteEnd = line[nameStart...].firstIndex(of: "\"") else { return nil }
             name = String(line[nameStart ..< quoteEnd])
             tail = String(line[line.index(after: quoteEnd)...])
-        } else if let skipped = remainder.range(of: XcodebuildSymbols.skippedKeyword) {
-            name = String(remainder[..<skipped.lowerBound])
-            tail = String(remainder[skipped.lowerBound...])
+        } else if let nameEnd = remainder.range(of: XcodebuildSymbols.swiftTestingFunctionNameSuffix) {
+            let endIndex = remainder.index(after: nameEnd.lowerBound)
+            name = String(remainder[..<endIndex])
+            tail = String(remainder[endIndex...])
         } else {
             return nil
         }
         guard !name.isEmpty else { return nil }
+
+        if tail.hasPrefix(XcodebuildSymbols.swiftTestingAliasPrefix) {
+            guard let aliasEnd = tail.range(of: XcodebuildSymbols.swiftTestingAliasSuffix) else { return nil }
+            tail = String(tail[aliasEnd.upperBound...])
+        }
 
         if tail.hasPrefix(XcodebuildSymbols.skippedKeyword + ".")
             || tail.hasPrefix(XcodebuildSymbols.skippedKeyword + ":")
@@ -2076,6 +2084,7 @@ public struct LineParser: Sendable {
                             Double(durationStr.trimmingCharacters(in: CharacterSet(charactersIn: ". \t")))
                         ) ?? 0
                 }
+                sawSwiftTestingRunSuccess = true
                 return .swiftTestingCompleted(executed: total, failed: 0, duration: duration)
             }
         }
