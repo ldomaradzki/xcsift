@@ -1566,7 +1566,9 @@ public struct LineParser: Sendable {
             return (testName, duration)
         }
 
-        if let report = Self.parseSwiftTestingReport(line), report.outcome == .passed {
+        // A function name is shared by every suite that declares it, so a pass reported under one
+        // would meet another suite's failure under the same name and report a flaky test.
+        if let report = Self.parseSwiftTestingReport(line), report.outcome == .passed, !report.isFunctionName {
             return (report.name, report.duration)
         }
 
@@ -1588,6 +1590,9 @@ public struct LineParser: Sendable {
         /// How many tests the line accounts for. One, unless the test is parameterised.
         let cases: Int
         let duration: Double?
+        /// The test has no display name, so the line names its function (`roundTrip()`) without
+        /// the suite that declares it.
+        let isFunctionName: Bool
     }
 
     /// Reads one of Swift Testing's per-test lines:
@@ -1615,6 +1620,7 @@ public struct LineParser: Sendable {
         }
         let name: String
         var tail: String
+        let isFunctionName = !remainder.hasPrefix("\"")
         if remainder.hasPrefix("\"") {
             let nameStart = line.index(after: testRange.upperBound)
             guard let quoteEnd = line[nameStart...].firstIndex(of: "\"") else { return nil }
@@ -1637,18 +1643,31 @@ public struct LineParser: Sendable {
         if tail.hasPrefix(XcodebuildSymbols.skippedKeyword + ".")
             || tail.hasPrefix(XcodebuildSymbols.skippedKeyword + ":")
         {
-            return SwiftTestingReport(name: name, outcome: .skipped, cases: 1, duration: nil)
+            return SwiftTestingReport(
+                name: name,
+                outcome: .skipped,
+                cases: 1,
+                duration: nil,
+                isFunctionName: isFunctionName
+            )
         }
         let cases = parameterisedCaseCount(in: tail) ?? 1
         if tail.contains(" started.") {
-            return SwiftTestingReport(name: name, outcome: .started, cases: cases, duration: nil)
+            return SwiftTestingReport(
+                name: name,
+                outcome: .started,
+                cases: cases,
+                duration: nil,
+                isFunctionName: isFunctionName
+            )
         }
         if let passed = tail.range(of: " passed after ") {
             return SwiftTestingReport(
                 name: name,
                 outcome: .passed,
                 cases: cases,
-                duration: seconds(in: tail[passed.upperBound...])
+                duration: seconds(in: tail[passed.upperBound...]),
+                isFunctionName: isFunctionName
             )
         }
         if let failed = tail.range(of: " failed after ") {
@@ -1656,13 +1675,20 @@ public struct LineParser: Sendable {
                 name: name,
                 outcome: .failed,
                 cases: cases,
-                duration: seconds(in: tail[failed.upperBound...])
+                duration: seconds(in: tail[failed.upperBound...]),
+                isFunctionName: isFunctionName
             )
         }
         // `recorded an issue at …` is how a failing test is first reported; the `failed after`
         // line follows, and counting by name makes the pair one failure.
         if tail.contains(XcodebuildSymbols.recordedIssue) {
-            return SwiftTestingReport(name: name, outcome: .failed, cases: cases, duration: nil)
+            return SwiftTestingReport(
+                name: name,
+                outcome: .failed,
+                cases: cases,
+                duration: nil,
+                isFunctionName: isFunctionName
+            )
         }
 
         return nil

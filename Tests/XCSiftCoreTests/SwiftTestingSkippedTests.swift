@@ -133,6 +133,30 @@ final class SwiftTestingSkippedTests: XCTestCase {
         XCTAssertEqual(result.failedTests.first?.duration, 0.001)
     }
 
+    /// Swift 6.3 output for `ParserTests.roundTrip()`, which passed, and `EncoderTests.roundTrip()`,
+    /// which failed. Neither line names its suite, so the pass is not evidence of a flaky test.
+    func testFunctionNameSharedAcrossSuitesIsNotFlaky() {
+        let input = """
+            ◇ Test run started.
+            ◇ Test roundTrip() started.
+            ◇ Test roundTrip() started.
+            ✔ Test roundTrip() passed after 0.001 seconds.
+            ✘ Test roundTrip() recorded an issue at T.swift:3:48: Expectation failed: 1 == 2
+            ✘ Test roundTrip() failed after 0.001 seconds with 1 issue.
+            ✘ Test run with 2 tests in 2 suites failed after 0.002 seconds with 1 issue.
+            """
+
+        let result = OutputParser().parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.passedTests, 1)
+        XCTAssertEqual(result.summary.failedTests, 1)
+        XCTAssertTrue(result.flakyTests.isEmpty)
+        XCTAssertNil(result.summary.flakyTests)
+        XCTAssertEqual(result.failedTests.first?.file, "T.swift")
+        XCTAssertEqual(result.failedTests.first?.line, 3)
+    }
+
     func testVerboseSkippedTestIsNotReportedAsPassed() {
         let input = """
             ➜ Test "requires service" (aka 'requiresService()') skipped.
