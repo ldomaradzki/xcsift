@@ -19,6 +19,7 @@ enum XcodebuildSymbols {
     static let noteKeyword = "note:"
     static let fatalErrorKeyword = "Fatal error"
     static let passedKeyword = "passed"
+    static let skippedKeyword = " skipped"
     static let failedKeyword = "failed"
     static let startedSuffix = "' started"
     static let recordedIssue = "recorded an issue"
@@ -50,6 +51,9 @@ enum XcodebuildSymbols {
     static let swiftTestingFail = "✘"
     static let swiftTestingStartedPrefix = "◇ Test "
     static let swiftTestingRunStarted = "◇ Test run started."
+    static let swiftTestingAliasPrefix = " (aka '"
+    static let swiftTestingAliasSuffix = "')"
+    static let swiftTestingFunctionNameSuffix = ") "
     static let emojiError = "❌"
     // U+100135 (macOS PUA) / U+21B3 (Linux) — carries #expect custom comment on the line after recorded-issue
     static let swiftTestingDetailsPrefix = "􀄵"

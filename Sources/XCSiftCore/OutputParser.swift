@@ -154,7 +154,9 @@ public struct StreamingOutputParser {
         // not — Xcode's console transcript frequently does not — the per-test lines are the only
         // record of that framework's tests, and an XCTest bundle counts them as zero. Dropping
         // them reported a run of two frameworks as the smaller one.
-        let swiftTestingObserved = lineParser.swiftTestingPassedCases + lineParser.swiftTestingFailedCases
+        let swiftTestingObserved =
+            lineParser.swiftTestingPassedCases + lineParser.swiftTestingFailedCases
+            + lineParser.swiftTestingSkippedCases
         let swiftTestingExecuted: Int? =
             state.swiftTestingExecutedCount ?? (swiftTestingObserved > 0 ? swiftTestingObserved : nil)
         let swiftTestingFailed = state.swiftTestingFailedCount ?? lineParser.swiftTestingFailedCases
@@ -184,7 +186,8 @@ public struct StreamingOutputParser {
 
         let computedPassedTests: Int? = {
             if let executed = totalExecuted {
-                return max(executed - totalFailed, 0)
+                // Swift Testing includes disabled tests in its run and scheduling totals.
+                return max(executed - totalFailed - lineParser.swiftTestingSkippedCases, 0)
             }
             if state.passedTestsCount > 0 {
                 return state.passedTestsCount
@@ -232,8 +235,8 @@ public struct StreamingOutputParser {
                 return hasPassedTests ? "success" : "failed"
             }
 
-            // Success requires positive evidence: a terminal success marker or passed tests.
-            if sawSuccessMarker || hasPassedTests {
+            // A passing Swift Testing summary also completes a run with only skipped tests.
+            if sawSuccessMarker || hasPassedTests || lineParser.sawSwiftTestingRunSuccess {
                 return "success"
             }
 
