@@ -1715,9 +1715,11 @@ public struct LineParser: Sendable {
         case .started:
             startedSwiftTestingTests.insert(report.name)
         case .passed:
+            if lastStartedTestName == report.name { lastStartedTestName = nil }
             guard seenSwiftTestingOutcomes.insert(report.name).inserted else { return report.outcome }
             swiftTestingPassedCases += report.cases
         case .failed:
+            if lastStartedTestName == report.name { lastStartedTestName = nil }
             guard seenSwiftTestingOutcomes.insert(report.name).inserted else { return report.outcome }
             swiftTestingFailedCases += report.cases
         case .skipped:

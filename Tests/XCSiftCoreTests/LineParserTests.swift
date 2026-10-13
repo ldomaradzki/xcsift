@@ -446,6 +446,31 @@ final class LineParserTests: XCTestCase {
         )
     }
 
+    // MARK: - No phantom testFailed for Swift Testing tests that finished before TEST FAILED
+
+    func testNoPhantomFailureAfterSwiftTestingTestsFinish() {
+        // Swift Testing starts tests in parallel, so the last one started can pass while another fails.
+        let input = """
+            ◇ Test leaks() started.
+            ◇ Test tidiesUp() started.
+            ✔ Test tidiesUp() passed after 0.160 seconds.
+            ✘ Test leaks() recorded an issue at LeakTests.swift:12:9: Expectation failed: weakObject == nil
+            ✘ Test leaks() failed after 0.972 seconds with 1 issue.
+            ✘ Test run with 2 tests in 1 suite failed after 0.972 seconds with 1 issue.
+
+            Failing tests:
+            \tLeakTests.leaks()
+
+            ** TEST FAILED **
+            """
+
+        let result = OutputParser().parse(input: input)
+
+        XCTAssertEqual(result.summary.passedTests, 1)
+        XCTAssertEqual(result.summary.failedTests, 1)
+        XCTAssertEqual(result.failedTests.map(\.test), ["leaks()"])
+    }
+
     // MARK: - Consecutive recordedIssue lines do not drop the second event
 
     func testConsecutiveRecordedIssueLines() {
