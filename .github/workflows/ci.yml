@@ -7,28 +7,63 @@ on:
     branches: [master]
 
 jobs:
-  build-macos:
-    name: Build & Test (macOS)
-    runs-on: macos-15
+  lint:
+    name: Lint
+    # The newest toolchain, so that the swift-format on CI is the one used to format locally.
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-
-      - name: Select Xcode 16.4
-        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
-
-      - name: Cache SPM packages
-        uses: actions/cache@v6
-        with:
-          path: .build
-          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-
 
       - name: Show Swift version
         run: swift --version
 
       - name: Lint
         run: swift format lint --strict --recursive .
+
+  build-macos:
+    name: Swift ${{ matrix.swift }} on Xcode ${{ matrix.xcode }}
+    runs-on: ${{ matrix.runs-on }}
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest supported toolchain: swift-tools-version 6.0, and Xcode 16.0 in the Homebrew formula.
+          - swift: "6.0"
+            xcode: "16.0"
+            runs-on: macos-15
+          - swift: "6.1"
+            xcode: "16.4"
+            runs-on: macos-15
+          - swift: "6.2"
+            xcode: "26.0"
+            runs-on: macos-26
+          - swift: "6.3"
+            xcode: "26.6"
+            runs-on: macos-26
+          # Homebrew builds the macOS 27 bottle with this toolchain.
+          - swift: "6.4"
+            xcode: "27.0"
+            runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v7
+
+      # The key names the toolchain: a .build directory from another compiler does not build.
+      - name: Cache SPM packages
+        uses: actions/cache@v6
+        with:
+          path: .build
+          key: ${{ runner.os }}-xcode-${{ matrix.xcode }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-${{ matrix.xcode }}-spm-
+
+      - name: Show Swift version
+        run: swift --version
 
       - name: Build
         run: swift build
@@ -37,20 +72,27 @@ jobs:
         run: swift test
 
   build-linux:
-    name: Build & Test (Linux)
+    name: Swift ${{ matrix.swift }} on Linux
     runs-on: ubuntu-latest
     container:
-      image: swift:6.3-jammy
+      image: swift:${{ matrix.swift }}-jammy
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # Homebrew builds the Linux bottles with the newest one.
+        swift: ["6.0", "6.1", "6.2", "6.3", "6.4"]
     steps:
       - uses: actions/checkout@v7
 
+      # The key names the toolchain: a .build directory from another compiler does not build.
       - name: Cache SPM packages
         uses: actions/cache@v6
         with:
           path: .build
-          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          key: ${{ runner.os }}-swift-${{ matrix.swift }}-spm-${{ hashFiles('Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-spm-
+            ${{ runner.os }}-swift-${{ matrix.swift }}-spm-
 
       - name: Show Swift version
         run: swift --version

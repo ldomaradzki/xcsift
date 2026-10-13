@@ -13,15 +13,18 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-15
+          - os: macos-26
             platform: macos-arm64
             arch: arm64
             build-path: arm64-apple-macosx/release
+            toolchain: xcode-26.6
+          # jammy, for the oldest glibc: the binary then runs on more distributions.
           - os: ubuntu-latest
             platform: linux-x64
             arch: x86_64
             build-path: x86_64-unknown-linux-gnu/release
-            container: swift:6.3-jammy
+            container: swift:6.4-jammy
+            toolchain: swift-6.4-jammy
             extra-flags: --static-swift-stdlib -Xlinker -lstdc++ -Xlinker -L/usr/lib/swift/linux
 
     runs-on: ${{ matrix.os }}
@@ -34,17 +37,18 @@ jobs:
 
       - uses: actions/checkout@v7
 
+      # The key names the toolchain: a .build directory from another compiler does not build.
       - name: Cache SPM packages
         uses: actions/cache@v6
         with:
           path: .build
-          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          key: ${{ runner.os }}-release-${{ matrix.toolchain }}-spm-${{ hashFiles('Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-spm-
+            ${{ runner.os }}-release-${{ matrix.toolchain }}-spm-
 
-      - name: Select Xcode 16.4 (macOS)
+      - name: Select Xcode 26.6 (macOS)
         if: matrix.platform == 'macos-arm64'
-        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
 
       - name: Replace version placeholder
         run: |
