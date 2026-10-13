@@ -102,3 +102,43 @@ jobs:
 
       - name: Run tests
         run: swift test
+
+  # TEMPORARY: checks the release build on the new toolchains. Remove before merge.
+  release-dry-run:
+    name: Release build (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-26
+            platform: macos-arm64
+            arch: arm64
+            build-path: arm64-apple-macosx/release
+          - os: ubuntu-latest
+            platform: linux-x64
+            arch: x86_64
+            build-path: x86_64-unknown-linux-gnu/release
+            container: swift:6.4-jammy
+            extra-flags: --static-swift-stdlib -Xlinker -lstdc++ -Xlinker -L/usr/lib/swift/linux
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    steps:
+      - name: Install dependencies (Linux)
+        if: matrix.platform == 'linux-x64'
+        run: apt-get update && apt-get install -y curl build-essential
+
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode 26.6 (macOS)
+        if: matrix.platform == 'macos-arm64'
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+
+      - name: Build release binary
+        run: swift build -c release --arch ${{ matrix.arch }} ${{ matrix.extra-flags }}
+
+      - name: Run release binary
+        run: |
+          .build/${{ matrix.build-path }}/xcsift --version
+          echo '** BUILD SUCCEEDED **' | .build/${{ matrix.build-path }}/xcsift -f toon
+          file .build/${{ matrix.build-path }}/xcsift || true
+          ldd .build/${{ matrix.build-path }}/xcsift || otool -L .build/${{ matrix.build-path }}/xcsift || true
