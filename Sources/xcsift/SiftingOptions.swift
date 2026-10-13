@@ -45,14 +45,19 @@ struct SiftingOptions: ParsableArguments {
     @Option(name: .long, help: "TOON delimiter (comma, tab, or pipe). Default: comma")
     var toonDelimiter: TOONDelimiterType?
 
+    /// Deprecated and hidden. Parsed so that existing command lines and MCP registrations still
+    /// start; TOON specification 4.0 removed key folding, so the output does not change.
     @Option(
         name: .long,
-        help:
-            "TOON key folding (disabled or safe). Default: disabled. When safe, nested single-key objects collapse to dotted paths"
+        help: ArgumentHelp("Deprecated: TOON specification 4.0 removed key folding. No effect.", visibility: .hidden)
     )
     var toonKeyFolding: TOONKeyFoldingType?
 
-    @Option(name: .long, help: "TOON flatten depth limit for key folding. Default: unlimited")
+    /// Deprecated and hidden, for the same reason as ``toonKeyFolding``. It only limited folding.
+    @Option(
+        name: .long,
+        help: ArgumentHelp("Deprecated: TOON specification 4.0 removed key folding. No effect.", visibility: .hidden)
+    )
     var toonFlattenDepth: Int?
 
     @Option(
@@ -85,7 +90,6 @@ struct SiftingOptions: ParsableArguments {
             cliExitOnFailure: exitOnFailure,
             cliToonDelimiter: toonDelimiter,
             cliToonKeyFolding: toonKeyFolding,
-            cliToonFlattenDepth: toonFlattenDepth,
             cliXcbeautify: xcbeautify
         )
     }

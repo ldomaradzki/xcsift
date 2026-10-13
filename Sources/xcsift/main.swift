@@ -39,16 +39,11 @@ enum TOONDelimiterType: String, ExpressibleByArgument {
     }
 }
 
+/// The values `--toon-key-folding` accepted. Kept so that existing command lines still parse; the
+/// option has no effect, because TOON specification 4.0 removed key folding.
 enum TOONKeyFoldingType: String, ExpressibleByArgument {
     case disabled
     case safe
-
-    var toonKeyFolding: TOONEncoder.KeyFolding {
-        switch self {
-        case .disabled: return .disabled
-        case .safe: return .safe
-        }
-    }
 }
 
 func getVersion() -> String {
@@ -114,8 +109,6 @@ struct XCSift: ParsableCommand {
 
             Configuration options:
               --toon-delimiter [comma|tab|pipe]  # Default: comma
-              --toon-key-folding [disabled|safe] # Default: disabled
-              --toon-flatten-depth N             # Default: unlimited
               --slow-threshold N                 # Slow test threshold in seconds
               --build-info                       # Per-target phases and timing
 
@@ -189,6 +182,9 @@ struct XCSift: ParsableCommand {
         } catch let error as ConfigError {
             writeToStderr("Error: \(error.description)\n")
             throw ExitCode.failure
+        }
+        for deprecation in resolved.deprecations {
+            writeToStderr(deprecation + "\n")
         }
 
         // Check if stdin is a terminal (no piped input) before trying to read

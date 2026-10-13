@@ -44,7 +44,10 @@ struct Configuration: Codable, Sendable {
 /// TOON-specific configuration section [toon]
 struct TOONConfiguration: Codable, Sendable {
     var delimiter: DelimiterOption?
+    /// Deprecated. Read so that existing configuration files still load, and so that `safe` gets a
+    /// warning. TOON specification 4.0 removed key folding, so the output does not change.
     var keyFolding: KeyFoldingOption?
+    /// Deprecated, for the same reason as ``keyFolding``. It only limited folding.
     var flattenDepth: Int?
 
     enum CodingKeys: String, CodingKey {

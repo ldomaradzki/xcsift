@@ -202,12 +202,17 @@ struct MCPProxyCommand: ParsableCommand {
     }
 
     private func resolveConfig() throws -> ResolvedConfig {
+        let resolved: ResolvedConfig
         do {
-            return try sifting.resolve()
+            resolved = try sifting.resolve()
         } catch let error as ConfigError {
             FileHandle.standardError.write(Data("Error: \(error.description)\n".utf8))
             throw ExitCode.failure
         }
+        for deprecation in resolved.deprecations {
+            FileHandle.standardError.write(Data((deprecation + "\n").utf8))
+        }
+        return resolved
     }
 
     // MARK: - Registration
@@ -250,6 +255,7 @@ struct MCPProxyCommand: ParsableCommand {
     /// Every option that changes how the proxy behaves, as the argument list that reproduces this
     /// invocation. `--verbose` is left out as a diagnostic, and so are the flags that select
     /// printing, registering or removing — those are this command, not the proxy's behaviour.
+    /// `--toon-key-folding` and `--toon-flatten-depth` are left out because they have no effect.
     func proxyArguments(for command: [String]) -> [String] {
         var args: [String] = ["mcp"]
 
@@ -265,8 +271,6 @@ struct MCPProxyCommand: ParsableCommand {
         if let slowThreshold = sifting.slowThreshold { args += ["--slow-threshold", String(slowThreshold)] }
         if sifting.xcbeautify { args.append("--xcbeautify") }
         if let delimiter = sifting.toonDelimiter { args += ["--toon-delimiter", delimiter.rawValue] }
-        if let folding = sifting.toonKeyFolding { args += ["--toon-key-folding", folding.rawValue] }
-        if let depth = sifting.toonFlattenDepth { args += ["--toon-flatten-depth", String(depth)] }
         if onSummary != .append { args += ["--on-summary", onSummary.rawValue] }
         if minRawLines != MCPDefaults.minimumRawLines { args += ["--min-raw-lines", String(minRawLines)] }
         if maxLogSize != MCPDefaults.maximumLogMegabytes { args += ["--max-log-size", String(maxLogSize)] }

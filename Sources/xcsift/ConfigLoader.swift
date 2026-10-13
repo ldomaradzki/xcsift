@@ -113,8 +113,6 @@ struct ConfigLoader {
             # TOON format configuration
             # [toon]
             # delimiter = "comma"     # "comma", "tab", or "pipe"
-            # key_folding = "disabled" # "disabled" or "safe"
-            # flatten_depth = 0       # 0 = unlimited, or positive integer
             """
     }
 

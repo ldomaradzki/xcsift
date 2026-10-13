@@ -329,8 +329,10 @@ Same build output (1 error, 3 warnings):
 | Option | Values | Description |
 |--------|--------|-------------|
 | `--toon-delimiter` | `comma`, `tab`, `pipe` | Table delimiter |
-| `--toon-key-folding` | `disabled`, `safe` | Collapse nested objects |
-| `--toon-flatten-depth` | Integer | Limit folding depth |
+
+The output conforms to TOON specification 4.1.
+`--toon-key-folding` and `--toon-flatten-depth` are deprecated and have no effect:
+the specification removed key folding in 4.0.
 
 ### Build Info in TOON
 

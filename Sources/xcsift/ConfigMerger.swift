@@ -23,8 +23,6 @@ struct ParseConfig: Sendable {
 struct RenderConfig: Sendable {
     var format: FormatType
     var toonDelimiter: TOONDelimiterType
-    var toonKeyFolding: TOONKeyFoldingType
-    var toonFlattenDepth: Int?
 }
 
 /// A resolved configuration: the two halves a result passes through, and what the pipeline then
@@ -43,6 +41,8 @@ struct ResolvedConfig: Sendable {
     var quiet: Bool
     /// Exit non-zero when the build did not succeed.
     var exitOnFailure: Bool
+    /// One line for each option that the user set and that has no effect now, for stderr.
+    var deprecations: [String] = []
 }
 
 // MARK: - Config Merger
@@ -66,8 +66,8 @@ enum ConfigMerger {
     ///   - cliExecutable: Executable flag from CLI
     ///   - cliExitOnFailure: Exit on failure flag from CLI
     ///   - cliToonDelimiter: TOON delimiter from CLI (nil if not explicitly set)
-    ///   - cliToonKeyFolding: TOON key folding from CLI (nil if not explicitly set)
-    ///   - cliToonFlattenDepth: TOON flatten depth from CLI (nil if not set)
+    ///   - cliToonKeyFolding: TOON key folding from CLI (nil if not explicitly set). It has no
+    ///     effect on the output; it only decides whether ``ResolvedConfig/deprecations`` says so.
     ///   - cliXcbeautify: xcbeautify input parsing flag from CLI
     /// - Returns: Resolved configuration with all values set
     static func merge(
@@ -85,7 +85,6 @@ enum ConfigMerger {
         cliExitOnFailure: Bool,
         cliToonDelimiter: TOONDelimiterType?,
         cliToonKeyFolding: TOONKeyFoldingType?,
-        cliToonFlattenDepth: Int?,
         cliXcbeautify: Bool = false
     ) -> ResolvedConfig {
 
@@ -128,22 +127,12 @@ enum ConfigMerger {
             toonDelimiter = .comma
         }
 
-        let toonKeyFolding: TOONKeyFoldingType
-        if let cliKeyFolding = cliToonKeyFolding {
-            toonKeyFolding = cliKeyFolding
-        } else if let configKeyFolding = config.toon?.keyFolding {
-            toonKeyFolding = configKeyFolding.toTOONKeyFoldingType
-        } else {
-            toonKeyFolding = .disabled
-        }
-
-        let toonFlattenDepth: Int?
-        if let cliDepth = cliToonFlattenDepth {
-            toonFlattenDepth = cliDepth
-        } else if let configDepth = config.toon?.flattenDepth, configDepth > 0 {
-            toonFlattenDepth = configDepth
-        } else {
-            toonFlattenDepth = nil
+        // Key folding: CLI > config. The output is the same either way; the user is told when
+        // they asked for the folded form. The flatten depth only ever limited folding.
+        let toonKeyFolding = cliToonKeyFolding ?? config.toon?.keyFolding?.toTOONKeyFoldingType
+        var deprecations: [String] = []
+        if toonKeyFolding == .safe {
+            deprecations.append(keyFoldingDeprecation)
         }
 
         return ResolvedConfig(
@@ -160,14 +149,21 @@ enum ConfigMerger {
             ),
             render: RenderConfig(
                 format: format,
-                toonDelimiter: toonDelimiter,
-                toonKeyFolding: toonKeyFolding,
-                toonFlattenDepth: toonFlattenDepth
+                toonDelimiter: toonDelimiter
             ),
             quiet: quiet,
-            exitOnFailure: exitOnFailure
+            exitOnFailure: exitOnFailure,
+            deprecations: deprecations
         )
     }
+
+    /// TOON specification 4.0 removed key folding, and folded output does not conform to 4.1. A
+    /// consumer that follows the specification reads `build_info.targets` as one key, so xcsift
+    /// always writes nested objects.
+    static let keyFoldingDeprecation =
+        "Warning: TOON key folding has no effect. TOON specification 4.0 removed it, so xcsift writes "
+        + "nested objects. Remove --toon-key-folding and --toon-flatten-depth, or key_folding and "
+        + "flatten_depth in the configuration file."
 
     /// Returns nil for empty strings, otherwise returns the string
     private static func nonEmptyString(_ value: String?) -> String? {
