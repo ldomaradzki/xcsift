@@ -37,7 +37,7 @@ enum MCPFixtures {
     }
 
     static func renderConfig(format: FormatType = .json) -> RenderConfig {
-        RenderConfig(format: format, toonDelimiter: .comma, toonKeyFolding: .disabled, toonFlattenDepth: nil)
+        RenderConfig(format: format, toonDelimiter: .comma)
     }
 
     /// A mock file system with a stable home directory, so `~` expansion is testable.

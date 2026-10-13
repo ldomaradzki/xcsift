@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/toon-format/toon-swift.git",
       "state" : {
-        "revision" : "b519ede235854489e1fbfe05d171c69a3bf558e5",
-        "version" : "0.4.0"
+        "revision" : "e16f6b163085bea46ce0ffa230b43d25b7b91737",
+        "version" : "0.5.1"
       }
     }
   ],

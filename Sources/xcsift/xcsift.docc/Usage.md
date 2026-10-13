@@ -243,22 +243,17 @@ xcodebuild build 2>&1 | xcsift -f toon --toon-delimiter tab
 xcodebuild build 2>&1 | xcsift -f toon --toon-delimiter pipe
 ```
 
-### `--toon-key-folding`
+### Deprecated: `--toon-key-folding` and `--toon-flatten-depth`
 
-Enable key folding: `disabled` (default) or `safe`.
+TOON specification 4.0 removed key folding,
+and folded output does not conform to specification 4.1.
+xcsift always writes nested objects.
 
-```bash
-# Collapses {a:{b:{c:1}}} to a.b.c: 1
-xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe
-```
-
-### `--toon-flatten-depth`
-
-Limit key folding depth (default: unlimited).
-
-```bash
-xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 3
-```
+xcsift still accepts both flags,
+so that existing scripts and MCP registrations still start,
+but the flags have no effect.
+With `--toon-key-folding safe`, xcsift writes a warning to stderr.
+Remove both flags.
 
 ## Configuration File Options
 
@@ -312,7 +307,7 @@ swift build 2>&1 | xcsift -f toon -w
 swift test --enable-code-coverage 2>&1 | xcsift -f toon -c --coverage-details
 
 # All TOON options
-xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-key-folding safe -w -c
+xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe -w -c
 
 # Slow test detection with coverage
 swift test --enable-code-coverage 2>&1 | xcsift --slow-threshold 1.0 --coverage

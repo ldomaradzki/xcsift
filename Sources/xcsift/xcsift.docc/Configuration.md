@@ -73,8 +73,6 @@ xcbeautify = false       # Parse xcbeautify/Tuist-formatted input (--xcbeautify)
 # TOON format configuration
 [toon]
 delimiter = "comma"      # "comma", "tab", or "pipe"
-key_folding = "disabled" # "disabled" or "safe"
-flatten_depth = 0        # 0 = unlimited, or positive integer
 ```
 
 ## Option Reference
@@ -138,8 +136,12 @@ Options in the `[toon]` section:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `delimiter` | string | `"comma"` | Tabular delimiter: `comma`, `tab`, or `pipe` |
-| `key_folding` | string | `"disabled"` | Key folding mode: `disabled` or `safe` |
-| `flatten_depth` | int | `0` | Key folding depth limit (0 = unlimited) |
+| `key_folding` | string | `"disabled"` | Deprecated. No effect: TOON specification 4.0 removed key folding. `safe` writes a warning to stderr |
+| `flatten_depth` | int | `0` | Deprecated. No effect: it only limited key folding |
+
+xcsift still reads `key_folding` and `flatten_depth`,
+so an existing configuration file still loads.
+Remove them.
 
 ## Priority Rules
 
@@ -218,7 +220,6 @@ format = "toon"
 # Custom TOON settings
 [toon]
 delimiter = "tab"
-key_folding = "safe"
 ```
 
 ### CI/CD Configuration

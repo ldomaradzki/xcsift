@@ -45,8 +45,6 @@ final class MCPCommandTests: XCTestCase {
             "--slow-threshold", "1.5",
             "--xcbeautify",
             "--toon-delimiter", "pipe",
-            "--toon-key-folding", "safe",
-            "--toon-flatten-depth", "3",
             "--on-summary", "replace",
             "--min-raw-lines", "5",
             "--max-log-size", "8",
@@ -56,12 +54,22 @@ final class MCPCommandTests: XCTestCase {
 
         for expected in [
             "--format", "toon", "--warnings", "--Werror", "--build-info", "--executable",
-            "--slow-threshold", "--xcbeautify", "--toon-delimiter", "pipe", "--toon-key-folding",
-            "safe", "--toon-flatten-depth", "3", "--on-summary", "replace", "--min-raw-lines", "5",
-            "--max-log-size", "8", "--no-inject-tools",
+            "--slow-threshold", "--xcbeautify", "--toon-delimiter", "pipe", "--on-summary", "replace",
+            "--min-raw-lines", "5", "--max-log-size", "8", "--no-inject-tools",
         ] {
             XCTAssertTrue(args.contains(expected), "snippet is missing \(expected)")
         }
+    }
+
+    /// A proxy registered with the key folding flags must still start, so the flags still parse.
+    /// They have no effect, so a new snippet does not carry them forward.
+    func testDeprecatedKeyFoldingFlagsParseButAreNotReproduced() throws {
+        let command = try parse(["--toon-key-folding", "safe", "--toon-flatten-depth", "3", "--print-config"])
+        XCTAssertEqual(command.sifting.toonKeyFolding, .safe)
+        XCTAssertEqual(command.sifting.toonFlattenDepth, 3)
+
+        let args = try snippetArgs(["--toon-key-folding", "safe", "--toon-flatten-depth", "3", "--print-config"])
+        XCTAssertEqual(args, ["mcp", "--", "xcrun", "mcpbridge"])
     }
 
     /// Values reach the snippet as JSON strings, so a quote or a backslash in a pattern must not

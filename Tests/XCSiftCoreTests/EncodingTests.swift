@@ -96,7 +96,7 @@ final class EncodingTests: XCTestCase {
 
         // Encode to TOON
         let encoder = TOONEncoder()
-        encoder.indent = 2
+        encoder.indentSize = 2
         encoder.delimiter = .comma
         let toonData = try encoder.encode(result)
         let toonString = String(data: toonData, encoding: .utf8)!
@@ -143,7 +143,7 @@ final class EncodingTests: XCTestCase {
 
         // Encode to TOON
         let encoder = TOONEncoder()
-        encoder.indent = 2
+        encoder.indentSize = 2
         encoder.delimiter = .comma
         let toonData = try encoder.encode(result)
         let toonString = String(data: toonData, encoding: .utf8)!

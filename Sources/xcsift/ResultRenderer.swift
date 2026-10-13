@@ -38,14 +38,12 @@ enum ResultRenderer {
         return string
     }
 
+    /// Encodes as TOON specification 4.1. Key folding is not offered: the specification removed it
+    /// in 4.0.
     static func toon(_ result: BuildResult, config: RenderConfig) throws -> String {
         let encoder = TOONEncoder()
-        encoder.indent = 2
+        encoder.indentSize = 2
         encoder.delimiter = config.toonDelimiter.toonDelimiter
-        encoder.keyFolding = config.toonKeyFolding.toonKeyFolding
-        if let depth = config.toonFlattenDepth {
-            encoder.flattenDepth = depth
-        }
 
         let data = try encoder.encode(result)
         guard let string = String(data: data, encoding: .utf8) else {

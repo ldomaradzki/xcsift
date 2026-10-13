@@ -541,7 +541,7 @@ final class BuildInfoTests: XCTestCase {
         let result = parser.parse(input: input, printBuildInfo: true)
 
         let encoder = TOONEncoder()
-        encoder.indent = 2
+        encoder.indentSize = 2
         let toonData = try encoder.encode(result)
         let toonString = String(data: toonData, encoding: .utf8)!
 
@@ -846,7 +846,7 @@ final class BuildInfoTests: XCTestCase {
         let result = parser.parse(input: input, printBuildInfo: true)
 
         let encoder = TOONEncoder()
-        encoder.indent = 2
+        encoder.indentSize = 2
         let toonData = try encoder.encode(result)
         let toonString = String(data: toonData, encoding: .utf8)!
 

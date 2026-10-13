@@ -356,8 +356,9 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertTrue(template.contains("exit_on_failure = false"))
         XCTAssertTrue(template.contains("[toon]"))
         XCTAssertTrue(template.contains("delimiter = \"comma\""))
-        XCTAssertTrue(template.contains("key_folding = \"disabled\""))
-        XCTAssertTrue(template.contains("flatten_depth = 0"))
+        // Deprecated options are not offered to new configuration files.
+        XCTAssertFalse(template.contains("key_folding"))
+        XCTAssertFalse(template.contains("flatten_depth"))
     }
 }
 
@@ -385,8 +386,7 @@ final class ConfigMergerTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: false,
             cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
+            cliToonKeyFolding: nil
         )
 
         XCTAssertEqual(resolved.render.format, .json)
@@ -411,8 +411,7 @@ final class ConfigMergerTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: false,
             cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
+            cliToonKeyFolding: nil
         )
 
         XCTAssertEqual(resolved.parse.warnings, true)
@@ -440,13 +439,38 @@ final class ConfigMergerTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: false,
             cliToonDelimiter: .pipe,  // CLI should override
-            cliToonKeyFolding: .safe,  // CLI should override
-            cliToonFlattenDepth: 3  // CLI should override
+            cliToonKeyFolding: .safe  // CLI should override
         )
 
         XCTAssertEqual(resolved.render.toonDelimiter, .pipe)
-        XCTAssertEqual(resolved.render.toonKeyFolding, .safe)
-        XCTAssertEqual(resolved.render.toonFlattenDepth, 3)
+        XCTAssertEqual(resolved.deprecations, [ConfigMerger.keyFoldingDeprecation])
+    }
+
+    /// Key folding has no effect, so only a request for the folded form gets a warning. An explicit
+    /// `disabled` asks for what xcsift writes anyway, and it wins over the file.
+    func testCLIKeyFoldingDisabledSilencesConfigDeprecation() {
+        var config = Configuration()
+        config.toon = TOONConfiguration()
+        config.toon?.keyFolding = .safe
+
+        let resolved = ConfigMerger.merge(
+            config: config,
+            cliFormat: nil,
+            cliWarnings: false,
+            cliWarningsAsErrors: false,
+            cliQuiet: false,
+            cliCoverage: false,
+            cliCoverageDetails: false,
+            cliCoveragePath: nil,
+            cliSlowThreshold: nil,
+            cliBuildInfo: false,
+            cliExecutable: false,
+            cliExitOnFailure: false,
+            cliToonDelimiter: nil,
+            cliToonKeyFolding: .disabled
+        )
+
+        XCTAssertTrue(resolved.deprecations.isEmpty)
     }
 
     // MARK: - Config Used When CLI Not Set
@@ -474,8 +498,7 @@ final class ConfigMergerTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: false,
             cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
+            cliToonKeyFolding: nil
         )
 
         XCTAssertEqual(resolved.render.format, .toon)
@@ -507,13 +530,11 @@ final class ConfigMergerTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: false,
             cliToonDelimiter: nil,  // Not set
-            cliToonKeyFolding: nil,  // Not set
-            cliToonFlattenDepth: nil  // Not set
+            cliToonKeyFolding: nil  // Not set
         )
 
         XCTAssertEqual(resolved.render.toonDelimiter, .tab)
-        XCTAssertEqual(resolved.render.toonKeyFolding, .safe)
-        XCTAssertEqual(resolved.render.toonFlattenDepth, 10)
+        XCTAssertEqual(resolved.deprecations, [ConfigMerger.keyFoldingDeprecation])
     }
 
     // MARK: - Defaults When Neither Set
@@ -533,8 +554,7 @@ final class ConfigMergerTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: false,
             cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
+            cliToonKeyFolding: nil
         )
 
         XCTAssertEqual(resolved.render.format, .json)
@@ -549,8 +569,7 @@ final class ConfigMergerTests: XCTestCase {
         XCTAssertEqual(resolved.parse.executable, false)
         XCTAssertEqual(resolved.exitOnFailure, false)
         XCTAssertEqual(resolved.render.toonDelimiter, .comma)
-        XCTAssertEqual(resolved.render.toonKeyFolding, .disabled)
-        XCTAssertNil(resolved.render.toonFlattenDepth)
+        XCTAssertTrue(resolved.deprecations.isEmpty)
     }
 
     // MARK: - Empty Coverage Path
@@ -573,8 +592,7 @@ final class ConfigMergerTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: false,
             cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
+            cliToonKeyFolding: nil
         )
 
         XCTAssertNil(resolved.parse.coveragePath)
@@ -598,39 +616,10 @@ final class ConfigMergerTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: false,
             cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
+            cliToonKeyFolding: nil
         )
 
         XCTAssertEqual(resolved.parse.coveragePath, "/custom/path")
-    }
-
-    // MARK: - Zero Flatten Depth
-
-    func testZeroFlattenDepthTreatedAsUnlimited() {
-        var config = Configuration()
-        config.toon = TOONConfiguration()
-        config.toon?.flattenDepth = 0  // 0 = unlimited
-
-        let resolved = ConfigMerger.merge(
-            config: config,
-            cliFormat: nil,
-            cliWarnings: false,
-            cliWarningsAsErrors: false,
-            cliQuiet: false,
-            cliCoverage: false,
-            cliCoverageDetails: false,
-            cliCoveragePath: nil,
-            cliSlowThreshold: nil,
-            cliBuildInfo: false,
-            cliExecutable: false,
-            cliExitOnFailure: false,
-            cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
-        )
-
-        XCTAssertNil(resolved.render.toonFlattenDepth)  // 0 becomes nil (unlimited)
     }
 }
 
@@ -666,8 +655,7 @@ final class ExitOnFailureTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: true,
             cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
+            cliToonKeyFolding: nil
         )
 
         XCTAssertTrue(resolved.exitOnFailure)
@@ -703,8 +691,7 @@ final class ExitOnFailureTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: true,
             cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
+            cliToonKeyFolding: nil
         )
 
         XCTAssertTrue(resolved.exitOnFailure)
@@ -739,8 +726,7 @@ final class ExitOnFailureTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: false,
             cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
+            cliToonKeyFolding: nil
         )
 
         XCTAssertFalse(resolved.exitOnFailure)
@@ -778,8 +764,7 @@ final class ExitOnFailureTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: true,
             cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
+            cliToonKeyFolding: nil
         )
 
         let shouldExitWithFailure = resolved.exitOnFailure && result.status != "success"
@@ -818,8 +803,7 @@ final class ExitOnFailureTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: true,
             cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
+            cliToonKeyFolding: nil
         )
 
         XCTAssertTrue(resolved.parse.warningsAsErrors)
@@ -852,8 +836,7 @@ final class ExitOnFailureTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: true,  // CLI should override
             cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
+            cliToonKeyFolding: nil
         )
 
         XCTAssertTrue(resolved.exitOnFailure)
@@ -877,8 +860,7 @@ final class ExitOnFailureTests: XCTestCase {
             cliExecutable: false,
             cliExitOnFailure: false,  // CLI not set (false = default)
             cliToonDelimiter: nil,
-            cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil
+            cliToonKeyFolding: nil
         )
 
         XCTAssertTrue(resolved.exitOnFailure)  // Config value because CLI false = "not set"
@@ -941,7 +923,6 @@ final class XcbeautifyConfigTests: XCTestCase {
             cliExitOnFailure: false,
             cliToonDelimiter: nil,
             cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil,
             cliXcbeautify: true
         )
 
@@ -967,7 +948,6 @@ final class XcbeautifyConfigTests: XCTestCase {
             cliExitOnFailure: false,
             cliToonDelimiter: nil,
             cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil,
             cliXcbeautify: false
         )
 
@@ -990,7 +970,6 @@ final class XcbeautifyConfigTests: XCTestCase {
             cliExitOnFailure: false,
             cliToonDelimiter: nil,
             cliToonKeyFolding: nil,
-            cliToonFlattenDepth: nil,
             cliXcbeautify: false
         )
 

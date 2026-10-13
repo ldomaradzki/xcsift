@@ -25,6 +25,10 @@ swift test
 swift format --recursive --in-place .
 ```
 
+CI lints once, with the `swift format` of Xcode 27.0 (`swift format lint --strict --recursive .`).
+Format with the same toolchain:
+two swift-format releases can format the same code differently.
+
 ### Commit Style
 Use [Conventional Commits](https://www.conventionalcommits.org/): `fix:`, `feat:`, `docs:`, `chore:`, `refactor:`, `test:`. See `git log --oneline` for examples.
 
@@ -219,21 +223,14 @@ swift build 2>&1 | xcsift --format toon --toon-delimiter tab
 # Pipe delimiter - alternative when data contains many commas
 xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe
 
-# TOON Key Folding - collapses nested single-key objects into dotted paths
-# Key folding options (default: disabled):
-# - disabled: Normal nested output (default)
-# - safe: Collapses {a:{b:{c:1}}} → a.b.c: 1 when all keys are valid identifiers
+# TOON key folding is deprecated: TOON specification 4.0 removed it.
+# xcsift always writes nested objects (TOON specification 4.1).
+# --toon-key-folding and --toon-flatten-depth (and key_folding / flatten_depth in the config file)
+# still parse, so existing scripts and MCP registrations still start, but they have no effect.
+# `safe` writes a warning to stderr. The flags are hidden from --help.
 
-# Enable key folding for more compact output
-xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe
-swift build 2>&1 | xcsift --format toon --toon-key-folding safe
-
-# Flatten depth - limits how deep key folding goes (default: unlimited)
-xcodebuild build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 3
-swift build 2>&1 | xcsift -f toon --toon-key-folding safe --toon-flatten-depth 2
-
-# Combine all TOON options
-xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe --toon-key-folding safe --toon-flatten-depth 5 -w -c
+# Combine TOON options
+xcodebuild test 2>&1 | xcsift -f toon --toon-delimiter pipe -w -c
 
 # Slow/flaky test detection
 # Detects tests that exceed a duration threshold and tests that both pass and fail in the same run
@@ -614,7 +611,7 @@ Test cases cover:
   - Executables included in JSON when flag is true
   - No executables in output
   - Executable deduplication by path
-- **TOON format encoding** (25 tests):
+- **TOON format encoding** (18 tests):
   - Basic TOON encoding
   - TOON with errors, warnings, and failed tests
   - TOON with linker errors
@@ -622,14 +619,6 @@ Test cases cover:
   - TOON with executables
   - Token efficiency verification (30-60% reduction)
   - Summary-only vs details mode in TOON format
-  - **TOON key folding features** (7 tests):
-    - Key folding disabled by default
-    - Key folding safe mode
-    - Flatten depth default value
-    - Flatten depth custom configuration
-    - Key folding with build results
-    - Key folding combined with flatten depth
-    - Combined TOON configuration
 - **Build phases, timing, and dependencies** (45 tests):
   - CompileSwiftSources phase parsing
   - SwiftDriver Compilation phase parsing
@@ -683,14 +672,14 @@ Test cases cover:
     - Config used when CLI not set
     - Defaults when neither set
     - Empty coverage path treated as nil
-    - Zero flatten depth treated as unlimited
+    - Deprecated key folding: `safe` gives a warning, CLI `disabled` silences the config value
   - ConfigError description tests
 - **Failed build commands** (31 tests in `Tests/XCSiftCoreTests/FailedCommandTests.swift`):
   the reason and what ends its search, task-local explanation (compiler, linker, script phase,
   build-system errors), `Testing failed:` restatements, success markers vouching only for earlier
   failures, multi-word rule names, CRLF and overlong lines, and the `LineParser` and
   `TrackingLineParser` contract of `.commandFailed`
-- **MCP proxy** (137 tests in `Tests/xcsiftTests/MCP*.swift`):
+- **MCP proxy** (138 tests in `Tests/xcsiftTests/MCP*.swift`):
   - `MCPMessageTests`: JSON model round-trips, single-line serialization, newline framing,
     oversized-message passthrough and its final-chunk flag, truncation reporting
   - `MCPSifterTests`: build-log path recovery (prose trees and JSON), transcript replacement, trust
@@ -701,7 +690,7 @@ Test cases cover:
     the build-tool gate failing closed, tool injection and capability declaration, injected tool
     calls and their argument validation, pending-request eviction
   - `MCPCommandTests`: the configuration snippet (completeness, escaping, terminators), every
-    validation refusal, and `MCPServerInstallerTests` — the `claude mcp` commands built for
+    validation refusal, the deprecated key folding flags (they parse, the snippet drops them), and `MCPServerInstallerTests` — the `claude mcp` commands built for
     `--install`/`--uninstall`, their shell quoting, and the taken-name and never-registered cases
   - `MCPProxyEndToEndTests`: the built binary proxying a canned POSIX-shell MCP server, a 5 MB
     passthrough followed by an in-sync sift, launch failure, a server that never answers, and
@@ -736,7 +725,13 @@ swift test --filter OutputParserTests.testParseError
 When modifying code, ensure Linux compatibility:
 - Use conditional imports: `#if canImport(Darwin)` / `#elseif canImport(Glibc)` / `#elseif canImport(Musl)`
 - Avoid `fputs(..., stderr)` — use `FileHandle.standardError.write()` for Swift 6 concurrency safety
-- CI runs on both macOS and Linux (see `.github/workflows/ci.yml`)
+- CI builds and tests every supported toolchain (see `.github/workflows/ci.yml`):
+  Swift 6.0 to 6.4 on macOS (Xcode 16.0, 16.4, 26.0, 26.6, 27.0)
+  and on Linux (`swift:6.x-jammy` containers).
+  Swift 6.0 is the minimum (`swift-tools-version: 6.0`, and Xcode 16.0 in the Homebrew formula),
+  so do not use a language feature that is newer,
+  for example a trailing comma in an argument list (Swift 6.1).
+  Homebrew builds the macOS 27 and Linux bottles with Swift 6.4.
 
 ### Swift 6 Concurrency
 
@@ -985,9 +980,11 @@ xcbeautify = false       # Parse xcbeautify/Tuist-formatted input (--xcbeautify)
 # TOON format configuration
 [toon]
 delimiter = "comma"      # "comma", "tab", or "pipe"
-key_folding = "disabled" # "disabled" or "safe"
-flatten_depth = 0        # 0 = unlimited, or positive integer
 ```
+
+`key_folding` and `flatten_depth` in `[toon]` are deprecated and have no effect:
+TOON specification 4.0 removed key folding.
+xcsift still reads them, so an existing configuration file still loads.
 
 ### Priority
 
