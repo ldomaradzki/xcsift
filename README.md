@@ -49,7 +49,7 @@ swift build -c release
 cp .build/release/xcsift /usr/local/bin/
 ```
 
-Also available via [mise](https://ldomaradzki.github.io/xcsift/documentation/xcsift/gettingstarted) and [Mint](https://ldomaradzki.github.io/xcsift/documentation/xcsift/gettingstarted).
+Also available via [mise](https://ldomaradzki.github.io/xcsift/documentation/xcsift/gettingstarted) and [Mint](https://ldomaradzki.github.io/xcsift/documentation/xcsift/gettingstarted). Releases after 1.6.0 publish a signed [packslip](https://packslip.dev) manifest, so mise's `packslip:` backend verifies the archive before installing it and can link the agent skill of that version (`mise skills sync`).
 
 ## Plugin Installation
 
@@ -60,6 +60,7 @@ Integrate with coding assistants via built-in installers:
 | Claude Code | `xcsift install-claude-code` | `xcsift uninstall-claude-code` |
 | Codex | `xcsift install-codex` | `xcsift uninstall-codex` |
 | Cursor | `xcsift install-cursor` | `xcsift uninstall-cursor` |
+| Any agent, skill only (mise) | `mise skills sync` | `mise skills sync --prune` once xcsift is removed |
 
 See [Plugin Installation](https://ldomaradzki.github.io/xcsift/documentation/xcsift/plugininstallation) for options and verification steps.
 

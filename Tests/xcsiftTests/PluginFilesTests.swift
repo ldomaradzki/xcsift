@@ -6,8 +6,9 @@ import XCTest
 /// Guards the plugin files that xcsift ships to Claude Code, Cursor, and Codex.
 ///
 /// Each fact below lives in more than one file, and the copies must agree: the hook decision logic
-/// sits in the Cursor template plus two scripts in `plugins/`, and the plugin version sits in three
-/// manifests. These tests read every copy, so a partial edit fails instead of shipping.
+/// sits in the Cursor template plus two scripts in `plugins/`, the skill sits in a template and in
+/// `skills/xcsift`, and the plugin version sits in three manifests. These tests read every copy, so a
+/// partial edit fails instead of shipping.
 final class PluginFilesTests: XCTestCase {
 
     private struct Hook {
@@ -108,6 +109,21 @@ final class PluginFilesTests: XCTestCase {
             CursorTemplates.hookScript,
             checkedIn.trimmingCharacters(in: .newlines),
             "CursorTemplates.hookScript and plugins/cursor/hooks/pre-xcsift.sh must stay equal"
+        )
+    }
+
+    /// The release manifest offers `skills/xcsift` at the release commit, so mise links that copy while
+    /// `install-codex` and `install-cursor` write the template compiled into the same binary.
+    func testSkillTemplateMatchesCheckedInSkill() throws {
+        let checkedIn = try String(
+            contentsOf: Self.repoRoot.appendingPathComponent("skills/xcsift/SKILL.md"),
+            encoding: .utf8
+        )
+
+        XCTAssertEqual(
+            SharedTemplates.skillMarkdown,
+            checkedIn.trimmingCharacters(in: .newlines),
+            "SharedTemplates.skillMarkdown and skills/xcsift/SKILL.md must stay equal"
         )
     }
 

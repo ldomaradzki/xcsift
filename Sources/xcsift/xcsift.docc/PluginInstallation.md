@@ -1,6 +1,7 @@
 # Plugin Installation
 
-Install xcsift plugins for Claude Code, Codex, and Cursor to automate build output processing.
+Install xcsift plugins for Claude Code, Codex, and Cursor, or its skill through mise, to automate build
+output processing.
 
 ## Overview
 
@@ -11,6 +12,7 @@ xcsift provides built-in commands to install and uninstall plugins for popular c
 - **Claude Code** — Marketplace plugin with automatic hook integration
 - **Codex** — Skill-based integration for xcsift commands
 - **Cursor** — Project-level or global hook installation
+- **Any agent through mise** — The skill of the installed release, linked by `mise skills sync`
 
 ## Claude Code Plugin
 
@@ -69,6 +71,35 @@ xcsift uninstall-codex
 ```
 
 Deletes the skill directory from `~/.codex/skills/xcsift/`.
+
+## Agent Skill from mise
+
+Every release after 1.6.0 names its skill, `skills/xcsift` at the release commit, in its signed release
+manifest. When xcsift is installed through mise's `packslip:` backend (see <doc:GettingStarted>), mise
+fetches the skill with the binary, and links it where an agent reads skills:
+
+```bash
+# List the skills of the tools active here
+mise skills ls
+
+# Claude Code, this project: .claude/skills/xcsift
+mise skills sync
+
+# Claude Code, every project: ~/.claude/skills/xcsift
+mise skills sync -g
+
+# Agents that read .agents/skills, or Codex
+mise skills sync --dir .agents/skills
+mise skills sync --dir ~/.codex/skills
+```
+
+The links point into mise's install of that version, so run `mise skills sync` again after changing
+versions (or set `skills.auto_sync = true`), and keep project links out of version control.
+
+The skill is the text `xcsift install-codex` and `xcsift install-cursor` write, and a test keeps the
+two equal. It tells the agent to pipe build commands through xcsift itself: mise installs no hook. For
+Claude Code, the marketplace plugin above also rewrites the commands; install one or the other, since
+with both the agent reads two skills that say the same thing.
 
 ## Cursor Hooks
 
@@ -132,6 +163,14 @@ ls -la ~/.codex/skills/xcsift/
 
 # Use the skill in Codex
 # Type: /xcsift
+```
+
+### Skill from mise
+
+```bash
+# The skill of the active xcsift version, and where it is linked
+mise skills ls
+ls -la .claude/skills/xcsift
 ```
 
 ### Cursor

@@ -114,7 +114,7 @@ failed_tests[2]{suite,test,file,line,message,duration}:
 |---------|----------|
 | No errors shown but build failed | Add `2>&1` to capture stderr |
 | Coverage shows `null` | Add `--enable-code-coverage` (SPM) or `-enableCodeCoverage YES` (xcodebuild) |
-| "xcsift not found" | Install: `brew install xcsift` or `swift build -c release && cp .build/release/xcsift /usr/local/bin/` |
+| "xcsift not found" | Install: `brew install xcsift` or build from source |
 | Coverage for wrong target | xcsift auto-filters to tested target; use `--coverage-path` to override |
 | Config not loading | Check `.xcsift.toml` in CWD or `~/.config/xcsift/config.toml` |
 
