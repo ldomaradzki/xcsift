@@ -28,6 +28,9 @@ mise use -g xcsift
 # Or explicitly via github backend (downloads binary)
 mise use -g github:ldomaradzki/xcsift
 
+# Or via the packslip backend: mise verifies each release's signed manifest
+mise use -g 'packslip:github.com/ldomaradzki/xcsift[workflow=release.yml]'
+
 # For project-local installation (adds to .mise.toml)
 mise use xcsift
 
@@ -35,6 +38,16 @@ mise use xcsift
 # [tools]
 # xcsift = "latest"
 ```
+
+Every release after 1.6.0 publishes a signed release manifest, `packslip.sigstore.json`, beside its
+archives. It is signed by this repository's release workflow and records each archive's digest,
+platform, the `xcsift` executable, and what the host needs to start it: macOS 13 or later, or a Linux
+with glibc 2.35 or later and `libstdc++.so.6`. With the `packslip:` backend, mise checks the signature
+and the archive before unpacking it, and refuses a host that cannot run the binary.
+`[workflow=release.yml]` accepts only releases signed by that workflow on a tag.
+
+mise offers a release as `latest` once it is 24 hours old; name the version (`…@X.Y.Z`) to install a
+newer one. The manifest also carries the agent skill for that version; see <doc:PluginInstallation>.
 
 ### Using Mint
 

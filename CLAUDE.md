@@ -47,6 +47,27 @@ swift build -c release
 cp .build/release/xcsift /usr/local/bin/
 ```
 
+### Releases
+
+A `v*` tag runs `.github/workflows/release.yml`: `build` makes the two archives, `release` publishes them,
+then `packslip` signs a [packslip](https://packslip.dev) release manifest and `publish-packslip` attaches
+it as `packslip.sigstore.json`. mise's `packslip:` backend installs from that manifest, and consumers hold
+every later release to what they accepted:
+
+- **The signer is the workflow's path.** Do not rename `release.yml` or sign from another workflow file:
+  consumers refuse the release until a person approves the new signer.
+- **Keep `attest: true`.** A release that drops the build provenance the previous one carried is refused.
+- **`id-token: write` belongs to the `packslip` job alone**, and every action in it stays pinned to a full
+  commit SHA, because any of them can sign as this workflow.
+- **Host requirements are written by hand** in the job's `release.toml`: `glibc_min` follows the Linux build
+  container (`swift:6.3-jammy`, glibc 2.35), `os_min` follows `.macOS(.v13)` in `Package.swift`. Change
+  them with either, and add an `[[artifact]]` entry with a new platform. packslip reads `libs` from the
+  binaries itself.
+- **The release must be published, not a draft**: the signing job reads it with `contents: read`.
+- **The skill it offers is `skills/xcsift` at the tagged commit.** `PluginFilesTests` keeps
+  `skills/xcsift/SKILL.md` equal to `SharedTemplates.skillMarkdown`, which `install-codex` and
+  `install-cursor` write, so edit the template and copy it to the file.
+
 ### MCP Proxy
 
 xcsift can sit in front of Xcode's own MCP server (Xcode 26+) and sift the build output
@@ -103,6 +124,9 @@ xcsift uninstall-cursor         # Remove hooks
 ```
 
 After plugin installation, xcodebuild and swift build commands are automatically piped through xcsift for structured output.
+
+**Any agent, through mise:** `mise skills sync` links the skill of the installed release into `.claude/skills`
+(`-g` for `~/.claude/skills`, `--dir` for another directory). It installs the skill only, no hook.
 
 ### Running the Tool
 ```bash
