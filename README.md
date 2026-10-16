@@ -49,7 +49,28 @@ swift build -c release
 cp .build/release/xcsift /usr/local/bin/
 ```
 
-Also available via [mise](https://ldomaradzki.github.io/xcsift/documentation/xcsift/gettingstarted) and [Mint](https://ldomaradzki.github.io/xcsift/documentation/xcsift/gettingstarted). Releases after 1.6.0 publish a signed [packslip](https://packslip.dev) manifest, so mise's `packslip:` backend verifies the archive before installing it and can link the agent skill of that version (`mise skills sync`).
+Also available via [mise](https://ldomaradzki.github.io/xcsift/documentation/xcsift/gettingstarted) and [Mint](https://ldomaradzki.github.io/xcsift/documentation/xcsift/gettingstarted). Since 1.7.0, releases publish a signed [packslip](https://packslip.dev) manifest, so mise's `packslip:` backend verifies the archive before installing it and can link the agent skill of that version (`mise skills sync`).
+
+### Verify a Release
+
+Since 1.7.0, every release is signed by this repository's release workflow. The signer's
+[packslip](https://packslip.dev) fingerprint is:
+
+```text
+ps1_p3pqpu6mhfthsvnwyk2rm3leli
+```
+
+It names this repository by its numeric ID, not its name, so `--pin` refuses a release signed from
+any other repository, including one that later takes over the name:
+
+```bash
+# Install the latest release, checked against the fingerprint
+packslip install github.com/ldomaradzki/xcsift --pin ps1_p3pqpu6mhfthsvnwyk2rm3leli
+
+# Or check archives you downloaded yourself, with the release's packslip.sigstore.json
+packslip verify packslip.sigstore.json --pin ps1_p3pqpu6mhfthsvnwyk2rm3leli \
+  --artifact xcsift-vX.Y.Z-macos-arm64.tar.gz
+```
 
 ## Plugin Installation
 
