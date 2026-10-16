@@ -67,9 +67,9 @@ any other repository, including one that later takes over the name:
 # Install the latest release, checked against the fingerprint
 packslip install github.com/ldomaradzki/xcsift --pin ps1_p3pqpu6mhfthsvnwyk2rm3leli
 
-# Or check archives you downloaded yourself
+# Or check archives you downloaded yourself, with the release's packslip.sigstore.json
 packslip verify packslip.sigstore.json --pin ps1_p3pqpu6mhfthsvnwyk2rm3leli \
-  --artifact xcsift-v1.7.0-macos-arm64.tar.gz
+  --artifact xcsift-vX.Y.Z-macos-arm64.tar.gz
 ```
 
 ## Plugin Installation
