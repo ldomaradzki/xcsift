@@ -310,7 +310,7 @@ public struct LineParser: Sendable {
         let buffered = processLine(pending)
         pendingRecordedIssueLine = nil
 
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         let isCommentContinuation =
             trimmed.hasPrefix(XcodebuildSymbols.swiftTestingDetailsPrefix)
             || trimmed.hasPrefix(XcodebuildSymbols.swiftTestingDetailsPrefixFallback)
@@ -892,6 +892,27 @@ public struct LineParser: Sendable {
     }
 
     // MARK: - Static Regex Patterns
+
+    private nonisolated(unsafe) static let swiftTestingIssueRegex = Regex {
+        " "
+        XcodebuildSymbols.recordedIssue
+        Optionally {
+            " with "
+            OneOrMore(.digit)
+            " argument"
+            Optionally { "s" }
+            ZeroOrMore(.any)
+        }
+        " at "
+        Capture(OneOrMore(.any, .reluctant))
+        ":"
+        Capture(OneOrMore(.digit))
+        ":"
+        OneOrMore(.digit)
+        ": "
+        Capture(ZeroOrMore(.any))
+        Anchor.endOfSubject
+    }
 
     private nonisolated(unsafe) static let parallelTestSchedulingRegex = Regex {
         "["
@@ -1820,18 +1841,15 @@ public struct LineParser: Sendable {
                 ) {
                     let afterName = line[nameEnd...]
 
-                    if let issueAt = afterName.range(of: " recorded an issue at ") {
-                        let afterIssue = String(line[issueAt.upperBound...])
-                        let parts = afterIssue.split(
-                            separator: ":",
-                            maxSplits: 3,
-                            omittingEmptySubsequences: false
+                    if let issue = afterName.firstMatch(of: Self.swiftTestingIssueRegex),
+                        let lineNum = Int(issue.2)
+                    {
+                        return FailedTest(
+                            test: testName,
+                            message: issue.3.trimmingCharacters(in: .whitespacesAndNewlines),
+                            file: String(withoutIndentation(issue.1)),
+                            line: lineNum
                         )
-                        if parts.count >= 4, let lineNum = Int(parts[1]) {
-                            let file = String(withoutIndentation(parts[0]))
-                            let message = String(parts[3]).trimmingCharacters(in: .whitespaces)
-                            return FailedTest(test: testName, message: message, file: file, line: lineNum)
-                        }
                     }
 
                     if let failedAfter = afterName.range(of: " failed after ") {
@@ -1886,6 +1904,11 @@ public struct LineParser: Sendable {
             if let quoteEnd = line[nameStart...].firstIndex(of: "\"") {
                 return (String(line[nameStart ..< quoteEnd]), line.index(after: quoteEnd))
             }
+        }
+
+        if let nameEnd = afterTest.range(of: XcodebuildSymbols.swiftTestingFunctionNameSuffix) {
+            let endIndex = afterTest.index(after: nameEnd.lowerBound)
+            return (String(afterTest[..<endIndex]), endIndex)
         }
 
         let endMarkers = [" recorded", " failed", " passed", " started"]
