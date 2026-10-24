@@ -54,6 +54,9 @@ enum XcodebuildSymbols {
     static let swiftTestingAliasPrefix = " (aka '"
     static let swiftTestingAliasSuffix = "')"
     static let swiftTestingFunctionNameSuffix = ") "
+    static let swiftTestingArgumentsPrefix = " with "
+    static let swiftTestingArgument = " argument"
+    static let swiftTestingSourceLocationPrefix = " at "
     static let emojiError = "❌"
     // U+100135 (macOS PUA) / U+21B3 (Linux) — carries #expect custom comment on the line after recorded-issue
     static let swiftTestingDetailsPrefix = "􀄵"

@@ -46,9 +46,11 @@ let package = Package(
                 .product(name: "ToonFormat", package: "toon-swift"),
             ],
             path: "Tests/XCSiftCoreTests",
+            exclude: ["Fixtures/SwiftTestingFailedOutputTestFixtures.swift"],
             resources: [
                 .copy("Fixtures/build.txt"),
                 .copy("Fixtures/swift-testing-output.txt"),
+                .copy("Fixtures/swift-testing-failed-output.txt"),
                 .copy("Fixtures/linker-error-output.txt"),
                 .copy("Fixtures/xcode-console-test-run.txt"),
                 .copy("Fixtures/xcode-test-results-summary.txt"),
