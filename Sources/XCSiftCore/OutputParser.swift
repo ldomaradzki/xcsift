@@ -297,7 +297,7 @@ public struct StreamingOutputParser {
             summary: summary,
             errors: finalErrors,
             warnings: finalWarnings,
-            failedTests: state.failedTests,
+            failedTests: state.failedTests.map(\.withArgumentsInMessage),
             linkerErrors: state.linkerErrors,
             coverage: coverage,
             slowTests: slowTests,
@@ -381,16 +381,24 @@ public struct StreamingOutputParser {
                     let mergedLine = t.line ?? existing.line
                     let mergedMessage = t.file != nil ? t.message : existing.message
                     let mergedDuration = t.duration ?? existing.duration
-                    if mergedFile != existing.file || mergedLine != existing.line
-                        || mergedDuration != existing.duration
-                    {
-                        state.failedTests[index] = FailedTest(
+                    let movedLocation = mergedFile != existing.file || mergedLine != existing.line
+                    // Each failing case of a parameterized test reports an issue of its own. Cases that
+                    // fail at the same place add their arguments; an issue elsewhere replaces them.
+                    let mergedArguments =
+                        movedLocation
+                        ? t.arguments : existing.arguments + t.arguments.filter { !existing.arguments.contains($0) }
+                    if movedLocation || mergedDuration != existing.duration {
+                        var merged = FailedTest(
                             test: existing.test,
                             message: mergedMessage,
                             file: mergedFile,
                             line: mergedLine,
                             duration: mergedDuration
                         )
+                        merged.arguments = mergedArguments
+                        state.failedTests[index] = merged
+                    } else if mergedArguments != existing.arguments {
+                        state.failedTests[index].arguments = mergedArguments
                     }
                 }
             }

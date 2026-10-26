@@ -57,6 +57,11 @@ enum XcodebuildSymbols {
     static let swiftTestingArgumentsPrefix = " with "
     static let swiftTestingArgument = " argument"
     static let swiftTestingSourceLocationPrefix = " at "
+    // `◇ Test case passing 1 argument n → 1 to allPass(n:) started.` — one case of a parameterized test
+    static let swiftTestingCasePrefix = "case passing "
+    static let swiftTestingExpectationFailed = "Expectation failed"
+    // `↳ a == b → false` — the expansion of a failed expectation's expression, after its comments
+    static let swiftTestingExpansionArrow = " → "
     static let emojiError = "❌"
     // U+100135 (macOS PUA) / U+21B3 (Linux) — carries #expect custom comment on the line after recorded-issue
     static let swiftTestingDetailsPrefix = "􀄵"

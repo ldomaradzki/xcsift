@@ -123,6 +123,8 @@ public struct LineParser: Sendable {
     // Run summaries include skipped tests. Deduplicate their lines within each run, not across
     // completed runs whose totals are accumulated by StreamingOutputParser.
     private var seenSwiftTestingSkippedTests: Set<String> = []
+    // A failed run summary counts issues, not tests, so the run's failed tests are kept apart.
+    private var swiftTestingFailedTestsInRun: Set<String> = []
     private var startedSwiftTestingTests: Set<String> = []
     private var lastCompletedXCTestSuiteKey: String?
 
@@ -311,22 +313,28 @@ public struct LineParser: Sendable {
         pendingRecordedIssueLine = nil
 
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        let isCommentContinuation =
+        let isDetail =
             trimmed.hasPrefix(XcodebuildSymbols.swiftTestingDetailsPrefix)
             || trimmed.hasPrefix(XcodebuildSymbols.swiftTestingDetailsPrefixFallback)
-        if isCommentContinuation {
-            if let event = buffered, case .testFailed(let failed) = event {
+        if isDetail {
+            // An expectation's comments come first, then the expansion of its expression
+            // (`a == b → false`). The message already states the expression, so only a comment joins it.
+            if let event = buffered, case .testFailed(let failed) = event,
+                !(failed.message.hasPrefix(XcodebuildSymbols.swiftTestingExpectationFailed)
+                    && trimmed.contains(XcodebuildSymbols.swiftTestingExpansionArrow))
+            {
                 didMergeCurrentLine = true
                 let comment = String(
                     trimmed.drop(while: { $0 != " " }).drop(while: { $0 == " " })
                 )
-                let amended = FailedTest(
+                var amended = FailedTest(
                     test: failed.test,
                     message: comment.isEmpty ? failed.message : failed.message + ": " + comment,
                     file: failed.file,
                     line: failed.line,
                     duration: failed.duration
                 )
+                amended.arguments = failed.arguments
                 return .consumed(.testFailed(amended))
             }
             if buffered == nil { droppedDeadBufferedLine = true }
@@ -865,6 +873,7 @@ public struct LineParser: Sendable {
             if let event = parseBuildAndTestTime(line) {
                 if case .swiftTestingCompleted = event {
                     seenSwiftTestingSkippedTests.removeAll(keepingCapacity: true)
+                    swiftTestingFailedTestsInRun.removeAll(keepingCapacity: true)
                 }
                 return event
             }
@@ -900,7 +909,9 @@ public struct LineParser: Sendable {
             XcodebuildSymbols.swiftTestingArgumentsPrefix
             OneOrMore(.digit)
             XcodebuildSymbols.swiftTestingArgument
-            ZeroOrMore(.any)
+            Optionally { "s" }
+            " "
+            Capture(OneOrMore(.any))
         }
         XcodebuildSymbols.swiftTestingSourceLocationPrefix
         // The message can quote another location (`… at config.yml:3:14: …`), and the arguments
@@ -1142,6 +1153,11 @@ public struct LineParser: Sendable {
                 line.startIndex,
                 offsetBy: XcodebuildSymbols.swiftTestingStartedPrefix.count
             )
+            // One case of a parameterized test. Its test started on a line of its own and ends on
+            // one, which clears it; a case never ends on a line, so tracking it left a phantom crash.
+            if line[afterPrefix...].hasPrefix(XcodebuildSymbols.swiftTestingCasePrefix) {
+                return nil
+            }
             if let result = extractSwiftTestingName(from: line, after: afterPrefix) {
                 let afterName = line[result.endIndex...]
                 if afterName.hasPrefix(" started") {
@@ -1745,6 +1761,7 @@ public struct LineParser: Sendable {
             swiftTestingPassedCases += report.cases
         case .failed:
             if lastStartedTestName == report.name { lastStartedTestName = nil }
+            swiftTestingFailedTestsInRun.insert(report.name)
             guard seenSwiftTestingOutcomes.insert(report.name).inserted else { return report.outcome }
             swiftTestingFailedCases += report.cases
         case .skipped:
@@ -1846,14 +1863,16 @@ public struct LineParser: Sendable {
                     let afterName = line[nameEnd...]
 
                     if let issue = afterName.firstMatch(of: Self.swiftTestingIssueRegex),
-                        let lineNum = Int(issue.2)
+                        let lineNum = Int(issue.3)
                     {
-                        return FailedTest(
+                        var failure = FailedTest(
                             test: testName,
-                            message: issue.3.trimmingCharacters(in: .whitespacesAndNewlines),
-                            file: String(withoutIndentation(issue.1)),
+                            message: issue.4.trimmingCharacters(in: .whitespacesAndNewlines),
+                            file: String(withoutIndentation(issue.2)),
                             line: lineNum
                         )
+                        if let arguments = issue.1 { failure.arguments = [String(arguments)] }
+                        return failure
                     }
 
                     if let failedAfter = afterName.range(of: " failed after ") {
@@ -2113,8 +2132,14 @@ public struct LineParser: Sendable {
                     ?? 0
             }
 
-            let clampedIssueCount = min(issueCount, totalCount)
-            return .swiftTestingCompleted(executed: totalCount, failed: clampedIssueCount, duration: duration)
+            // `with Y issues` counts issues, and one test can record several. The tests this run
+            // reported as failed are the count; the issues stand in only when no test line came.
+            let failedCount = swiftTestingFailedTestsInRun.isEmpty ? issueCount : swiftTestingFailedTestsInRun.count
+            return .swiftTestingCompleted(
+                executed: totalCount,
+                failed: min(failedCount, totalCount),
+                duration: duration
+            )
         }
 
         // Swift Testing passed summary: "Test run with N tests in N suites passed after X seconds."
