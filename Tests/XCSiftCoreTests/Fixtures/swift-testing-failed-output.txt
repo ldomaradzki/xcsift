@@ -1,0 +1,66 @@
+◇ Test run started.
+↳ Testing Library Version: 6.4 (efd8d65801f569d)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite FailureFixtures started.
+◇ Test expectationFailure() started.
+✘ Test expectationFailure() recorded an issue at SwiftTestingFailedOutputTestFixtures.swift:15:9: Expectation failed: actual == 2
+↳ Values should match
+↳ actual == 2 → false
+↳   actual → 1
+✘ Test expectationFailure() failed after 0.001 seconds with 1 issue.
+◇ Test requirementFailure() started.
+✘ Test requirementFailure() recorded an issue at SwiftTestingFailedOutputTestFixtures.swift:20:17: Expectation failed: value
+↳ A value is required
+↳ value → nil
+✘ Test requirementFailure() failed after 0.001 seconds with 1 issue.
+◇ Test thrownError() started.
+✘ Test thrownError() recorded an issue at SwiftTestingFailedOutputTestFixtures.swift:23:6: Caught error: .invalid
+✘ Test thrownError() failed after 0.001 seconds with 1 issue.
+◇ Test explicitIssue() started.
+✘ Test explicitIssue() recorded an issue at SwiftTestingFailedOutputTestFixtures.swift:28:21: Issue recorded
+↳ An explicit failure
+✘ Test explicitIssue() failed after 0.001 seconds with 1 issue.
+◇ Test missingExpectedError() started.
+✘ Test missingExpectedError() recorded an issue at SwiftTestingFailedOutputTestFixtures.swift:32:9: Expectation failed: an error was expected but none was thrown
+↳ FixtureError.self → <not evaluated>
+↳   FixtureError → <not evaluated>
+↳   self → <not evaluated>
+✘ Test missingExpectedError() failed after 0.001 seconds with 1 issue.
+◇ Test unexpectedError() started.
+✘ Test unexpectedError() recorded an issue at SwiftTestingFailedOutputTestFixtures.swift:36:9: Expectation failed: an error was thrown when none was expected: ".invalid" of type FixtureError
+↳ Never.self → <not evaluated>
+↳   Never → <not evaluated>
+↳   self → <not evaluated>
+✘ Test unexpectedError() failed after 0.001 seconds with 1 issue.
+◇ Test parameterizedFailure(value:) started.
+◇ Test case passing 1 argument value → "invalid" to parameterizedFailure(value:) started.
+✘ Test parameterizedFailure(value:) recorded an issue with 1 argument value → "invalid" at SwiftTestingFailedOutputTestFixtures.swift:41:9: Expectation failed: value == "valid"
+↳ The argument must be valid
+↳ value == "valid" → false
+↳   value → "invalid"
+◇ Test case passing 1 argument value → "bad: value at noon" to parameterizedFailure(value:) started.
+✘ Test parameterizedFailure(value:) recorded an issue with 1 argument value → "bad: value at noon" at SwiftTestingFailedOutputTestFixtures.swift:41:9: Expectation failed: value == "valid"
+↳ The argument must be valid
+↳ value == "valid" → false
+↳   value → "bad: value at noon"
+✘ Test parameterizedFailure(value:) with 2 test cases failed after 0.001 seconds with 2 issues.
+◇ Test "Multiple arguments" started.
+◇ Test case passing 2 arguments actual → 1, expected → 2 to "Multiple arguments" started.
+✘ Test "Multiple arguments" recorded an issue with 2 arguments actual → 1, expected → 2 at SwiftTestingFailedOutputTestFixtures.swift:46:9: Expectation failed: actual == expected
+↳ actual == expected → false
+↳   actual → 1
+↳   expected → 2
+✘ Test "Multiple arguments" with 1 test case failed after 0.001 seconds with 1 issue.
+◇ Test multipleIssues() started.
+✘ Test multipleIssues() recorded an issue at SwiftTestingFailedOutputTestFixtures.swift:50:9: Expectation failed: Bool(false)
+↳ Bool(false) → false
+↳   false → ()
+✘ Test multipleIssues() recorded an issue at SwiftTestingFailedOutputTestFixtures.swift:51:21: Issue recorded
+↳ A second issue in the same test
+✘ Test multipleIssues() failed after 0.001 seconds with 2 issues.
+◇ Test missingKnownIssue() started.
+✘ Test missingKnownIssue() recorded an issue at SwiftTestingFailedOutputTestFixtures.swift:55:23: Known issue was not recorded
+↳ This failure no longer occurs
+✘ Test missingKnownIssue() failed after 0.001 seconds with 1 issue.
+✘ Suite FailureFixtures failed after 0.003 seconds with 12 issues.
+✘ Test run with 10 tests in 1 suite failed after 0.003 seconds with 12 issues.
