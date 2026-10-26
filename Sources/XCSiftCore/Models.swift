@@ -410,6 +410,10 @@ public struct FailedTest: Codable, Sendable {
     // Internal only - used for GitHub Actions format, not encoded to JSON/TOON
     public var column: Int? = nil
 
+    // Internal only - the arguments of each failing case of a parameterized Swift Testing test
+    // (`value → "invalid"`). Cases add up while the failures merge; the result's message carries them.
+    var arguments: [String] = []
+
     public enum CodingKeys: String, CodingKey {
         case test, message, file, line, duration
     }
@@ -421,6 +425,20 @@ public struct FailedTest: Codable, Sendable {
         self.line = line
         self.duration = duration
         self.column = nil
+    }
+
+    /// This failure with the failing arguments, if any, at the end of its message.
+    var withArgumentsInMessage: FailedTest {
+        guard !arguments.isEmpty else { return self }
+        var failure = FailedTest(
+            test: test,
+            message: message + " [arguments: " + arguments.joined(separator: "; ") + "]",
+            file: file,
+            line: line,
+            duration: duration
+        )
+        failure.column = column
+        return failure
     }
 }
 
