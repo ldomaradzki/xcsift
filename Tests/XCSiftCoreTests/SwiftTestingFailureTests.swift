@@ -98,6 +98,21 @@ final class SwiftTestingFailureTests: XCTestCase {
         }
     }
 
+    func testLocationQuotedInMessageDoesNotReplaceIssueLocation() throws {
+        let message = "Caught error: parse failed at config.yml:3:14: unexpected token"
+        for issue in ["recorded an issue", "recorded an issue with 1 argument n → 1"] {
+            let input = "✘ Test throwsLocated(n:) \(issue) at ParamTests.swift:20:6: \(message)"
+
+            let result = OutputParser().parse(input: input)
+
+            let failure = try XCTUnwrap(result.failedTests.first, input)
+            XCTAssertEqual(failure.test, "throwsLocated(n:)", input)
+            XCTAssertEqual(failure.file, "ParamTests.swift", input)
+            XCTAssertEqual(failure.line, 20, input)
+            XCTAssertEqual(failure.message, message, input)
+        }
+    }
+
     func testKnownParameterizedIssueIsNotAFailure() {
         let input = """
             ✔ Test validatesFixture(_:) recorded a known issue with 1 argument fixture → "invalid" at Fixtures.swift:12:5: Expectation failed

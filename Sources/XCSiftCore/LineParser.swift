@@ -900,11 +900,15 @@ public struct LineParser: Sendable {
             XcodebuildSymbols.swiftTestingArgumentsPrefix
             OneOrMore(.digit)
             XcodebuildSymbols.swiftTestingArgument
-            Optionally { "s" }
             ZeroOrMore(.any)
         }
         XcodebuildSymbols.swiftTestingSourceLocationPrefix
-        Capture(OneOrMore(.any, .reluctant))
+        // The message can quote another location (`… at config.yml:3:14: …`), and the arguments
+        // above are greedy, so only a Swift file ends the issue's own location.
+        Capture {
+            OneOrMore(.any, .reluctant)
+            ".swift"
+        }
         ":"
         Capture(OneOrMore(.digit))
         ":"
