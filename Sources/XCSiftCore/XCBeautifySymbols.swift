@@ -15,6 +15,16 @@ enum XCBeautifySymbols {
     static let measure = "◷"
     static let skipped = "⊘"
 
+    // GitHub Actions renderer (`--renderer github-actions`, which Tuist selects when `GITHUB_ACTIONS`
+    // is set) writes diagnostics as workflow commands instead of `[x]` and `[!]`:
+    // `::error file=<path>,line=<n>,col=<n>::<message>`, or `::error ::<message>` without a location.
+    static let workflowError = "::error"
+    static let workflowWarning = "::warning"
+    static let workflowMessageSeparator = "::"
+    static let workflowFileKey = "file="
+    static let workflowLineKey = ",line="
+    static let workflowColumnKey = ",col="
+
     // Terminal status line (xcbeautify rewrites `** <PHASE> SUCCEEDED **` to "<Phase> Succeeded").
     // The rewrite drops the `**` brackets, so the phase name is the only thing that separates a
     // marker from ordinary run-script output. Match the known phases, not the bare suffix.

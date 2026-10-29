@@ -41,14 +41,34 @@ final class ExitOnFailureEndToEndTests: XCTestCase {
         XCTAssertEqual(failure["message"] as? String, "\"2 tests skipped.\"")
     }
 
-    private func runXCSift(input: String) throws -> (exitCode: Int32, json: [String: Any], stderr: String) {
+    // xcbeautify writes a warning as a workflow command on GitHub Actions (issue #103).
+    func testWorkflowCommandWarningFailsWarningsAsErrors() throws {
+        let input = """
+            [Foo] Compiling Foo.swift
+            ::warning file=/repo/Sources/Foo/Foo.swift,line=10,col=5::variable 'x' was never used
+            Build Succeeded
+            """
+
+        let output = try runXCSift(input: input, arguments: ["--xcbeautify", "-W"])
+
+        XCTAssertEqual(output.exitCode, 1)
+        XCTAssertEqual(output.json["status"] as? String, "failed")
+        let error = try XCTUnwrap((output.json["errors"] as? [[String: Any]])?.first)
+        XCTAssertEqual(error["file"] as? String, "/repo/Sources/Foo/Foo.swift")
+        XCTAssertEqual(error["line"] as? Int, 10)
+    }
+
+    private func runXCSift(
+        input: String,
+        arguments: [String] = []
+    ) throws -> (exitCode: Int32, json: [String: Any], stderr: String) {
         let config = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".toml")
         try Data().write(to: config)
         defer { try? FileManager.default.removeItem(at: config) }
 
         let process = Process()
         process.executableURL = Self.executable
-        process.arguments = ["-E", "--format", "json", "--config", config.path]
+        process.arguments = ["-E", "--format", "json", "--config", config.path] + arguments
         var environment = ProcessInfo.processInfo.environment
         environment.removeValue(forKey: "GITHUB_ACTIONS")
         process.environment = environment

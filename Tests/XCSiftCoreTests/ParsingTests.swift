@@ -1155,6 +1155,105 @@ final class ParsingTests: XCTestCase {
         XCTAssertNil(result.summary.flakyTests)
     }
 
+    // MARK: - XCTExpectFailure
+
+    // Lines as `swift test` and `xcodebuild test` print them on Xcode 27.1 (issue #102).
+    func testExpectedFailureIsNotAFailure() {
+        let parser = OutputParser()
+        let input = """
+            Test Case '-[P.T testX]' started.
+            XCTExpectFailure: matcher accepted Assertion Failure at T.swift:22: XCTAssertTrue failed - card never surfaced
+            T.swift:22: Expected failure in -[P.T testX]: XCTAssertTrue failed - card never surfacedReason: (known defect)
+            Test Case '-[P.T testX]' passed (0.001 seconds).
+            ** TEST SUCCEEDED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.failedTests, 0)
+        XCTAssertEqual(result.summary.passedTests, 1)
+        XCTAssertTrue(result.failedTests.isEmpty)
+        XCTAssertTrue(result.flakyTests.isEmpty)
+        XCTAssertEqual(result.summary.errors, 0)
+    }
+
+    func testExpectedFailuresOfEveryAssertionKind() {
+        let parser = OutputParser()
+        let input = """
+            Test Case '-[PTests.T testAssertTrueExpected]' started.
+            XCTExpectFailure: matcher accepted Assertion Failure at T.swift:7: XCTAssertTrue failed - card never surfaced
+            T.swift:7: Expected failure in -[PTests.T testAssertTrueExpected]: XCTAssertTrue failed - card never surfacedReason: (known defect)
+            Test Case '-[PTests.T testAssertTrueExpected]' passed (0.103 seconds).
+            Test Case '-[PTests.T testEqualExpected]' started.
+            XCTExpectFailure: matcher accepted Assertion Failure at T.swift:20: XCTAssertEqual failed: ("42") is not equal to ("41")
+            T.swift:20: Expected failure in -[PTests.T testEqualExpected]: XCTAssertEqual failed: ("42") is not equal to ("41")Reason: (known defect)
+            Test Case '-[PTests.T testEqualExpected]' passed (0.000 seconds).
+            Test Case '-[PTests.T testFailExpected]' started.
+            XCTExpectFailure: matcher accepted Assertion Failure at T.swift:13: failed - expected
+            T.swift:13: Expected failure in -[PTests.T testFailExpected]: failed - expectedReason: (known defect)
+            Test Case '-[PTests.T testFailExpected]' passed (0.000 seconds).
+            Test Suite 'PTests.xctest' passed at 2026-10-29 00:37:30.578.
+            \t Executed 3 tests, with 0 failures (0 unexpected) in 0.050 (0.051) seconds
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.failedTests, 0)
+        XCTAssertEqual(result.summary.passedTests, 3)
+        XCTAssertTrue(result.flakyTests.isEmpty)
+    }
+
+    // A strict expectation that nothing met is a real failure, and so is an ordinary one beside it.
+    func testExpectedFailureLeavesRealFailuresReported() {
+        let parser = OutputParser()
+        let input = """
+            Test Case '-[PTests.T testAssertTrueExpected]' started.
+            XCTExpectFailure: matcher accepted Assertion Failure at T.swift:7: XCTAssertTrue failed - card never surfaced
+            T.swift:7: Expected failure in -[PTests.T testAssertTrueExpected]: XCTAssertTrue failed - card never surfacedReason: (known defect)
+            Test Case '-[PTests.T testAssertTrueExpected]' passed (0.103 seconds).
+            Test Case '-[PTests.T testRealFailure]' started.
+            /repo/Tests/PTests/T.swift:30: error: -[PTests.T testRealFailure] : XCTAssertTrue failed - really broken
+            Test Case '-[PTests.T testRealFailure]' failed (0.000 seconds).
+            Test Case '-[PTests.T testStrictNoFailure]' started.
+            XCTExpectFailure: ignoring unmatched expected failure issue
+            /repo/Tests/PTests/T.swift:25: error: -[PTests.T testStrictNoFailure] : Expected failure 'should fail but does not' but none recorded
+            Test Case '-[PTests.T testStrictNoFailure]' failed (0.000 seconds).
+            Test Suite 'PTests.xctest' failed at 2026-10-29 00:37:20.520.
+            \t Executed 3 tests, with 2 failures (1 unexpected) in 0.105 (0.105) seconds
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.failedTests, 2)
+        XCTAssertEqual(result.summary.passedTests, 1)
+        XCTAssertFalse(result.failedTests.contains { $0.test.contains("testAssertTrueExpected") })
+        XCTAssertTrue(result.failedTests.contains { $0.test.contains("testRealFailure") })
+        XCTAssertTrue(result.failedTests.contains { $0.test.contains("testStrictNoFailure") })
+        XCTAssertEqual(result.errors.map(\.line), [25])
+        XCTAssertTrue(result.flakyTests.isEmpty)
+    }
+
+    // Xcode's console transcript indents test output under the task that emitted it.
+    func testIndentedExpectedFailureIsNotAFailure() {
+        let parser = OutputParser()
+        let input = """
+            Test Case '-[P.T testX]' started.
+                XCTExpectFailure: matcher accepted Assertion Failure at T.swift:22: XCTAssertTrue failed - card never surfaced
+                T.swift:22: Expected failure in -[P.T testX]: XCTAssertTrue failed - card never surfacedReason: (known defect)
+            Test Case '-[P.T testX]' passed (0.001 seconds).
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertTrue(result.failedTests.isEmpty)
+        XCTAssertTrue(result.flakyTests.isEmpty)
+    }
+
     func testDurationInFailedTestStruct() {
         let parser = OutputParser()
         let input = """

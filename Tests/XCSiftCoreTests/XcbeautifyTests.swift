@@ -139,6 +139,36 @@ final class XcbeautifyWarningTests: XCTestCase {
         XCTAssertEqual(result.warnings[0].message, "variable 'unused' was never used")
     }
 
+    // xcbeautify's terminal renderer writes a compile warning with two spaces after the marker
+    // (issue #101).
+    func testCompileWarningWithTwoSpacesHasNoLeadingSpaceInFile() {
+        let parser = OutputParser()
+        let input = """
+            [!]  /repo/Sources/Foo/Foo.swift:10:5: variable 'x' was never used
+            ⚠️  /repo/Sources/Foo/Foo.swift:11:5: variable 'y' was never used
+            Build Succeeded
+            """
+
+        let result = parser.parse(input: input, printWarnings: true, xcbeautify: true)
+
+        XCTAssertEqual(result.warnings.map(\.file), ["/repo/Sources/Foo/Foo.swift", "/repo/Sources/Foo/Foo.swift"])
+        XCTAssertEqual(result.warnings.map(\.line), [10, 11])
+        XCTAssertEqual(result.warnings.first?.message, "variable 'x' was never used")
+    }
+
+    func testCompileWarningWithTwoSpacesKeepsPathWhenPromotedToError() {
+        let parser = OutputParser()
+        let input = """
+            [!]  /repo/Sources/Foo/Foo.swift:10:5: variable 'x' was never used
+            Build Succeeded
+            """
+
+        let result = parser.parse(input: input, warningsAsErrors: true, xcbeautify: true)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.errors.map(\.file), ["/repo/Sources/Foo/Foo.swift"])
+    }
+
     func testWarningIgnoredWithoutFlag() {
         let parser = OutputParser()
         let input = """
@@ -163,6 +193,151 @@ final class XcbeautifyWarningTests: XCTestCase {
         XCTAssertEqual(result.summary.warnings, 1)
         XCTAssertEqual(result.errors[0].message, "error message")
         XCTAssertEqual(result.warnings[0].message, "warning message")
+    }
+}
+
+// MARK: - xcbeautify GitHub Actions Renderer Tests
+
+/// xcbeautify's GitHub Actions renderer, which Tuist selects when `GITHUB_ACTIONS` is set, writes
+/// diagnostics as workflow commands (issue #103).
+final class XcbeautifyGitHubActionsTests: XCTestCase {
+
+    func testWorkflowWarningParsed() throws {
+        let parser = OutputParser()
+        let input = """
+            [Foo] Compiling Foo.swift
+            ::warning file=/repo/Sources/Foo/Foo.swift,line=10,col=5::variable 'x' was never used; consider replacing with '_' or removing it
+            Build Succeeded
+            """
+
+        let result = parser.parse(input: input, printWarnings: true, xcbeautify: true)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.warnings, 1)
+        let warning = try XCTUnwrap(result.warnings.first)
+        XCTAssertEqual(warning.file, "/repo/Sources/Foo/Foo.swift")
+        XCTAssertEqual(warning.line, 10)
+        XCTAssertEqual(warning.message, "variable 'x' was never used; consider replacing with '_' or removing it")
+    }
+
+    func testWorkflowWarningPromotedByWarningsAsErrors() {
+        let parser = OutputParser()
+        let input = """
+            ::warning file=/repo/Sources/Foo/Foo.swift,line=10,col=5::variable 'x' was never used
+            Build Succeeded
+            """
+
+        let result = parser.parse(input: input, warningsAsErrors: true, xcbeautify: true)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.errors, 1)
+        XCTAssertEqual(result.errors.map(\.file), ["/repo/Sources/Foo/Foo.swift"])
+    }
+
+    func testWorkflowErrorParsed() throws {
+        let parser = OutputParser()
+        let input = """
+            [Foo] Compiling Foo.swift
+            ::error file=/repo/Sources/Foo/Foo.swift,line=12,col=9::cannot find 'bar' in scope
+            Build Failed
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.errors, 1)
+        let error = try XCTUnwrap(result.errors.first)
+        XCTAssertEqual(error.file, "/repo/Sources/Foo/Foo.swift")
+        XCTAssertEqual(error.line, 12)
+        XCTAssertEqual(error.column, 9)
+        XCTAssertEqual(error.message, "cannot find 'bar' in scope")
+    }
+
+    func testWorkflowCommandsWithoutLocation() {
+        let parser = OutputParser()
+        let input = """
+            ::warning ::Run script build phase 'Lint' will be run during every build
+            ::error ::Testing failed
+            ::error::documented form without a space
+            """
+
+        let result = parser.parse(input: input, printWarnings: true, xcbeautify: true)
+
+        XCTAssertEqual(result.warnings.map(\.file), [nil])
+        XCTAssertEqual(result.warnings.map(\.message), ["Run script build phase 'Lint' will be run during every build"])
+        XCTAssertEqual(result.errors.map(\.message), ["Testing failed", "documented form without a space"])
+        XCTAssertEqual(result.errors.map(\.file), [nil, nil])
+    }
+
+    func testWorkflowLocationWithoutColumnOrLine() {
+        let parser = OutputParser()
+        let input = """
+            ::error file=/repo/Foo.swift,line=7::no column
+            ::error file=/repo/Bar.swift::no line
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.errors.map(\.file), ["/repo/Foo.swift", "/repo/Bar.swift"])
+        XCTAssertEqual(result.errors.map(\.line), [7, nil])
+        XCTAssertEqual(result.errors.map(\.column), [nil, nil])
+    }
+
+    // xcbeautify does not escape the path, so a comma stays part of it.
+    func testWorkflowPathWithComma() throws {
+        let parser = OutputParser()
+        let input = """
+            ::error file=/repo/A,B/Foo.swift,line=3,col=1::message
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        let error = try XCTUnwrap(result.errors.first)
+        XCTAssertEqual(error.file, "/repo/A,B/Foo.swift")
+        XCTAssertEqual(error.line, 3)
+        XCTAssertEqual(error.column, 1)
+    }
+
+    func testFailingTestMessageIsTrimmed() {
+        let parser = OutputParser()
+        let input = """
+            ::error file=/repo/Tests/FooTests.swift,line=22::    testX, XCTAssertTrue failed
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.errors.map(\.message), ["testX, XCTAssertTrue failed"])
+    }
+
+    func testOtherWorkflowCommandsIgnored() {
+        let parser = OutputParser()
+        let input = """
+            ::notice ::Skipped FooTests.testSkipped
+            ::group::Build
+            ::endgroup::
+            ::errors are not a command
+            Build Succeeded
+            """
+
+        let result = parser.parse(input: input, printWarnings: true, xcbeautify: true)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.errors, 0)
+        XCTAssertEqual(result.summary.warnings, 0)
+    }
+
+    func testWorkflowCommandsIgnoredWithoutFlag() {
+        let parser = OutputParser()
+        let input = """
+            ::warning file=/repo/Foo.swift,line=10,col=5::variable 'x' was never used
+            ** BUILD SUCCEEDED **
+            """
+
+        let result = parser.parse(input: input, printWarnings: true, xcbeautify: false)
+
+        XCTAssertEqual(result.summary.warnings, 0)
+        XCTAssertTrue(parser.didEmitXcbeautifyHint)
     }
 }
 
