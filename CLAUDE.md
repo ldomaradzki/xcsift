@@ -582,6 +582,11 @@ explicitly:
     A `✔` needs the duration and a `✖` needs a duration or a one-word test before `, `,
     so Tuist's `✔ Success` / `✖ Error` are not tests.
     An indented `[!]` is a Swift Testing issue and goes to the Swift Testing parser, not to warnings
+  - A Swift Testing result has no `Test` in xcbeautify's rendering, and XCTest's `Executed …` totals
+    do not include it. `LineParser.recordingXcbeautifySwiftTestingResult` counts a `✔`/`✖` result
+    whose name has a quote or a `()` in the Swift Testing tallies (each parameterised case counts),
+    and gives it the name the Swift Testing parser uses (`"Display name"` → `Display name`),
+    so the failure merges with its `recorded an issue` line. XCTest names have neither
   - The terminal renderer writes a compile warning with two spaces after `[!]`/`⚠️`;
     the path is trimmed
   - Parses the GitHub Actions renderer (`::error file=<path>,line=<n>,col=<n>::<message>`,
@@ -747,10 +752,11 @@ Test cases cover:
   - `MCPProxyEndToEndTests`: the built binary proxying a canned POSIX-shell MCP server, a 5 MB
     passthrough followed by an in-sync sift, launch failure, a server that never answers, and
     shutdown escalation to SIGKILL
-- **xcbeautify parsing** (49 tests in `Tests/XcbeautifyTests.swift`):
+- **xcbeautify parsing** (52 tests in `Tests/XcbeautifyTests.swift`):
   - ASCII and emoji error/warning markers (`[x]`, `❌`, `[!]`, `⚠️`)
   - GitHub Actions workflow commands (`::error`, `::warning`, with and without a location)
   - Test status markers (`✔`, `✖`): indented, Swift Testing, parallel, UI tests, and Tuist's own `✔ Success` / `✖ Error`
+  - Pass and fail counts of runs with XCTest and Swift Testing, in both renderers, and of Swift Testing alone
   - Auto-detection hint (shown/not shown/once/clean input)
   - Flag-gating (markers ignored without `--xcbeautify`)
   - Integration tests (full output, TOON format, default mode unaffected)
