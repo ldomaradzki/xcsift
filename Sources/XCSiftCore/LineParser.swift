@@ -762,7 +762,7 @@ public struct LineParser: Sendable {
 
         // xcbeautify parsing
         if shouldParseXcbeautify, let event = parseXcbeautifyLine(line) {
-            return event
+            return recordingXcbeautifySwiftTestingResult(event)
         }
 
         // Fast-path filter
@@ -1804,27 +1804,7 @@ public struct LineParser: Sendable {
         guard !remainder.hasPrefix("run with "), !remainder.lowercased().hasPrefix("case ") else {
             return nil
         }
-        let name: String
-        var tail: String
-        let isFunctionName = !remainder.hasPrefix("\"")
-        if remainder.hasPrefix("\"") {
-            let nameStart = line.index(after: testRange.upperBound)
-            guard let quoteEnd = line[nameStart...].firstIndex(of: "\"") else { return nil }
-            name = String(line[nameStart ..< quoteEnd])
-            tail = String(line[line.index(after: quoteEnd)...])
-        } else if let nameEnd = remainder.range(of: XcodebuildSymbols.swiftTestingFunctionNameSuffix) {
-            let endIndex = remainder.index(after: nameEnd.lowerBound)
-            name = String(remainder[..<endIndex])
-            tail = String(remainder[endIndex...])
-        } else {
-            return nil
-        }
-        guard !name.isEmpty else { return nil }
-
-        if tail.hasPrefix(XcodebuildSymbols.swiftTestingAliasPrefix) {
-            guard let aliasEnd = tail.range(of: XcodebuildSymbols.swiftTestingAliasSuffix) else { return nil }
-            tail = String(tail[aliasEnd.upperBound...])
-        }
+        guard let (name, tail, isFunctionName) = swiftTestingName(in: remainder) else { return nil }
 
         if tail.hasPrefix(XcodebuildSymbols.skippedKeyword + ".")
             || tail.hasPrefix(XcodebuildSymbols.skippedKeyword + ":")
@@ -1880,6 +1860,36 @@ public struct LineParser: Sendable {
         return nil
     }
 
+    /// Reads the test's name at the start of `remainder`: `"Display name"` without its quotes, or a
+    /// function name followed by a space (`roundTrip() `). The tail starts after the name and after
+    /// any `(aka 'function()')`.
+    private static func swiftTestingName(
+        in remainder: Substring
+    ) -> (name: String, tail: String, isFunctionName: Bool)? {
+        let name: String
+        var tail: Substring
+        let isFunctionName = !remainder.hasPrefix("\"")
+        if remainder.hasPrefix("\"") {
+            let nameStart = remainder.index(after: remainder.startIndex)
+            guard let quoteEnd = remainder[nameStart...].firstIndex(of: "\"") else { return nil }
+            name = String(remainder[nameStart ..< quoteEnd])
+            tail = remainder[remainder.index(after: quoteEnd)...]
+        } else if let nameEnd = remainder.range(of: XcodebuildSymbols.swiftTestingFunctionNameSuffix) {
+            let endIndex = remainder.index(after: nameEnd.lowerBound)
+            name = String(remainder[..<endIndex])
+            tail = remainder[endIndex...]
+        } else {
+            return nil
+        }
+        guard !name.isEmpty else { return nil }
+
+        if tail.hasPrefix(XcodebuildSymbols.swiftTestingAliasPrefix) {
+            guard let aliasEnd = tail.range(of: XcodebuildSymbols.swiftTestingAliasSuffix) else { return nil }
+            tail = tail[aliasEnd.upperBound...]
+        }
+        return (name, String(tail), isFunctionName)
+    }
+
     /// `with 4 test cases passed after …` → 4.
     private static func parameterisedCaseCount(in tail: String) -> Int? {
         guard let with = tail.range(of: " with "), let cases = tail.range(of: " test case") else {
@@ -1896,26 +1906,78 @@ public struct LineParser: Sendable {
 
     private mutating func tallySwiftTestingOutcome(_ line: String) -> SwiftTestingOutcome? {
         guard let report = Self.parseSwiftTestingReport(line) else { return nil }
+        tally(report)
+        return report.outcome
+    }
 
+    private mutating func tally(_ report: SwiftTestingReport) {
         switch report.outcome {
         case .started:
             startedSwiftTestingTests.insert(report.name)
         case .passed:
             if lastStartedTestName == report.name { lastStartedTestName = nil }
-            guard seenSwiftTestingOutcomes.insert(report.name).inserted else { return report.outcome }
+            guard seenSwiftTestingOutcomes.insert(report.name).inserted else { return }
             swiftTestingPassedCases += report.cases
         case .failed:
             if lastStartedTestName == report.name { lastStartedTestName = nil }
             swiftTestingFailedTestsInRun.insert(report.name)
-            guard seenSwiftTestingOutcomes.insert(report.name).inserted else { return report.outcome }
+            guard seenSwiftTestingOutcomes.insert(report.name).inserted else { return }
             swiftTestingFailedCases += report.cases
         case .skipped:
             seenSwiftTestingOutcomes.insert(report.name)
-            guard seenSwiftTestingSkippedTests.insert(report.name).inserted else { return report.outcome }
+            guard seenSwiftTestingSkippedTests.insert(report.name).inserted else { return }
             swiftTestingSkippedCases += report.cases
             if lastStartedTestName == report.name { lastStartedTestName = nil }
         }
-        return report.outcome
+    }
+
+    /// xcbeautify writes a Swift Testing result without the word `Test` (`✔ passes() (0.001 seconds)`,
+    /// `✖ "Display name" (0.001 seconds) 1 issue(s)`), so the Swift Testing parser never reads it.
+    /// Count it as that parser would, and name it as that parser names the test's issue, so the two
+    /// merge. An XCTest name has no parenthesis or quote (`testLogin`, `LoginTests.testLogin`).
+    private mutating func recordingXcbeautifySwiftTestingResult(_ event: ParseEvent) -> ParseEvent {
+        let rendered: String
+        let outcome: SwiftTestingOutcome
+        switch event {
+        case .testPassed(let name, _):
+            (rendered, outcome) = (name, .passed)
+        case .testFailed(let failure):
+            (rendered, outcome) = (failure.test, .failed)
+        default:
+            return event
+        }
+        // The function-name rule needs the space that follows the name in Swift Testing's own lines.
+        guard let (name, tail, isFunctionName) = Self.swiftTestingName(in: Substring(rendered + " ")) else {
+            return event
+        }
+
+        let cases = Self.parameterisedCaseCount(in: tail) ?? 1
+        tally(
+            SwiftTestingReport(
+                name: name,
+                outcome: outcome,
+                cases: cases,
+                duration: nil,
+                isFunctionName: isFunctionName
+            )
+        )
+
+        switch event {
+        case .testPassed(_, let duration):
+            return .testPassed(name: name, duration: duration)
+        case .testFailed(let failure):
+            return .testFailed(
+                FailedTest(
+                    test: name,
+                    message: failure.message,
+                    file: failure.file,
+                    line: failure.line,
+                    duration: failure.duration
+                )
+            )
+        default:
+            return event
+        }
     }
 
     private func parseFailedTest(_ line: String) -> FailedTest? {

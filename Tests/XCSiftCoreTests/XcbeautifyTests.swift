@@ -510,6 +510,98 @@ final class XcbeautifyTestStatusTests: XCTestCase {
     }
 }
 
+// MARK: - xcbeautify Test Counts
+
+/// XCTest's `Executed …` totals do not include Swift Testing, and xcbeautify writes a Swift Testing
+/// result without the word `Test`. Those results have to reach the Swift Testing counts.
+final class XcbeautifyTestCountTests: XCTestCase {
+
+    // A Tuist 4.214 run of both frameworks, terminal renderer. XCTest: 4 passed, 5 failed,
+    // 1 skipped. Swift Testing: 1 passed, 1 failed.
+    func testBothFrameworksTerminalRenderer() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'All tests' started at 2026-10-29 08:24:15.280.
+            Test Suite 'PTests.xctest' started at 2026-10-29 08:24:15.281.
+            Test Suite 'T' started at 2026-10-29 08:24:15.281.
+                ✔ testAssertTrueExpected (0.772 seconds)
+                ✔ testEqualExpected (0.001 seconds)
+                ✔ testFailExpected (0.001 seconds)
+                ✔ testPass (0.001 seconds)
+                ✖ testRealFailure, XCTAssertTrue failed - really broken
+                ✖ testStrictNoFailure, Expected failure 'should fail but does not' but none recorded
+            Executed 6 tests, with 2 failures (1 unexpected) in 0.776 (0.778) seconds
+            Test Suite 'U' started at 2026-10-29 08:24:16.059.
+                ⊘ testSkipped (0.001 seconds)
+                ✖ testThrows, failed: caught error: "Oops()"
+                ✖ testUnwrap, XCTUnwrap failed: expected non-nil value of type "Int"
+                ✖ testXCTFail, failed - boom
+            Executed 4 tests, with 1 test skipped and 3 failures (1 unexpected) in 0.004 (0.005) seconds
+            Test Suite 'PTests.xctest' failed at 2026-10-29 08:24:16.064.
+            Executed 10 tests, with 1 test skipped and 5 failures (2 unexpected) in 0.780 (0.783) seconds
+            Test Suite 'All tests' failed at 2026-10-29 08:24:16.064.
+            Executed 10 tests, with 1 test skipped and 5 failures (2 unexpected) in 0.780 (0.784) seconds
+            Test run started.
+            Suite ST started
+                ✔ passes() (0.001 seconds)
+                [!]  Test fails() recorded an issue at ST.swift:6:26: Expectation failed: answer() == 41
+                ✖ fails() (0.001 seconds) 1 issue(s)
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.summary.passedTests, 5)
+        XCTAssertEqual(result.summary.failedTests, 6)
+        XCTAssertEqual(result.failedTests.filter { $0.test == "fails()" }.count, 1)
+    }
+
+    // The same run with the GitHub Actions renderer. No line here reaches the Swift Testing parser.
+    func testBothFrameworksGitHubActionsRenderer() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'PTests.xctest' started at 2026-10-29 08:24:41.108.
+                ✔ testPass (0.000 seconds)
+            ::error file=/repo/Tests/PTests/T.swift,line=30::    testRealFailure, XCTAssertTrue failed - really broken
+            Test Suite 'PTests.xctest' failed at 2026-10-29 08:24:41.851.
+            Executed 2 tests, with 1 failure (1 unexpected) in 0.739 (0.743) seconds
+            Test run started.
+            Suite ST started
+            ::error ::fails() (0.001 seconds) 1 issue(s)
+                ✔ passes() (0.001 seconds)
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.summary.passedTests, 2)
+        XCTAssertEqual(result.summary.failedTests, 2)
+    }
+
+    // Each case of a parameterised test counts, and a display name loses its quotes so that the
+    // failure and its issue are one entry.
+    func testSwiftTestingOnly() throws {
+        let parser = OutputParser()
+        let input = """
+            Test run started.
+            Suite ST started
+                ✔ a() (0.001 seconds)
+                ✔ "Display name" (0.001 seconds)
+                ✔ cases(n:) with 4 test cases (0.002 seconds)
+                [!]  Test "Broken" recorded an issue at ST.swift:6:26: Expectation failed: x
+                ✖ "Broken" (0.001 seconds) 1 issue(s)
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.summary.passedTests, 6)
+        XCTAssertEqual(result.summary.failedTests, 1)
+        let failure = try XCTUnwrap(result.failedTests.first)
+        XCTAssertEqual(result.failedTests.count, 1)
+        XCTAssertEqual(failure.test, "Broken")
+        XCTAssertEqual(failure.file, "ST.swift")
+        XCTAssertEqual(failure.line, 6)
+    }
+}
+
 // MARK: - xcbeautify Auto-detection Hint Tests
 
 final class XcbeautifyAutoDetectTests: XCTestCase {
