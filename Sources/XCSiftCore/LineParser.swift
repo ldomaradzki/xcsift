@@ -624,6 +624,8 @@ public struct LineParser: Sendable {
         add(XcodebuildSymbols.swiftTestingFail, candidates: .test)
         add(XcodebuildSymbols.swiftTestingStartedPrefix, candidates: .test)
         add(XcodebuildSymbols.emojiError, candidates: [.error, .test])
+        // Not every failure message says `failed` (`Expected failure '…' but none recorded`).
+        add(XcodebuildSymbols.xctestFailureFormat, candidates: .test)
         add(XcodebuildSymbols.expectFailureLogPrefix, candidates: .expectedFailure)
         add(XcodebuildSymbols.expectedFailureMarker, candidates: .expectedFailure)
 
@@ -1234,20 +1236,20 @@ public struct LineParser: Sendable {
             )
         }
 
+        // xcbeautify indents test results. Diagnostics stay at the start of the line: an indented
+        // `[!]` is a Swift Testing issue, which the Swift Testing parser reads.
+        let result = line.drop(while: { $0 == " " })
         let passPrefix = XCBeautifySymbols.pass + " "
-        if line.hasPrefix(passPrefix) {
-            return parseXcbeautifyTestResult(
-                String(line.dropFirst(passPrefix.count)),
-                passed: true
-            )
+        if result.hasPrefix(passPrefix) {
+            guard let (name, duration) = parseXcbeautifyPassedTest(result.dropFirst(passPrefix.count)) else {
+                return nil
+            }
+            return .testPassed(name: name, duration: duration)
         }
 
         let failPrefix = XCBeautifySymbols.fail + " "
-        if line.hasPrefix(failPrefix) {
-            return parseXcbeautifyTestResult(
-                String(line.dropFirst(failPrefix.count)),
-                passed: false
-            )
+        if result.hasPrefix(failPrefix) {
+            return parseXcbeautifyFailedTest(result.dropFirst(failPrefix.count)).map { .testFailed($0) }
         }
 
         return nil
@@ -1330,8 +1332,26 @@ public struct LineParser: Sendable {
         else { return nil }
 
         let location = Self.workflowCommandLocation(command[..<separator.lowerBound].drop(while: { $0 == " " }))
-        // A failing test's message is indented, as in the terminal renderer.
-        let message = command[separator.upperBound...].trimmingCharacters(in: .whitespaces)
+        let rawMessage = command[separator.upperBound...]
+        let message = rawMessage.trimmingCharacters(in: .whitespaces)
+
+        // The renderer writes a failing test as an error too. It indents an XCTest failure as the
+        // terminal renderer does, and ends a Swift Testing failure with its issue count.
+        if isError,
+            rawMessage.hasPrefix(XCBeautifySymbols.indent) || rawMessage.hasSuffix(XCBeautifySymbols.issuesSuffix),
+            let failure = parseXcbeautifyFailedTest(Substring(message))
+        {
+            return .testFailed(
+                FailedTest(
+                    test: failure.test,
+                    message: failure.message,
+                    file: failure.file ?? location.file,
+                    line: failure.line ?? location.line,
+                    duration: failure.duration
+                )
+            )
+        }
+
         if isError {
             return .error(
                 BuildError(file: location.file, line: location.line, message: message, column: location.column)
@@ -1367,31 +1387,73 @@ public struct LineParser: Sendable {
         return (path.isEmpty ? nil : String(path), line, column)
     }
 
-    private func parseXcbeautifyTestResult(_ content: String, passed: Bool) -> ParseEvent? {
-        let keyword = passed ? " passed" : " failed"
-        guard let keywordRange = content.range(of: keyword) else { return nil }
-        let testName = String(content[content.startIndex ..< keywordRange.lowerBound])
-        if testName.isEmpty { return nil }
+    /// Reads what follows `✔ `. A pass always carries its duration, so Tuist's `✔ Success` at the
+    /// end of a command is not a test, and a raw Swift Testing line goes to the Swift Testing parser.
+    private func parseXcbeautifyPassedTest(_ content: Substring) -> (name: String, duration: Double?)? {
+        guard let (head, duration) = Self.xcbeautifyDuration(in: content) else { return nil }
+        let name = Self.xcbeautifyTestName(head, dropping: XCBeautifySymbols.passedSuffix)
+        return name.isEmpty ? nil : (name, duration)
+    }
 
-        var duration: Double?
-        let afterKeyword = String(content[keywordRange.upperBound...])
-        if let openParen = afterKeyword.firstIndex(of: "("),
-            let closeParen = afterKeyword.firstIndex(of: ")")
+    /// Reads what follows `✖ `: `<test>, <reason>` (an XCTest assertion), `<file>:<line>, <reason>`
+    /// (a UI test), or a name with a duration (Swift Testing, parallel testing). Tuist's own
+    /// `✖ Error` is none of them.
+    private func parseXcbeautifyFailedTest(_ content: Substring) -> FailedTest? {
+        if content.hasPrefix(XcodebuildSymbols.restartingAfter) { return nil }
+
+        if let (head, duration) = Self.xcbeautifyDuration(in: content) {
+            let name = Self.xcbeautifyTestName(head, dropping: XCBeautifySymbols.failedSuffix)
+            if name.isEmpty { return nil }
+            return FailedTest(test: name, message: "Test failed", file: nil, line: nil, duration: duration)
+        }
+
+        // A test's name is one word, and a reason is free text.
+        guard let separator = content.range(of: XCBeautifySymbols.reasonSeparator) else { return nil }
+        let subject = content[..<separator.lowerBound]
+        let reason = String(content[separator.upperBound...])
+        guard !subject.isEmpty, !subject.contains(" ") else { return nil }
+
+        if subject.contains("/"), let colon = subject.lastIndex(of: ":"),
+            let line = Int(subject[subject.index(after: colon)...])
         {
-            let durationStr =
-                afterKeyword[afterKeyword.index(after: openParen) ..< closeParen]
-                .trimmingCharacters(in: .whitespaces)
-                .replacingOccurrences(of: " seconds", with: "")
-            duration = Self.finiteDuration(Double(durationStr))
+            let file = String(subject[..<colon])
+            return FailedTest(test: XcodebuildSymbols.unnamedTestFailure, message: reason, file: file, line: line)
+        }
+        return FailedTest(test: String(subject), message: reason, file: nil, line: nil)
+    }
+
+    /// Splits `<head> (<t> seconds)`, and Swift Testing's `<head> (<t> seconds) <n> issue(s)`, into
+    /// the head and the duration. Returns `nil` for any other shape.
+    private static func xcbeautifyDuration(in content: Substring) -> (head: Substring, duration: Double?)? {
+        var body = content
+        if body.hasSuffix(XCBeautifySymbols.issuesSuffix) {
+            body = body.dropLast(XCBeautifySymbols.issuesSuffix.count)
+            let count = body.reversed().prefix(while: \.isNumber).count
+            guard count > 0 else { return nil }
+            body = body.dropLast(count)
+            guard body.last == " " else { return nil }
+            body = body.dropLast()
         }
 
-        if passed {
-            return .testPassed(name: testName, duration: duration)
-        } else {
-            return .testFailed(
-                FailedTest(test: testName, message: "Test failed", file: nil, line: nil, duration: duration)
-            )
+        guard body.hasSuffix(XCBeautifySymbols.durationClose),
+            let open = body.range(of: XCBeautifySymbols.durationOpen, options: .backwards),
+            let seconds = Double(body[open.upperBound...].dropLast(XCBeautifySymbols.durationClose.count))
+        else { return nil }
+        return (body[..<open.lowerBound], finiteDuration(seconds))
+    }
+
+    /// `[<Suite>] <test> on '<device>'` becomes `<Suite>.<test>`. `suffix` is the ` passed` or
+    /// ` failed` of the older `<test> passed (<t> seconds)` shape.
+    private static func xcbeautifyTestName(_ head: Substring, dropping suffix: String) -> String {
+        var name = head
+        if name.hasSuffix(suffix) { name = name.dropLast(suffix.count) }
+        if name.hasSuffix("'"), let device = name.range(of: XCBeautifySymbols.deviceInfix, options: .backwards) {
+            name = name[..<device.lowerBound]
         }
+        if name.hasPrefix(XCBeautifySymbols.suiteOpen), let close = name.range(of: XCBeautifySymbols.suiteClose) {
+            return name[name.index(after: name.startIndex) ..< close.lowerBound] + "." + name[close.upperBound...]
+        }
+        return String(name)
     }
 
     // MARK: - Error / Warning Parsing
@@ -1856,26 +1918,30 @@ public struct LineParser: Sendable {
     }
 
     private func parseFailedTest(_ line: String) -> FailedTest? {
+        if let errorRange = line.range(of: XcodebuildSymbols.xctestFailureFormat),
+            let bracketEnd = line.range(
+                of: XcodebuildSymbols.xctestFailureMessageSeparator,
+                range: errorRange.upperBound ..< line.endIndex
+            )
+        {
+            let beforeError = String(line[..<errorRange.lowerBound])
+            let testName = String(line[errorRange.upperBound ..< bracketEnd.lowerBound])
+            let message = String(line[bracketEnd.upperBound...])
+            let components = beforeError.split(separator: ":", omittingEmptySubsequences: false)
+            if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
+                let file = components[0 ..< (components.count - 1)].joined(separator: ":")
+                return FailedTest(
+                    test: testName,
+                    message: message,
+                    file: String(withoutIndentation(Substring(file))),
+                    line: lineNum
+                )
+            }
+        }
+
         if line.contains("XCTAssertEqual failed") || line.contains("XCTAssertTrue failed")
             || line.contains("XCTAssertFalse failed")
         {
-            if let errorRange = line.range(of: ": error: -["),
-                let bracketEnd = line.range(of: "] : ", range: errorRange.upperBound ..< line.endIndex)
-            {
-                let beforeError = String(line[..<errorRange.lowerBound])
-                let testName = String(line[errorRange.upperBound ..< bracketEnd.lowerBound])
-                let message = String(line[bracketEnd.upperBound...])
-                let components = beforeError.split(separator: ":", omittingEmptySubsequences: false)
-                if components.count >= 2, let lineNum = Int(components[components.count - 1]) {
-                    let file = components[0 ..< (components.count - 1)].joined(separator: ":")
-                    return FailedTest(
-                        test: testName,
-                        message: message,
-                        file: String(withoutIndentation(Substring(file))),
-                        line: lineNum
-                    )
-                }
-            }
             if let bracketStart = line.range(of: "-["),
                 let bracketEnd = line.range(of: "]", range: bracketStart.upperBound ..< line.endIndex)
             {
