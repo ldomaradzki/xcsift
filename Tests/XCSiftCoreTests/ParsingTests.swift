@@ -1296,6 +1296,47 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.failedTests.map(\.file), ["/repo/Tests/PTests/T.swift"])
     }
 
+    // MARK: - XCTSkip
+
+    // XCTest counts a skipped test as executed. It did not pass.
+    func testSkippedXCTestIsNotPassed() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'PTests.xctest' started at 2026-10-29 08:24:15.281.
+            Test Case '-[P.T a]' passed (0.001 seconds).
+            Test Case '-[P.T b]' skipped (0.001 seconds).
+            Test Suite 'PTests.xctest' passed at 2026-10-29 08:24:16.064.
+            \t Executed 2 tests, with 1 test skipped and 0 failures (0 unexpected) in 0.780 (0.783) seconds
+            ** TEST SUCCEEDED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.passedTests, 1)
+        XCTAssertEqual(result.summary.failedTests, 0)
+    }
+
+    // Summaries as `xcodebuild test` prints them on Xcode 27.1: per suite, per bundle, and again
+    // for `All tests`.
+    func testSkippedXCTestsInAMixedRun() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'U' failed at 2026-10-29 08:24:16.059.
+            \t Executed 4 tests, with 1 test skipped and 3 failures (1 unexpected) in 0.004 (0.005) seconds
+            Test Suite 'PTests.xctest' failed at 2026-10-29 08:24:16.064.
+            \t Executed 10 tests, with 2 tests skipped and 5 failures (2 unexpected) in 0.780 (0.783) seconds
+            Test Suite 'All tests' failed at 2026-10-29 08:24:16.064.
+            \t Executed 10 tests, with 2 tests skipped and 5 failures (2 unexpected) in 0.780 (0.784) seconds
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.summary.failedTests, 5)
+        XCTAssertEqual(result.summary.passedTests, 3)
+    }
+
     // A compiler diagnostic has a column, and its message does not start with `-[`.
     func testCompilerErrorsStayErrors() {
         let parser = OutputParser()

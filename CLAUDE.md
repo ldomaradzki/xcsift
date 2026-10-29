@@ -519,6 +519,10 @@ explicitly:
     Both lines can carry `XCTAssertTrue failed`, so `LineParser` skips them before any parser
     (the `.expectedFailure` candidate bit).
     An unmet strict expectation (`error: … : Expected failure '…' but none recorded`) is a real failure
+  - **`XCTSkip`**: XCTest counts a skipped test as executed
+    (`Executed 10 tests, with 1 test skipped and 5 failures`).
+    `LineParser` subtracts the skipped tests from the executed count of `.testSuiteCompleted`,
+    so they are not counted as passed
   - **Swift Testing console symbols**: SF Symbols from Private Use Area (macOS) with Unicode fallbacks (Linux)
     - `details` line: `􀄵` U+100135 (macOS) / `↳` U+21B3 (Linux) — carries `#expect` custom comments
     - `fail` line: `􀢄` U+100884 (macOS) / `✘` U+2718 (Linux)

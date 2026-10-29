@@ -35,6 +35,7 @@ public enum ParseEvent: Codable, Sendable {
 
     // Test run summaries
     /// An XCTest bundle completed; carries executed/failed totals and duration for that bundle.
+    /// `executed` leaves out the tests the bundle skipped, which XCTest counts as executed.
     case testSuiteCompleted(suiteName: String, executed: Int, failed: Int, duration: Double)
     /// A Swift Testing run completed; carries aggregate totals across all suites.
     case swiftTestingCompleted(executed: Int, failed: Int, duration: Double)
@@ -2158,8 +2159,17 @@ public struct LineParser: Sendable {
                 executedCount = total
             }
 
-            var failureCount: Int = 0
+            // XCTest counts a skipped test as executed (`Executed 10 tests, with 1 test skipped and
+            // 5 failures`). It neither passed nor failed, so it is not in the count.
             let afterWith = String(trimmedLine[withRange.upperBound...])
+            if let skippedRange = afterWith.range(of: XcodebuildSymbols.skippedKeyword) {
+                let words = afterWith[..<skippedRange.lowerBound].split(separator: " ")
+                if words.count >= 2, let skipped = Int(words[words.count - 2]), let executed = executedCount {
+                    executedCount = max(executed - skipped, 0)
+                }
+            }
+
+            var failureCount: Int = 0
             if let failureRange = afterWith.range(of: " failure") {
                 let beforeFailure = afterWith[..<failureRange.lowerBound]
                 if let lastWord = beforeFailure.split(separator: " ").last,
