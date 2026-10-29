@@ -1232,9 +1232,124 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(result.summary.passedTests, 1)
         XCTAssertFalse(result.failedTests.contains { $0.test.contains("testAssertTrueExpected") })
         XCTAssertTrue(result.failedTests.contains { $0.test.contains("testRealFailure") })
-        XCTAssertTrue(result.failedTests.contains { $0.test.contains("testStrictNoFailure") })
-        XCTAssertEqual(result.errors.map(\.line), [25])
+        let strict = result.failedTests.first { $0.test.contains("testStrictNoFailure") }
+        XCTAssertEqual(strict?.line, 25)
+        XCTAssertEqual(strict?.message, "Expected failure 'should fail but does not' but none recorded")
+        XCTAssertTrue(result.errors.isEmpty)
         XCTAssertTrue(result.flakyTests.isEmpty)
+    }
+
+    // MARK: - XCTest failures without an XCTAssert keyword
+
+    // Lines as `xcodebuild test` prints them on Xcode 27.1. Each failure used to be an error plus a
+    // test named `-[PTests.U testXCTFail]` with no message.
+    func testEveryXCTestFailureIsAFailedTest() {
+        let parser = OutputParser()
+        let input = """
+            Test Case '-[PTests.U testThrows]' started.
+            /repo/Tests/PTests/T.swift:50: error: -[PTests.U testThrows] : failed: caught error: "Oops()"
+            Test Case '-[PTests.U testThrows]' failed (0.001 seconds).
+            Test Case '-[PTests.U testUnwrap]' started.
+            /repo/Tests/PTests/T.swift:45: error: -[PTests.U testUnwrap] : XCTUnwrap failed: expected non-nil value of type "Int"
+            Test Case '-[PTests.U testUnwrap]' failed (0.001 seconds).
+            Test Case '-[PTests.U testXCTFail]' started.
+            /repo/Tests/PTests/T.swift:40: error: -[PTests.U testXCTFail] : failed - boom
+            Test Case '-[PTests.U testXCTFail]' failed (0.002 seconds).
+            Test Suite 'PTests.xctest' failed at 2026-10-29 08:24:16.064.
+            \t Executed 3 tests, with 3 failures (1 unexpected) in 0.004 (0.005) seconds
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertTrue(result.errors.isEmpty)
+        XCTAssertEqual(result.summary.failedTests, 3)
+        XCTAssertEqual(
+            result.failedTests.map(\.test),
+            ["PTests.U testThrows", "PTests.U testUnwrap", "PTests.U testXCTFail"]
+        )
+        XCTAssertEqual(
+            result.failedTests.map(\.message),
+            [
+                "failed: caught error: \"Oops()\"", "XCTUnwrap failed: expected non-nil value of type \"Int\"",
+                "failed - boom",
+            ]
+        )
+        XCTAssertEqual(result.failedTests.map(\.file), Array(repeating: "/repo/Tests/PTests/T.swift", count: 3))
+        XCTAssertEqual(result.failedTests.map(\.line), [50, 45, 40])
+        XCTAssertEqual(result.failedTests.map(\.duration), [0.001, 0.001, 0.002])
+    }
+
+    // Xcode's console transcript indents the failure under its task.
+    func testIndentedXCTFailIsAFailedTest() {
+        let parser = OutputParser()
+        let input = """
+                /repo/Tests/PTests/T.swift:40: error: -[PTests.U testXCTFail] : failed - boom
+            Test Case '-[PTests.U testXCTFail]' failed (0.002 seconds).
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertTrue(result.errors.isEmpty)
+        XCTAssertEqual(result.failedTests.map(\.test), ["PTests.U testXCTFail"])
+        XCTAssertEqual(result.failedTests.map(\.file), ["/repo/Tests/PTests/T.swift"])
+    }
+
+    // MARK: - XCTSkip
+
+    // XCTest counts a skipped test as executed. It did not pass.
+    func testSkippedXCTestIsNotPassed() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'PTests.xctest' started at 2026-10-29 08:24:15.281.
+            Test Case '-[P.T a]' passed (0.001 seconds).
+            Test Case '-[P.T b]' skipped (0.001 seconds).
+            Test Suite 'PTests.xctest' passed at 2026-10-29 08:24:16.064.
+            \t Executed 2 tests, with 1 test skipped and 0 failures (0 unexpected) in 0.780 (0.783) seconds
+            ** TEST SUCCEEDED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.status, "success")
+        XCTAssertEqual(result.summary.passedTests, 1)
+        XCTAssertEqual(result.summary.failedTests, 0)
+    }
+
+    // Summaries as `xcodebuild test` prints them on Xcode 27.1: per suite, per bundle, and again
+    // for `All tests`.
+    func testSkippedXCTestsInAMixedRun() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'U' failed at 2026-10-29 08:24:16.059.
+            \t Executed 4 tests, with 1 test skipped and 3 failures (1 unexpected) in 0.004 (0.005) seconds
+            Test Suite 'PTests.xctest' failed at 2026-10-29 08:24:16.064.
+            \t Executed 10 tests, with 2 tests skipped and 5 failures (2 unexpected) in 0.780 (0.783) seconds
+            Test Suite 'All tests' failed at 2026-10-29 08:24:16.064.
+            \t Executed 10 tests, with 2 tests skipped and 5 failures (2 unexpected) in 0.780 (0.784) seconds
+            ** TEST FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.summary.failedTests, 5)
+        XCTAssertEqual(result.summary.passedTests, 3)
+    }
+
+    // A compiler diagnostic has a column, and its message does not start with `-[`.
+    func testCompilerErrorsStayErrors() {
+        let parser = OutputParser()
+        let input = """
+            /repo/Sources/Foo.m:12:3: error: no visible @interface for 'Foo' declares the selector 'bar'
+            /repo/Sources/Foo.swift:3:5: error: cannot find 'x' in scope
+            ** BUILD FAILED **
+            """
+
+        let result = parser.parse(input: input)
+
+        XCTAssertEqual(result.errors.map(\.line), [12, 3])
+        XCTAssertTrue(result.failedTests.isEmpty)
     }
 
     // Xcode's console transcript indents test output under the task that emitted it.

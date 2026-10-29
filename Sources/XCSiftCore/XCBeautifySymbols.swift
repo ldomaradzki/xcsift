@@ -15,6 +15,22 @@ enum XCBeautifySymbols {
     static let measure = "◷"
     static let skipped = "⊘"
 
+    // Test result lines of the terminal renderer, each indented by `indent`:
+    // `✔ <test> (<t> seconds)`, `✖ <test>, <reason>`, `✖ <test> (<t> seconds) <n> issue(s)`
+    // (Swift Testing), and `✔ [<Suite>] <test> on '<device>' (<t> seconds)` (parallel testing).
+    // The GitHub Actions renderer indents a failing XCTest test's message the same way.
+    static let indent = "    "
+    static let reasonSeparator = ", "
+    static let durationOpen = " ("
+    static let durationClose = " seconds)"
+    static let issuesSuffix = " issue(s)"
+    static let suiteOpen = "["
+    static let suiteClose = "] "
+    static let deviceInfix = " on '"
+    // Earlier xcsift fixtures write `✔ <test> passed (<t> seconds)`.
+    static let passedSuffix = " passed"
+    static let failedSuffix = " failed"
+
     // GitHub Actions renderer (`--renderer github-actions`, which Tuist selects when `GITHUB_ACTIONS`
     // is set) writes diagnostics as workflow commands instead of `[x]` and `[!]`:
     // `::error file=<path>,line=<n>,col=<n>::<message>`, or `::error ::<message>` without a location.

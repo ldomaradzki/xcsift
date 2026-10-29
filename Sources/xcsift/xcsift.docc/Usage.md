@@ -224,6 +224,12 @@ When enabled, xcsift recognizes these xcbeautify markers:
 - `✔` — passed tests
 - `✖` — failed tests
 
+xcbeautify indents a test result and writes the duration after the name:
+`✔ testLogin (0.123 seconds)`, `✖ testLogin, XCTAssertTrue failed`,
+`✖ fails() (0.001 seconds) 1 issue(s)` for Swift Testing,
+and `✔ [LoginTests] testLogin on 'iPhone 17' (0.123 seconds)` for parallel testing.
+A `✔` line without a duration is not a test, so Tuist's `✔ Success` does not count.
+
 xcsift also reads the workflow commands of xcbeautify's GitHub Actions renderer.
 Tuist selects this renderer when `GITHUB_ACTIONS` is set,
 and `xcbeautify --renderer github-actions` selects it explicitly:
@@ -232,7 +238,10 @@ and `xcbeautify --renderer github-actions` selects it explicitly:
 
 The location is optional (`::error ::<message>`).
 `--warnings`, `--Werror` and `--exit-on-failure` give the same result for both renderers.
-In this renderer, a failing test is an `::error` line, so xcsift reports it under `errors`.
+This renderer writes a failing test as an `::error` line too.
+xcsift reports it under `failed_tests`:
+the renderer indents an XCTest failure (`::error file=…::    testLogin, <reason>`)
+and ends a Swift Testing failure with its issue count.
 
 **Auto-detection:** If xcsift detects xcbeautify markers without `--xcbeautify`, it prints a hint to stderr suggesting the flag.
 

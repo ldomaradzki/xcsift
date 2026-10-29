@@ -509,12 +509,20 @@ explicitly:
   with the tool's own output as the reason, when the failing task reported no error of its own
   (see "Failed build commands" under the multi-line context pattern)
 - **Test Failure Detection**: XCUnit assertion failures and general test failures
+  - **XCTest failure line**: `<file>:<line>: error: -[<Class> <test>] : <message>` is a failed test
+    whatever the message says (`XCTFail`, `XCTUnwrap`, a thrown error, an unmet expectation).
+    It is not an error, and it merges with the `Test Case '-[…]' failed` line by test name.
+    A compiler diagnostic has a column and no `-[`, so it stays an error
   - **`XCTExpectFailure`**: XCTest writes two lines for a failure it absorbed,
     `XCTExpectFailure: matcher accepted …` and `<file>:<line>: Expected failure in -[…]: …`,
     and then reports the test as passed.
     Both lines can carry `XCTAssertTrue failed`, so `LineParser` skips them before any parser
     (the `.expectedFailure` candidate bit).
     An unmet strict expectation (`error: … : Expected failure '…' but none recorded`) is a real failure
+  - **`XCTSkip`**: XCTest counts a skipped test as executed
+    (`Executed 10 tests, with 1 test skipped and 5 failures`).
+    `LineParser` subtracts the skipped tests from the executed count of `.testSuiteCompleted`,
+    so they are not counted as passed
   - **Swift Testing console symbols**: SF Symbols from Private Use Area (macOS) with Unicode fallbacks (Linux)
     - `details` line: `􀄵` U+100135 (macOS) / `↳` U+21B3 (Linux) — carries `#expect` custom comments
     - `fail` line: `􀢄` U+100884 (macOS) / `✘` U+2718 (Linux)
@@ -567,12 +575,20 @@ explicitly:
   - Tracked internally for passed tests (used for slow/flaky detection)
 - **xcbeautify Input Parsing**: Opt-in `--xcbeautify` flag for parsing xcbeautify/Tuist-formatted output
   - Parses `[x]`/`❌` as errors, `[!]`/`⚠️` as warnings, `✔` as passed, `✖` as failed
+  - Test results are indented by four spaces and carry no `passed`/`failed`:
+    `✔ <test> (<t> seconds)`, `✖ <test>, <reason>`, `✖ <file>:<line>, <reason>` (UI tests),
+    `✖ <test> (<t> seconds) <n> issue(s)` (Swift Testing),
+    `✔ [<Suite>] <test> on '<device>' (<t> seconds)` (parallel, named `<Suite>.<test>`).
+    A `✔` needs the duration and a `✖` needs a duration or a one-word test before `, `,
+    so Tuist's `✔ Success` / `✖ Error` are not tests.
+    An indented `[!]` is a Swift Testing issue and goes to the Swift Testing parser, not to warnings
   - The terminal renderer writes a compile warning with two spaces after `[!]`/`⚠️`;
     the path is trimmed
   - Parses the GitHub Actions renderer (`::error file=<path>,line=<n>,col=<n>::<message>`,
     `::warning …`, location optional), which Tuist selects when `GITHUB_ACTIONS` is set.
     The path is not escaped, so `line` and `col` are read from the end.
-    That renderer writes a failing test as `::error`, so it is reported under `errors`
+    That renderer writes a failing test as `::error` too: an indented message (XCTest, parallel)
+    or one that ends in `issue(s)` (Swift Testing) is a failed test, anything else an error
   - Auto-detection: Emits stderr hint when xcbeautify markers detected without flag
   - Testable via `parser.didEmitXcbeautifyHint` property (`private(set)`)
 
@@ -731,10 +747,10 @@ Test cases cover:
   - `MCPProxyEndToEndTests`: the built binary proxying a canned POSIX-shell MCP server, a 5 MB
     passthrough followed by an in-sync sift, launch failure, a server that never answers, and
     shutdown escalation to SIGKILL
-- **xcbeautify parsing** (42 tests in `Tests/XcbeautifyTests.swift`):
+- **xcbeautify parsing** (49 tests in `Tests/XcbeautifyTests.swift`):
   - ASCII and emoji error/warning markers (`[x]`, `❌`, `[!]`, `⚠️`)
   - GitHub Actions workflow commands (`::error`, `::warning`, with and without a location)
-  - Test status markers (`✔`, `✖`)
+  - Test status markers (`✔`, `✖`): indented, Swift Testing, parallel, UI tests, and Tuist's own `✔ Success` / `✖ Error`
   - Auto-detection hint (shown/not shown/once/clean input)
   - Flag-gating (markers ignored without `--xcbeautify`)
   - Integration tests (full output, TOON format, default mode unaffected)

@@ -298,16 +298,54 @@ final class XcbeautifyGitHubActionsTests: XCTestCase {
         XCTAssertEqual(error.column, 1)
     }
 
-    func testFailingTestMessageIsTrimmed() {
+    // Lines as Tuist 4.214 printed them with `GITHUB_ACTIONS` set.
+    func testFailingXCTestIsAFailedTest() throws {
         let parser = OutputParser()
         let input = """
-            ::error file=/repo/Tests/FooTests.swift,line=22::    testX, XCTAssertTrue failed
+            ::error file=/repo/Tests/PTests/T.swift,line=30::    testRealFailure, XCTAssertTrue failed - really broken
+            ::error file=/repo/Tests/PTests/T.swift,line=40::    testXCTFail, failed - boom
+            Executed 2 tests, with 2 failures (0 unexpected) in 0.004 (0.005) seconds
             """
 
         let result = parser.parse(input: input, xcbeautify: true)
 
         XCTAssertEqual(result.status, "failed")
-        XCTAssertEqual(result.errors.map(\.message), ["testX, XCTAssertTrue failed"])
+        XCTAssertTrue(result.errors.isEmpty)
+        XCTAssertEqual(result.failedTests.map(\.test), ["testRealFailure", "testXCTFail"])
+        XCTAssertEqual(result.failedTests.map(\.message), ["XCTAssertTrue failed - really broken", "failed - boom"])
+        XCTAssertEqual(result.failedTests.map(\.file), ["/repo/Tests/PTests/T.swift", "/repo/Tests/PTests/T.swift"])
+        XCTAssertEqual(result.failedTests.map(\.line), [30, 40])
+    }
+
+    func testFailingSwiftTestingAndParallelTestsAreFailedTests() {
+        let parser = OutputParser()
+        let input = """
+            ::error ::fails() (0.001 seconds) 1 issue(s)
+            ::error ::    testB on 'iPhone 17' (0.200 seconds)
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertTrue(result.errors.isEmpty)
+        XCTAssertEqual(result.failedTests.map(\.test), ["fails()", "testB"])
+        XCTAssertEqual(result.failedTests.map(\.duration), [0.001, 0.2])
+    }
+
+    // Only an indented message or an issue count marks a test. A compiler message keeps its commas.
+    func testOtherErrorsStayErrors() {
+        let parser = OutputParser()
+        let input = """
+            ::error file=/repo/Foo.swift,line=3,col=5::unavailable, use bar
+            ::error ::    Restarting after unexpected exit, crash, or test timeout in FooTests.testBar()
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertTrue(result.failedTests.isEmpty)
+        XCTAssertEqual(
+            result.errors.map(\.message),
+            ["unavailable, use bar", "Restarting after unexpected exit, crash, or test timeout in FooTests.testBar()"]
+        )
     }
 
     func testOtherWorkflowCommandsIgnored() {
@@ -382,6 +420,93 @@ final class XcbeautifyTestStatusTests: XCTestCase {
 
         // Without xcbeautify flag, ✔ should not be counted as xcbeautify-style test
         XCTAssertNil(result.summary.passedTests)
+    }
+
+    // The terminal renderer indents its test results and writes no `passed`/`failed`. Lines as
+    // Tuist 4.214 printed them.
+    func testIndentedXCTestResults() {
+        let parser = OutputParser()
+        let input = """
+            Test Suite 'T' started at 2026-10-29 08:24:15.281.
+                ✔ testPass (0.001 seconds)
+                ✖ testRealFailure, XCTAssertTrue failed - really broken
+                ✖ testXCTFail, failed - boom
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.status, "failed")
+        XCTAssertEqual(result.summary.passedTests, 1)
+        XCTAssertEqual(result.failedTests.map(\.test), ["testRealFailure", "testXCTFail"])
+        XCTAssertEqual(result.failedTests.map(\.message), ["XCTAssertTrue failed - really broken", "failed - boom"])
+    }
+
+    // The indented `[!]` is the issue's location, which the Swift Testing parser reads. It is not a
+    // warning.
+    func testIndentedSwiftTestingResults() throws {
+        let parser = OutputParser()
+        let input = """
+            Suite ST started
+                ✔ passes() (0.001 seconds)
+                [!]  Test fails() recorded an issue at ST.swift:6:26: Expectation failed: answer() == 41
+                ✖ fails() (0.001 seconds) 1 issue(s)
+            """
+
+        let result = parser.parse(input: input, printWarnings: true, xcbeautify: true)
+
+        XCTAssertEqual(result.summary.warnings, 0)
+        XCTAssertEqual(result.failedTests.count, 1)
+        let failure = try XCTUnwrap(result.failedTests.first)
+        XCTAssertEqual(failure.test, "fails()")
+        XCTAssertEqual(failure.file, "ST.swift")
+        XCTAssertEqual(failure.line, 6)
+        XCTAssertEqual(failure.duration, 0.001)
+    }
+
+    func testParallelTestResults() {
+        let parser = OutputParser()
+        let input = """
+                ✔ [FooTests] testA on 'iPhone 17' (0.100 seconds)
+                ✖ [FooTests] testB on 'iPhone 17' (0.200 seconds)
+                ✔ [FooTests] testC (0.300 seconds)
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertEqual(result.summary.passedTests, 2)
+        XCTAssertEqual(result.failedTests.map(\.test), ["FooTests.testB"])
+        XCTAssertEqual(result.failedTests.map(\.duration), [0.2])
+    }
+
+    func testUITestFailureKeepsItsLocation() throws {
+        let parser = OutputParser()
+        let input = """
+                ✖ /repo/UITests/LoginUITests.swift:12, Failed to tap "Login" Button
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        let failure = try XCTUnwrap(result.failedTests.first)
+        XCTAssertEqual(failure.file, "/repo/UITests/LoginUITests.swift")
+        XCTAssertEqual(failure.line, 12)
+        XCTAssertEqual(failure.message, "Failed to tap \"Login\" Button")
+    }
+
+    // Tuist ends a command with `✔ Success` or `✖ Error`, and neither is a test. A raw Swift Testing
+    // line is the Swift Testing parser's, not a test called `Test run with 1 test`.
+    func testOtherMarkedLinesAreNotTests() {
+        let parser = OutputParser()
+        let input = """
+            ✔ Test run with 1 test passed after 0.001 seconds.
+            ✔ Success
+            ✖ Error
+                ✖ Restarting after unexpected exit, crash, or test timeout in FooTests.testBar()
+            """
+
+        let result = parser.parse(input: input, xcbeautify: true)
+
+        XCTAssertTrue(result.failedTests.isEmpty)
+        XCTAssertEqual(result.summary.passedTests, 1)
     }
 }
 
