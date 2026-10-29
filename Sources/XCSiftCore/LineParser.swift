@@ -565,10 +565,12 @@ public struct LineParser: Sendable {
         /// `(in target '`: a task header, which starts a new task for failed-command tracking.
         /// Not a parser category either.
         static let taskHeader = LineCandidates(rawValue: 1 << 9)
+        /// A failure that `XCTExpectFailure` absorbed. Not a parser category: it vetoes the others.
+        static let expectedFailure = LineCandidates(rawValue: 1 << 10)
         static let parserCategories: LineCandidates = [
             .error, .warning, .test, .status, .buildInfo, .executable,
         ]
-        static let all = parserCategories.union([.jsonSyntax, .taskHeader])
+        static let all = parserCategories.union([.jsonSyntax, .taskHeader, .expectedFailure])
     }
 
     private struct UTF8Marker: Sendable {
@@ -622,6 +624,8 @@ public struct LineParser: Sendable {
         add(XcodebuildSymbols.swiftTestingFail, candidates: .test)
         add(XcodebuildSymbols.swiftTestingStartedPrefix, candidates: .test)
         add(XcodebuildSymbols.emojiError, candidates: [.error, .test])
+        add(XcodebuildSymbols.expectFailureLogPrefix, candidates: .expectedFailure)
+        add(XcodebuildSymbols.expectedFailureMarker, candidates: .expectedFailure)
 
         for marker in ["{", "[", "}", "]", "\"", "\\"] {
             add(marker, candidates: .jsonSyntax)
@@ -725,12 +729,14 @@ public struct LineParser: Sendable {
         // xcbeautify auto-detection hint
         if !shouldParseXcbeautify && !xcbeautifyHintEmitted,
             let firstByte = line.utf8.first,
-            firstByte == 0x5B || firstByte == 0xE2
+            firstByte == 0x5B || firstByte == 0xE2 || firstByte == 0x3A
         {
             if line.hasPrefix(XCBeautifySymbols.asciiError + " ")
                 || line.hasPrefix(XCBeautifySymbols.asciiWarning + " ")
                 || line.hasPrefix(XCBeautifySymbols.error + " ")
                 || line.hasPrefix(XCBeautifySymbols.warning + " ")
+                || line.hasPrefix(XCBeautifySymbols.workflowError + " ")
+                || line.hasPrefix(XCBeautifySymbols.workflowWarning + " ")
             {
                 xcbeautifyHintEmitted = true
                 didEmitXcbeautifyHint = true
@@ -792,6 +798,10 @@ public struct LineParser: Sendable {
         }
 
         if candidates.intersection(.parserCategories).isEmpty { return nil }
+
+        // XCTest reports a failure that `XCTExpectFailure` absorbed, then reports the test as
+        // passed. The absorbed assertion still reads like a failure (`XCTAssertTrue failed`).
+        if candidates.contains(.expectedFailure), isExpectedFailureReport(line) { return nil }
 
         // Suite name tracking (state only, no event emitted)
         if candidates.contains(.test), let suiteName = parseCompletedXCTestSuiteName(line) {
@@ -967,6 +977,13 @@ public struct LineParser: Sendable {
     private func isRuntimeLogNoise(_ line: String) -> Bool {
         if line.hasPrefix(XcodebuildSymbols.coreDataLogPrefix) { return true }
         return line.firstMatch(of: Self.osLogLineRegex) != nil
+    }
+
+    /// `true` for the two lines XCTest writes about a failure that `XCTExpectFailure` absorbed.
+    /// Xcode's console transcript indents them under their task.
+    private func isExpectedFailureReport(_ line: String) -> Bool {
+        withoutIndentation(Substring(line)).hasPrefix(XcodebuildSymbols.expectFailureLogPrefix)
+            || line.contains(XcodebuildSymbols.expectedFailureMarker)
     }
 
     // MARK: - Linker Parsing
@@ -1189,6 +1206,10 @@ public struct LineParser: Sendable {
     // MARK: - xcbeautify
 
     private func parseXcbeautifyLine(_ line: String) -> ParseEvent? {
+        if line.hasPrefix(XCBeautifySymbols.workflowMessageSeparator) {
+            return parseXcbeautifyWorkflowCommand(line)
+        }
+
         let errorPrefix = XCBeautifySymbols.asciiError + " "
         let emojiErrorPrefix = XCBeautifySymbols.error + " "
         if line.hasPrefix(errorPrefix) {
@@ -1235,6 +1256,9 @@ public struct LineParser: Sendable {
     private func parseXcbeautifyDiagnostic(_ content: String) -> (
         file: String?, line: Int?, column: Int?, message: String
     ) {
+        // xcbeautify writes a compile warning with two spaces after its marker (`[!]  <path>`),
+        // and every other diagnostic with one.
+        let content = String(content.drop(while: { $0 == " " }))
         let components = content.split(
             separator: ":",
             maxSplits: .max,
@@ -1283,6 +1307,64 @@ public struct LineParser: Sendable {
     private func parseXcbeautifyDiagnosticAsWarning(_ content: String) -> BuildWarning {
         let (file, line, _, message) = parseXcbeautifyDiagnostic(content)
         return BuildWarning(file: file, line: line, message: message)
+    }
+
+    /// Parses `::error …::<message>` and `::warning …::<message>` from xcbeautify's GitHub Actions
+    /// renderer. Other workflow commands (`::notice`, `::group::`) are not diagnostics.
+    private func parseXcbeautifyWorkflowCommand(_ line: String) -> ParseEvent? {
+        let isError: Bool
+        let command: Substring
+        if line.hasPrefix(XCBeautifySymbols.workflowError) {
+            isError = true
+            command = line.dropFirst(XCBeautifySymbols.workflowError.count)
+        } else if line.hasPrefix(XCBeautifySymbols.workflowWarning) {
+            isError = false
+            command = line.dropFirst(XCBeautifySymbols.workflowWarning.count)
+        } else {
+            return nil
+        }
+
+        // xcbeautify writes `::error ::…` without a location, and GitHub documents `::error::…`.
+        guard command.first == " " || command.hasPrefix(XCBeautifySymbols.workflowMessageSeparator),
+            let separator = command.range(of: XCBeautifySymbols.workflowMessageSeparator)
+        else { return nil }
+
+        let location = Self.workflowCommandLocation(command[..<separator.lowerBound].drop(while: { $0 == " " }))
+        // A failing test's message is indented, as in the terminal renderer.
+        let message = command[separator.upperBound...].trimmingCharacters(in: .whitespaces)
+        if isError {
+            return .error(
+                BuildError(file: location.file, line: location.line, message: message, column: location.column)
+            )
+        }
+        return .warning(BuildWarning(file: location.file, line: location.line, message: message))
+    }
+
+    /// Reads `file=<path>,line=<n>,col=<n>`, where `line` and `col` are optional. xcbeautify does not
+    /// escape the path, so the numbers are read from the end and a comma in the path stays in it.
+    private static func workflowCommandLocation(_ properties: Substring) -> (
+        file: String?, line: Int?, column: Int?
+    ) {
+        guard properties.hasPrefix(XCBeautifySymbols.workflowFileKey) else { return (nil, nil, nil) }
+        var path = properties.dropFirst(XCBeautifySymbols.workflowFileKey.count)
+
+        var column: Int?
+        if let key = path.range(of: XCBeautifySymbols.workflowColumnKey, options: .backwards),
+            let value = Int(path[key.upperBound...])
+        {
+            column = value
+            path = path[..<key.lowerBound]
+        }
+
+        var line: Int?
+        if let key = path.range(of: XCBeautifySymbols.workflowLineKey, options: .backwards),
+            let value = Int(path[key.upperBound...])
+        {
+            line = value
+            path = path[..<key.lowerBound]
+        }
+
+        return (path.isEmpty ? nil : String(path), line, column)
     }
 
     private func parseXcbeautifyTestResult(_ content: String, passed: Bool) -> ParseEvent? {

@@ -38,6 +38,13 @@ enum XcodebuildSymbols {
     static let testFailureRestatement = ":test failure:"
     /// Stands in for the test a failure could not be attributed to.
     static let unnamedTestFailure = "Test assertion"
+    /// XCTest's own log line about `XCTExpectFailure`, for example
+    /// `XCTExpectFailure: matcher accepted Assertion Failure at T.swift:7: XCTAssertTrue failed`.
+    static let expectFailureLogPrefix = "XCTExpectFailure: "
+    /// `<file>:<line>: Expected failure in -[<test>]: <message>`, a failure that `XCTExpectFailure`
+    /// absorbed. The test still passes. An unmet strict expectation is a real failure, and XCTest
+    /// reports it as `error: … : Expected failure '<reason>' but none recorded`.
+    static let expectedFailureMarker = ": Expected failure in "
     static let testSuitePrefix = "Test Suite '"
     static let testSuiteLowerPrefix = "Test suite '"
     static let testSuiteStartedSuffix = "' started"

@@ -224,6 +224,16 @@ When enabled, xcsift recognizes these xcbeautify markers:
 - `✔` — passed tests
 - `✖` — failed tests
 
+xcsift also reads the workflow commands of xcbeautify's GitHub Actions renderer.
+Tuist selects this renderer when `GITHUB_ACTIONS` is set,
+and `xcbeautify --renderer github-actions` selects it explicitly:
+- `::error file=<path>,line=<n>,col=<n>::<message>` — errors
+- `::warning file=<path>,line=<n>,col=<n>::<message>` — warnings
+
+The location is optional (`::error ::<message>`).
+`--warnings`, `--Werror` and `--exit-on-failure` give the same result for both renderers.
+In this renderer, a failing test is an `::error` line, so xcsift reports it under `errors`.
+
 **Auto-detection:** If xcsift detects xcbeautify markers without `--xcbeautify`, it prints a hint to stderr suggesting the flag.
 
 **Note:** Without this flag, xcbeautify-formatted lines are silently ignored. The flag can also be set in `.xcsift.toml`:
