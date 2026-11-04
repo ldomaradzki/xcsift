@@ -1745,7 +1745,8 @@ public struct LineParser: Sendable {
 
             var duration: Double?
             if let lastParen = line.range(of: "(", options: .backwards),
-                let secondsEnd = line.range(of: XcodebuildSymbols.secondsKeyword, options: .backwards)
+                let secondsEnd = line.range(of: XcodebuildSymbols.secondsKeyword, options: .backwards),
+                lastParen.upperBound <= secondsEnd.lowerBound
             {
                 duration = Self.finiteDuration(Double(String(line[lastParen.upperBound ..< secondsEnd.lowerBound])))
             }
@@ -2055,7 +2056,8 @@ public struct LineParser: Sendable {
 
             var duration: Double?
             if let lastParen = line.range(of: "(", options: .backwards),
-                let secondsEnd = line.range(of: XcodebuildSymbols.secondsKeyword, options: .backwards)
+                let secondsEnd = line.range(of: XcodebuildSymbols.secondsKeyword, options: .backwards),
+                lastParen.upperBound <= secondsEnd.lowerBound
             {
                 duration = Self.finiteDuration(Double(String(line[lastParen.upperBound ..< secondsEnd.lowerBound])))
             }
