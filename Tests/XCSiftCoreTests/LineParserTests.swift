@@ -139,6 +139,15 @@ final class LineParserTests: XCTestCase {
         XCTAssertEqual(failed.test, "-[MyModule.MyTests testFoo]")
     }
 
+    func testFailedTestWithLogGluedToTheDuration() {
+        var parser = LineParser()
+        let result = parser.feed("Test Case '-[MyModule.MyTests testFoo]' failed (0.020 seconds2026-11-06 (Fig) err")
+        guard case .consumed(let event) = result, case .testFailed(let failed) = event else {
+            return XCTFail("Expected .consumed(.testFailed), got \(result)")
+        }
+        XCTAssertNil(failed.duration)
+    }
+
     // MARK: - Passed test
 
     func testPassedTest() {
@@ -152,6 +161,15 @@ final class LineParserTests: XCTestCase {
         }
         XCTAssertEqual(name, "-[MyModule.MyTests testBar]")
         XCTAssertEqual(duration ?? 0, 0.001, accuracy: 0.0001)
+    }
+
+    func testPassedTestWithLogGluedToTheDuration() {
+        var parser = LineParser()
+        let result = parser.feed("Test Case '-[MyModule.MyTests testBar]' passed (0.020 seconds2026-11-06 (Fig) err")
+        guard case .consumed(let event) = result, case .testPassed(_, let duration) = event else {
+            return XCTFail("Expected .consumed(.testPassed), got \(result)")
+        }
+        XCTAssertNil(duration)
     }
 
     // MARK: - Test started
